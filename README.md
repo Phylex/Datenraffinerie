@@ -59,7 +59,8 @@ ROCv3-539345
 After successful execution of two `adc` calibrations with different environmental conditions there would be two folders inside the `adc` folder of the
 calibration stage as shown above. Each of these directories will contain two top-level files, one corresponding to the calibration overlay that calibrates
 the different slow control parameters of the target, named `calibration_overlay.yaml` and one that contains the state of the environment during the
-execution called `environment.yaml`
+execution called `environment.yaml`. The concept of the environment should also include settings of the Target that do not vary for an entire
+measurement, but may vary from one measurement to the next.
 
 ### Taking new data if the environment is different
 When a Stage is executed, environmental information in form of a `*.yaml` file may be passed to the Stage.
@@ -71,3 +72,39 @@ further actions are performed.
 In the example case of an `adc` calibration, when the state in the `environment.yaml` of `Target/Calibration/adc/2` matches the state passed to the task,
 the `configuration_overlay.yaml` of the directory in `Target/Calibration/adc/2` will be returned as the output of the stage to the following one.
 If there is no subsequent stage, the execution terminates.
+
+### Keeping track of quickly changing state:
+When performing the scan, the configuration parameters are changed from one 'atomic' measurement to the next. To be able to reconstruct the state of
+the Target during any of these 'atomic' measurements all parameters of the target that are changed from measurement to measurement are saved as a
+`parameters_*.yaml`. This parameters file will be linked to the corresponding data file via matching filenames. For example, the
+`parameters_tws_01.yaml` would store the parameters for the `tws_01.root` file.
+
+Using this approach, a multi dimensional scan would only create data in one directory. It would rely on the analysis software to properly associate
+and sort the information of the scan to produce the output of said analysis. The measurement tasks MUST NOT impose a directory structure in their
+respective output directory, as this would duplicate structure that is contained in the `.yaml` files.
+
+## State of the Measurement System
+Things like the firmware/software version and the default configuration of the diffrerent system components that where used to perform the measurement
+are assumed to be Identical for all Procedures in the `Target` folder. These parameters are stored in the `Defaults` directory. There is one file per
+system component. So for example the hexacontroller settings, and the ROC default configuration used for all subsequent actions is stored in this
+directory. The following is an example with a LD hexaboard as target.
+```
+HEXB-LD-539345
+├── Defaults
+│   ├── daq-server.yaml
+│   ├── daq-client.yaml
+│   ├── slow-control-server.yaml
+│   └── ld_hexaboard.yaml
+├── Calibration
+│   ├── adc
+│   │   ├── 1
+│   │   └── 2
+│   ├── pedestal
+│   └── toa-acg
+├── Measurements
+└── Analyses
+```
+
+As can be seen each of the different system components has a default configuration that is stored as part of the `Target` directory and is used as
+default for all measurements within that target directory. If the user wants to run measurements with a different default configuration then they must
+create a new target directory.
