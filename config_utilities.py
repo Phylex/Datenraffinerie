@@ -117,6 +117,19 @@ def parse_scan_config(scan_config_dict, scan_name):
         scan_parameters.append((scan_dimension['key'], scan_range))
     return (scan_parameters, pre_scan_calibration, scan_name, scan_analyses)
 
+def generate_patch_dict_from_key_tuple(keys: list, value):
+    keys.reverse()
+    patch = {}
+    patch[keys[0]] = value
+    for key in keys[1:]:
+        if isinstance(key, list):
+            patch = {key[0]: patch}
+            for subkey in key[1:]:
+                patch[subkey] = patch[key[0]]
+        else:
+            patch = {key: patch}
+    return patch
+
 
 def compile_testsuite_configuration(testsuite_config: dict):
     scan_configs = []
@@ -151,6 +164,7 @@ def test_load_config():
     assert isinstance(config, list)
     assert isinstance(config[0], dict)
 
+
 def test_config_updater():
     test_fpath = Path('./test_configurations/parse_scan_config.yaml')
     config = load_configuration(test_fpath)
@@ -160,3 +174,11 @@ def test_config_updater():
     updated_dict = update_dict(original, update)
     assert original['calibrated']
     assert updated_dict['calibrated'] is False
+
+def test_patch_generator():
+    keys = [['k1', 'k2', 'k3'], 'k4', 'k5']
+    value = 1
+    patch_dict = generate_patch_dict_from_key_tuple(keys, value)
+    assert patch_dict['k1']['k4']['k5'] == 1
+    assert patch_dict['k2']['k4']['k5'] == 1
+    assert patch_dict['k3']['k4']['k5'] == 1
