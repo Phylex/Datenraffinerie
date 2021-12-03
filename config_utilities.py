@@ -63,7 +63,7 @@ def patch_configuration(config: dict, patch: dict):
     then this is done here. Also the correct part of the cofiguration
     may be selected
     """
-    update_dict(config, patch)
+    return update_dict(config, patch)
 
 
 def parse_scan_config(scan_config_dict, scan_name):
