@@ -1,0 +1,108 @@
+roc_s0:
+  sc:
+    DigitalHalf:
+      all:
+        L1Offset: 10
+        IdleFrame: 0xCCCCCCC
+        CalibrationSC: 1
+    GlobalAnalog:
+      all:
+        Delay9: 3
+        Delay87: 3
+        Delay65: 3
+        Delay40: 2
+        range_inv: 6
+        range_tot: 4
+    ReferenceVoltage:
+      0:
+        Vbg_1v: 3
+        Refi: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Tot_vref: 700
+        Toa_vref: 400
+      1:
+        Vbg_1v: 3
+        Refi: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Tot_vref: 700
+        Toa_vref: 400
+    Top:
+      all:
+        BIAS_I_PLL_D: 63
+        EN_HIGH_CAPA: 1
+        RunL: 1
+        RunR: 1
+roc_s1:
+  sc:
+    DigitalHalf:
+      all:
+        L1Offset: 10
+        IdleFrame: 0xCCCCCCC
+        CalibrationSC: 1
+    GlobalAnalog:
+      all:
+        Delay9: 3
+        Delay87: 3
+        Delay65: 3
+        Delay40: 2
+        range_inv: 6
+        range_tot: 4
+    ReferenceVoltage:
+      0:
+        Vbg_1v: 3
+        Refi: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Tot_vref: 700
+        Toa_vref: 400
+      1:
+        Vbg_1v: 3
+        Refi: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Tot_vref: 700
+        Toa_vref: 400
+    Top:
+      all:
+        BIAS_I_PLL_D: 63
+        EN_HIGH_CAPA: 1
+        RunL: 1
+        RunR: 1
+roc_s2:
+  sc:
+    DigitalHalf:
+      all:
+        L1Offset: 10
+        IdleFrame: 0xCCCCCCC
+        CalibrationSC: 1
+    GlobalAnalog:
+      all:
+        Delay9: 3
+        Delay87: 3
+        Delay65: 3
+        Delay40: 2
+        range_inv: 6
+        range_tot: 4
+    ReferenceVoltage:
+      0:
+        Vbg_1v: 3
+        Refi: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Tot_vref: 700
+        Toa_vref: 400
+      1:
+        Vbg_1v: 3
+        Refi: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Tot_vref: 700
+        Toa_vref: 400
+    Top:
+      all:
+        BIAS_I_PLL_D: 63
+        EN_HIGH_CAPA: 1
+        RunL: 1
+        RunR: 1

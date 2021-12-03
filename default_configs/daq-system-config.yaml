@@ -1,0 +1,109 @@
+client:
+  hostname: 'localhost'
+  port: 6001
+  server_port: 8888
+  hw_type: LD
+server:
+  hostname: 'hc640256'
+  port: 6000
+  IdelayStep: '8'
+  NChips: '3'
+  NEvents: '5000'
+  Number_of_events_per_readout: '-1'
+  zmqPushPull_port: '8888'
+  delayScanData_port: '8889'
+  elinks_daq:
+    - name : 'link0'
+      polarity: 0
+      idcode: 0
+    - name : 'link1'
+      polarity: 1
+      idcode: 1
+    - name : 'link4'
+      polarity: 0
+      idcode: 4
+    - name : 'link5'
+      polarity: 1
+      idcode: 5
+    - name : 'link8'
+      polarity: 0
+      idcode: 8
+    - name : 'link9'
+      polarity: 1
+      idcode: 9
+  elinks_trg:
+    - name : 'link0'
+      polarity: 0
+      idcode: 0
+    - name : 'link1'
+      polarity: 1
+      idcode: 2
+    - name : 'link2'
+      polarity: 0
+      idcode: 3
+    - name : 'link3'
+      polarity: 1
+      idcode: 1
+    - name : 'link4'
+      polarity: 0
+      idcode: 4
+    - name : 'link5'
+      polarity: 1
+      idcode: 6
+    - name : 'link6'
+      polarity: 0
+      idcode: 7
+    - name : 'link7'
+      polarity: 1
+      idcode: 5
+    - name : 'link8'
+      polarity: 0
+      idcode: 8
+    - name : 'link9'
+      polarity: 1
+      idcode: 1
+    - name : 'link10'
+      polarity: 0
+      idcode: 11
+    - name : 'link11'
+      polarity: 1
+      idcode: 9
+  l1a_enables:
+    random_l1a         : '0x0'
+    external_l1as      : '0x0'
+    block_sequencer    : '0x0'
+  l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
+    - name : 'A'
+      enable : '0'
+      BX : '0x10'
+      length : '1'
+      flavor: 'L1A'
+      prescale : '0x0'
+      followMode : 'DISABLE'
+    - name : 'B'
+      enable : '0'
+      BX : '0x20'
+      length : '1'
+      flavor : 'L1A'
+      prescale : '0x0'
+      followMode : 'DISABLE'
+    - name : 'C'
+      enable : '0'
+      BX : '0x30'
+      length : '1'
+      flavor : 'L1A'
+      prescale : '0x0'
+      followMode : 'DISABLE'
+    - name : 'D'
+      enable : '0'
+      BX : '0x40'
+      length : '1'
+      flavor : 'L1A'
+      prescale : '0x0'
+      followMode : 'DISABLE'
+  l1a_settings:
+    bx_spacing: '0x2b'         #Minimum bx spcing between random or external triggers i.e. here : 43 BX between 2 consecutive L1A (when reading 1 BX per event)
+    external_debounce: '0x0'   #flags to indicate if external L1A should be debounced (generally a fine idea)
+    length: '0x1'              #number of consequitive L1A to send in case of external trigger; don't know yet if it will have any effect on rand L1A gen
+    ext_delay: '0x0'           #8-bit delays for each external L1A input
+    log2_rand_bx_period: '0x0'  #LOG2(random period) (bigger numbers -> slower trigger rate)
