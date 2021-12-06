@@ -1,13 +1,16 @@
-import yaml
 from pathlib import Path
+import yaml
+
 
 class ConfigPatchError(Exception):
     def __init__(self, message):
         self.message = message
 
+
 class ConfigFormatError(Exception):
     def __init__(self, message):
         self.message = message
+
 
 def load_configuration(config_path):
     """
@@ -131,6 +134,42 @@ def generate_patch_dict_from_key_tuple(keys: list, value):
     return patch
 
 
+def diff_dict(d1: dict, d2: dict) -> dict:
+    """
+    create the diff of two dictionaries.
+
+    Create a dictionary containing all the keys that differ between
+    d1 and d2 or that exist in d2 but not in d1. The value of the
+    differing key will be the value found in d2.
+
+    Example:
+        With the inputs being
+        d1 = {'a': 1, 'b': {'c': 2, 'f': 4}, 'e': 3}
+        d2 = {'a': 2, 'b': {'c': 3, 'f': 4}, 'e': 3, 'g': 4}
+
+        the resulting diff will be
+        diff = {'a': 2, 'b': {'c':3}, 'g': 4}
+
+        showing that the keys 'a' and 'b:c' are different and that the
+        value in the differing d2 is 2 for a and 3 for 'b:c' respectively.
+        As there is an entry in d2 that is not in d1 it will appear in the
+        diff, however if there is an entry in d1 that is not in d2 it will
+        not appear.
+
+    This function is intended to find the patch that where applied on d1 to
+    create d2. This may provide some motivation for the way that the function
+    handles the different dictionaries
+    """
+    diff = {}
+    for key2, value2 in d2.items():
+        if key2 not in d1.keys() or value2 != d1[key2]:
+            diff[key2] = value2
+        elif isinstance(d1[key2], dict) and isinstance(value2, dict):
+            diff[key2] = diff_dict(d1[key2], value2)
+    return diff
+
+
+# TODO finish implementation
 def compile_testsuite_configuration(testsuite_config: dict):
     scan_configs = []
     for k, v in testsuite_config.items():
@@ -142,6 +181,7 @@ def compile_testsuite_configuration(testsuite_config: dict):
                     'The configuration seems to be malformed.'
                     ' expected %s to be a dict.' % str(v))
 
+#### TESTS ####
 
 def test_parse_scan_config():
     test_fpath = Path('./test_configurations/parse_scan_config.yaml')
@@ -182,3 +222,15 @@ def test_patch_generator():
     assert patch_dict['k1']['k4']['k5'] == 1
     assert patch_dict['k2']['k4']['k5'] == 1
     assert patch_dict['k3']['k4']['k5'] == 1
+
+def test_diff_dict():
+    test_dict_1 = {'a': 1, 'b': {'c': 2, 'f': 4}, 'e': 3}
+    test_dict_2 = {'a': 2, 'b': {'c': 3, 'f': 4}, 'e': 3, 'g': 4}
+    result = diff_dict(test_dict_1, test_dict_2)
+    print(result)
+    assert result['g'] == 4
+    assert result['b']['c'] == 3
+    assert result['a'] == 2
+    result = diff_dict(test_dict_2, test_dict_1)
+    assert result['b']['c'] == 2
+    assert result['a'] == 1
