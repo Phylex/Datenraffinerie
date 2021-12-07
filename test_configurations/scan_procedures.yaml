@@ -1,8 +1,7 @@
-injection_scan:
+- name: injection_scan
+  type: scan
   calibrated: True
   calibration_procedure: 'pedestal'
-  analyses:
-    - injeciton_scan_analysis
   scan_parameters:
     - key: ['level1_key1', 'level2_key2', 'CalibDAC']
       range:
@@ -11,11 +10,10 @@ injection_scan:
         step: 4
 
 
-timewalk_scan:
+- name: timewalk_scan
+  type: scan
   calibrated: True
-  calibration_procedure: 'pedestal'
-  analyses:
-    - injeciton_scan_analysis
+  calibration_procedure: 'pedestal_calibration'
   scan_parameters:
     - key: ['level1_key1', 'level2_key2', 'injection_phase']
       range:
@@ -29,6 +27,3 @@ timewalk_scan:
         step: 5
 
 
-roc_characterisation:
-  - injecion_scan
-  - pedestal_scan

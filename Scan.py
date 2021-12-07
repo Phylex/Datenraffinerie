@@ -26,10 +26,12 @@ class Measurement(luigi.Task):
     label = luigi.Parameter()
     identifier = luigi.IntParameter()
 
-
     # configuration of the (daq) system
     daq_system = luigi.Parameter()
     daq_system_config = luigi.DictParameter()
+
+    # calibration if one is required
+    calibration = luigi.Parameter()
 
     def output(self):
         """
@@ -79,6 +81,9 @@ class Format(luigi.Task):
     daq_system = luigi.Parameter(significant=False)
     daq_system_config = luigi.DictParameter(significant=False)
 
+    # calibration if one is required
+    calibration = luigi.Parameter()
+
     def requires(self):
         """
         to be able to unpack the data we need the data and the
@@ -90,7 +95,8 @@ class Format(luigi.Task):
                            self.label,
                            self.identifier,
                            self.daq_system,
-                           self.daq_system_config)
+                           self.daq_system_config,
+                           self.calibration)
 
     def output(self):
         """
@@ -118,7 +124,7 @@ class Scan(luigi.Task):
     """
     # parameters describing the position of the parameters in the task
     # tree
-    task_id = luigi.parameter(significant=True)
+    task_id = luigi.Parameter(significant=True)
 
     # parameters describing to the type of measurement being taken
     # and the relevant information for the measurement/scan
@@ -133,6 +139,9 @@ class Scan(luigi.Task):
     target_config = luigi.DictParameter(significant=False)
     daq_system = luigi.Parameter(significant=False)
     daq_system_config = luigi.DictParameter(significant=False)
+
+    # calibration if one is required
+    calibration = luigi.Parameter()
 
     supported_formats = ['hdf5']
 
@@ -172,23 +181,25 @@ class Scan(luigi.Task):
                                            self.target_conn,
                                            subscan_target_config,
                                            self.daq_system,
-                                           self.daq_system_config))
+                                           self.daq_system_config,
+                                           self.calibration))
         # The scan has reached the one dimensional case. Spawn a measurement
         # for every value that takes part in the scan
         else:
             for i, value in enumerate(values):
                 patch = generate_patch_dict_from_key_tuple(
                         parameter, value)
-                measurement_config = patch_configuration(self.base_config,
+                measurement_config = patch_configuration(self.target_config,
                                                          patch)
                 required_tasks.append(Format(measurement_config,
-                                             self.target_conn
+                                             self.target_conn,
                                              self.output_dir,
                                              self.output_format,
                                              self.label,
-                                             self.task_id + i
+                                             self.task_id + i,
                                              self.daq_system,
-                                             self.daq_system_config))
+                                             self.daq_system_config,
+                                             self.calibration))
         return required_tasks
 
     def run(self):
@@ -198,7 +209,7 @@ class Scan(luigi.Task):
         """
         data_segments = []
         for data_file in self.input():
-            data_segments.append(pd.read_hdf(file))
+            data_segments.append(pd.read_hdf(data_file))
         merged_data = pd.concat(data_segments, ignore_index=True, axis=0)
         with self.output().open('wb') as outfile:
             merged_data.to_hdf(outfile)

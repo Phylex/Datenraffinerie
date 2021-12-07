@@ -1,0 +1,7 @@
+- name: pedestal_calibration
+  type: analysis
+  DAQ_task: pedestal_scan
+  analysis_parameters:
+    p1: 346045
+    p2: 45346
+    p3: 'string option'
