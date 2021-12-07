@@ -69,56 +69,6 @@ def patch_configuration(config: dict, patch: dict):
     return update_dict(config, patch)
 
 
-def parse_scan_config(scan_config_dict, scan_name):
-    """
-    parse the different entries of the dictionary to create
-    the configuration that can be passed to the higher_order_scan function
-
-    The function returns a tuple that can be passed to the higher-order-scan
-    """
-    # check if any calibrations need to be performed before taking data
-    pre_scan_calibration = None
-    if 'calibrated' in scan_config_dict.keys() and scan_config_dict['calibrated'] is True:
-        if 'calibration_procedure' not in scan_config_dict.keys():
-            raise ConfigFormatError("If the scan needs a calibration to"
-                                    "execute first, then the "
-                                    "'calibration_procedure' must be"
-                                    " defined.")
-        pre_scan_calibration = scan_config_dict['calibration_procedure']
-
-    # parse the analyses to be performed
-    scan_analyses = []
-    if 'analyses' in scan_config_dict.keys():
-        scan_analyses = scan_config_dict['analyses']
-
-    # parse the scan dimensions
-    scan_parameters = []
-    if 'scan_parameters' not in scan_config_dict.keys():
-        raise ConfigFormatError("There needs to be a 'scan_parameters' list"
-                f" in the scan entry {scan_name}")
-    for scan_dimension in scan_config_dict['scan_parameters']:
-        step = 1
-        start = None
-        stop = None
-        if 'range' not in scan_dimension.keys():
-            raise ConfigFormatError("A range must be specified"
-                                    " for a scan dimension")
-        for k, v in scan_dimension.items():
-            if k == 'range':
-                for l, w in v.items():
-                    if l == 'step':
-                        step = w
-                    if l == 'start':
-                        start = w
-                    if l == 'stop':
-                        stop = w
-        if start is None or stop is None:
-            raise ConfigFormatError(f"The Scan configuration {scan_name} is"
-                    " malformed. It misses either the start or stop entry for"
-                    " one of it's dimensions")
-        scan_range = list(range(start, stop, step))
-        scan_parameters.append((scan_dimension['key'], scan_range))
-    return (scan_parameters, pre_scan_calibration, scan_name, scan_analyses)
 
 def generate_patch_dict_from_key_tuple(keys: list, value):
     keys.reverse()
@@ -169,51 +119,160 @@ def diff_dict(d1: dict, d2: dict) -> dict:
     return diff
 
 
-# TODO finish implementation
-def compile_testsuite_configuration(testsuite_config: dict):
-    scan_configs = []
-    for k, v in testsuite_config.items():
-        try:
-            if 'scan_parameters' in v.keys():
-                scan_configs.append(parse_scan_config(v, k))
-        except AttributeError:
-            raise ConfigFormatError(
-                    'The configuration seems to be malformed.'
-                    ' expected %s to be a dict.' % str(v))
+def parse_scan_config(scan_config: dict) -> tuple:
+    """
+    parse the different entries of the dictionary to create
+    the configuration that can be passed to the higher_order_scan function
+
+    The function returns a tuple that contains some of the information that
+    needs to be passed to the scan task
+    """
+    daq_label = scan_config['name']
+    # check if any calibrations need to be performed before taking data
+    calibration = None
+    if 'calibration' in scan_config.keys():
+        calibration = scan_config['calibration']
+
+    # parse the scan dimensions
+    scan_parameters = []
+    if 'scan_parameters' not in scan_config.keys():
+        raise ConfigFormatError("There needs to be a 'scan_parameters' list"
+                                f" in the scan entry {daq_label}")
+    for scan_dimension in scan_config['scan_parameters']:
+        step = 1
+        start = None
+        stop = None
+        if 'range' not in scan_dimension.keys():
+            raise ConfigFormatError("A range must be specified"
+                                    " for a scan dimension")
+        for key, value in scan_dimension.items():
+            if key == 'range':
+                for subkey, subval in value.items():
+                    if subkey == 'step':
+                        step = subval
+                    if subkey == 'start':
+                        start = subval
+                    if subkey == 'stop':
+                        stop = subval
+        if start is None or stop is None:
+            raise ConfigFormatError(f"The Scan configuration {daq_label} is"
+                                    " malformed. It misses either the start"
+                                    " or stop entry for one of it's "
+                                    " dimensions")
+        scan_range = list(range(start, stop, step))
+        scan_parameters.append((scan_dimension['key'], scan_range))
+    return (scan_parameters, calibration, daq_label)
+
+
+def parse_analysis_config(analysis_config: dict) -> tuple:
+    """
+    parse the analysis configuration from a dict and return it in the
+    same way that the parse_scan_config
+
+    Returns
+        Tuple containing the parameters relevant to the analysis given
+        by the analysis_label along with the name of the daq task that
+        provides the data for the analysis
+        analysis_parameters: parameters of the analysis to be performed
+        daq: daq task required by the analysis
+        analysis_label: name of the analysis
+    """
+    analysis_label = analysis_config['name']
+    # parse the daq that is required for the analysis
+    if 'daq' not in analysis_config.keys():
+        raise ConfigFormatError("an analysis must specify a daq task")
+    daq = analysis_config['daq']
+
+    analysis_parameters = {}
+    if 'parameters' in analysis_config.keys():
+        if not isinstance(analysis_config['parameters'], dict):
+            raise ConfigFormatError("The parameters of an analysis must be"
+                                    " a dictionary")
+        analysis_parameters = analysis_config['parameters']
+    return (analysis_parameters, daq, analysis_label)
+
+
+def parse_config_entry(entry: dict):
+    """
+    take care of calling the right function for the different configuration
+    types calls the parse_scan_config and parse_analysis_config.
+    """
+    ptype = entry['type']
+    if ptype.lower() == 'daq':
+        return parse_scan_config(entry)
+    if ptype.lower() == 'analysis':
+        return parse_analysis_config(entry)
+    raise ValueError("The type of a procedure must be"
+                     " either daq or analysis")
+
+
+def parse_config_file(config_path: str):
+    path = Path(config_path)
+    if not path.exists():
+        raise ValueError("The filepath given does not exist")
+    procedures = []
+    workflows = []
+    config = load_configuration(path)
+    if isinstance(config, dict):
+        if 'libraries' in config.keys():
+            other_paths = config['libraries']
+            for path in other_paths:
+                other_procedures, other_workflows = parse_config_file(path)
+                for procedure in other_procedures:
+                    procedures.append(procedure)
+                for workflow in other_workflows:
+                    workflows.append(workflow)
+        if 'workflows' in config.keys():
+            pass
+        if 'procedures' in config.keys():
+            if isinstance(config['procedures'], list):
+                for procedure in config['procedures']:
+                    ptype = procedure['type']
+                    if ptype.lower() == 'daq':
+                        procedures.append(parse_scan_config(procedure))
+                    elif ptype.lower() == 'analysis':
+                        procedures.append(parse_analysis_config(procedure))
+                    else:
+                        raise ValueError("The type of a procedure must be"
+                                         " either daq or analysis")
+            else:
+                raise ValueError("procedures must be a list, not a dictionary")
+    elif isinstance(config, list):
+        for entry in config:
+            procedures.append(parse_config_entry(entry))
+    return procedures, workflows
+
 
 #### TESTS ####
-
 def test_parse_scan_config():
-    test_fpath = Path('./test_configurations/parse_scan_config.yaml')
+    test_fpath = Path('./test_configurations/scan_procedures.yaml')
     scan_configs = []
     with open(test_fpath, 'r') as test_file:
         test_config = yaml.safe_load(test_file.read())
         for scan in test_config:
-            for k, val in scan.items():  # this should have length one
-                scan_configs.append(parse_scan_config(val, k))
+            scan_configs.append(parse_scan_config(scan))
     assert len(scan_configs[0][0][0][0]) == 3  # number of keys
     assert len(scan_configs) == 2  # number of different scans
     assert len(scan_configs[1][0]) == 2  # number of dimensions in the second scan
     assert scan_configs[0][0][0][0][0] == 'level1_key1'
-    assert scan_configs[1][3][0] == 'injection_scan_analysis'
 
 
 def test_load_config():
-    test_fpath = Path('./test_configurations/parse_scan_config.yaml')
+    test_fpath = Path('./test_configurations/scan_procedures.yaml')
     config = load_configuration(test_fpath)
     assert isinstance(config, list)
     assert isinstance(config[0], dict)
 
 
 def test_config_updater():
-    test_fpath = Path('./test_configurations/parse_scan_config.yaml')
+    test_fpath = Path('./test_configurations/scan_procedures.yaml')
     config = load_configuration(test_fpath)
-    original = config[0]['injection_scan']
-    assert original['calibrated']
-    update = {'calibrated': False}
+    original = config[0]
+    assert 'calibration' not in original
+    update = {'calibration': 'pedestal_calibration'}
     updated_dict = update_dict(original, update)
-    assert original['calibrated']
-    assert updated_dict['calibrated'] is False
+    assert original['calibration'] == 'pedestal_calibration'
+
 
 def test_patch_generator():
     keys = [['k1', 'k2', 'k3'], 'k4', 'k5']
@@ -222,6 +281,7 @@ def test_patch_generator():
     assert patch_dict['k1']['k4']['k5'] == 1
     assert patch_dict['k2']['k4']['k5'] == 1
     assert patch_dict['k3']['k4']['k5'] == 1
+
 
 def test_diff_dict():
     test_dict_1 = {'a': 1, 'b': {'c': 2, 'f': 4}, 'e': 3}
