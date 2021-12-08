@@ -1,16 +1,44 @@
-import luigi
-from luigi import target
-import yaml
-from config_utilities import generate_patch_dict_from_key_tuple
-from config_utilities import patch_configuration
+"""
+Module containing the classes that together constitute a measurement
+and encapsulate the different steps needed to take a measurement using the
+hexaboard
+"""
 from pathlib import Path
-import os
-from time import sleep
-from control_adapter import TargetAdapter, DAQAdapter
 from functools import reduce
 import operator
 import pandas as pd
+import luigi
+import yaml
+from config_utilities import generate_patch_dict_from_key_tuple
+from config_utilities import patch_configuration
+from valve_yard import ValveYard
 
+class Configuration(luigi.Task):
+    """
+    Write the configuration file for every run this way the
+    configuration can be created without needing to run the
+    whole daq process
+    """
+    target_config = luigi.DictParameter(significant=False)
+    label = luigi.Parameter(significant=True)
+    output_dir = luigi.Parameter(significant=True)
+    identifier = luigi.IntParameter(significant=True)
+    calibration = luigi.OptionalParameter(default=None)
+    root_config_path = luigi.Parameter(significant=False)
+
+    def requires(self):
+        if self.calibration is not None:
+            return ValveYard(self.root_config_path,
+                             self.calibration)
+
+    def output(self):
+        output_path = Path(self.output_dir) / self.label +\
+            str(self.identifier) + '-config.yaml'
+        return luigi.LocalTarget(output_path)
+
+    def run(self):
+        with self.output().open('w') as conf_out:
+            yaml.dump(self.target_config, conf_out)
 
 class Measurement(luigi.Task):
     """
@@ -31,32 +59,40 @@ class Measurement(luigi.Task):
     daq_system_config = luigi.DictParameter()
 
     # calibration if one is required
-    calibration = luigi.Parameter()
+    calibration = luigi.OptionalParameter(default=None,
+                                          significant=False)
+    root_config_path = luigi.Parameter(significant=False)
+
+    def requires(self):
+        return Configuration(self.target_config,
+                             self.label,
+                             self.output_dir,
+                             self.identifier,
+                             self.calibration,
+                             self.root_config_path)
 
     def output(self):
         """
         Specify the output of this task to be the measured data along with the
         configuration of the target during the measurement
         """
-        config_path = Path(self.output_dir) / self.label +\
-            str(self.identifier) + '-config.yaml'
         data_path = Path(self.output_dir) / self.label +\
             str(self.identifier) + '-data.raw'
-        return [luigi.LocalTarget(config_path),
-                luigi.LocalTarget(data_path)]
+        return (luigi.LocalTarget(data_path), self.input())
 
     def run(self):
         """
         Perform the measurement after configuring the different parts
         of the system
         """
-        output_files = self.output()
-        config_file = output_files[0]
-        data_file = output_files[1]
+
+        # load the possibly calibrated configuration from the configuration
+        # task
+        with self.input().open('r') as config_file:
+            target_config = yaml.safe_load(config_file.read())
+        data_file = self.output()
         self.daq_system.configure(self.daq_system_config)
-        self.target_conn.configure(self.target_config)
-        with data_file.open('w') as dfile:
-            yaml.dump(self.target_config, dfile)
+        self.target_conn.configure(target_config)
         self.daq_system.acquire_measurement(data_file.path)
 
 
