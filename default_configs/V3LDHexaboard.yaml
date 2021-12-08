@@ -1,3 +1,5 @@
+hostname: hc640256.cern.ch
+port: 5555
 roc_s0:
   DigitalHalf:
     0:
