@@ -9,7 +9,7 @@ import operator
 import pandas as pd
 import luigi
 import yaml
-from config_utilities import generate_patch_dict_from_key_tuple
+from config_utilities import generate_patch
 from config_utilities import patch_configuration
 from valve_yard import ValveYard
 
@@ -204,7 +204,7 @@ class Scan(luigi.Task):
                                     [len(param[1]) for param in
                                      self.scan_parameters[1:]])
             for i, value in enumerate(values):
-                patch = generate_patch_dict_from_key_tuple(
+                patch = generate_patch(
                             parameter, value)
                 subscan_target_config = patch_configuration(self.target_config,
                                                             patch)
@@ -223,7 +223,7 @@ class Scan(luigi.Task):
         # for every value that takes part in the scan
         else:
             for i, value in enumerate(values):
-                patch = generate_patch_dict_from_key_tuple(
+                patch = generate_patch(
                         parameter, value)
                 measurement_config = patch_configuration(self.target_config,
                                                          patch)
