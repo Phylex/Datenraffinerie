@@ -79,7 +79,7 @@ def patch_configuration(config: dict, patch: dict):
     return update_dict(config, patch)
 
 
-def generate_patch_dict_from_key_tuple(keys: list, value):
+def generate_patch(keys: list, value):
     """
     the Scan task receives a list of keys and values and needs
     to generate a patch from one of the values of the list
@@ -337,13 +337,16 @@ def test_update_dict():
 
 
 def test_patch_generator():
+    """
+    test that the generate_patch_dict_from_key_tuple function
+    """
     keys = [['k1', 'k2', 'k3'], 'k4', 'k5']
     value = 1
-    patch_dict = generate_patch_dict_from_key_tuple(keys, value)
-    assert patch_dict['k1']['k4']['k5'] == 1
-    assert patch_dict['k2']['k4']['k5'] == 1
-    assert patch_dict['k3']['k4']['k5'] == 1
-
+    expected_dict = {'k1': {'k4': {'k5': 1}},
+                     'k2': {'k4': {'k5': 1}},
+                     'k3': {'k4': {'k5': 1}}}
+    patch_dict = generate_patch(keys, value)
+    assert patch_dict == expected_dict
 
 def test_diff_dict():
     test_dict_1 = {'a': 1, 'b': {'c': 2, 'f': 4}, 'e': 3}
