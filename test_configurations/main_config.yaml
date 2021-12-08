@@ -1,4 +1,9 @@
 libraries:
   - "./calibration_procedures.yaml"
   - "./scan_procedures.yaml"
-  - "./analysis_procedures.yaml
+  - "./analysis_procedures.yaml"
+
+workflows:
+  - name: production_test
+    analyses:
+    - timewalk_analysis

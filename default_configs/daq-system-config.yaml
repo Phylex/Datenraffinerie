@@ -1,14 +1,14 @@
 client:
-  hostname: 'localhost'
+  hostname: localhost
   port: 6001
   server_port: 8888
   hw_type: LD
 server:
-  hostname: 'hc640256'
+  hostname: hc640256
   port: 6000
-  IdelayStep: '8'
-  NChips: '3'
-  NEvents: '5000'
+  IdelayStep: 8
+  NChips: 3
+  NEvents: 5000
   Number_of_events_per_readout: '-1'
   zmqPushPull_port: '8888'
   delayScanData_port: '8889'

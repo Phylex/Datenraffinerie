@@ -1,5 +1,14 @@
+"""
+Module containing the utilities to parse and properly prepare the configuration
+provided by the user
+
+The functions here are testable by calling pytest config_utilities.py
+The tests can also be used as a guide on how to use the functions and
+what to expect of their behaviour
+"""
 from pathlib import Path
 import yaml
+import os
 
 
 class ConfigPatchError(Exception):
@@ -31,7 +40,7 @@ def update_dict(original: dict, update: dict, offset: bool = False):
     update: the dictionary that will either overwrite or extend the original
 
     offset: If True, the values in the update dictionary will be interpreted as
-            offsets to the values in the original dict. The resulting value will
+            offsets to the values in the original dict. The resulting value wil
             be original + update (this will be string concatenation if both the
             original and update values are strings
 
@@ -41,23 +50,24 @@ def update_dict(original: dict, update: dict, offset: bool = False):
                   do appear in the update dict overwrite/extend the values in
                   the original
     """
-    original = original.copy()
+    result = original.copy()
     for update_key in update.keys():
-        if update_key in original.keys():
-            if type(original[update_key]) is not type(update[update_key]):
+        if update_key in result.keys():
+            if type(result[update_key]) is not type(update[update_key]):
                 raise ConfigPatchError(
                         'The type of the patch does not match the '
                         'type of the original value')
-            if type(original[update_key]) is dict:
-                update_dict(original[update_key], update[update_key])
+            if isinstance(result[update_key], dict):
+                result[update_key] = update_dict(result[update_key],
+                                                 update[update_key])
             else:
                 if offset is True:
-                    original[update_key] += update[update_key]
+                    result[update_key] += update[update_key]
                 else:
-                    original[update_key] = update[update_key]
+                    result[update_key] = update[update_key]
         else:
-            original[update_key] = update[update_key]
-    return original
+            result[update_key] = update[update_key]
+    return result
 
 
 def patch_configuration(config: dict, patch: dict):
@@ -69,8 +79,12 @@ def patch_configuration(config: dict, patch: dict):
     return update_dict(config, patch)
 
 
-
 def generate_patch_dict_from_key_tuple(keys: list, value):
+    """
+    the Scan task receives a list of keys and values and needs
+    to generate a patch from one of the values of the list
+    and all the keys. This function does that
+    """
     keys.reverse()
     patch = {}
     patch[keys[0]] = value
@@ -112,33 +126,93 @@ def diff_dict(d1: dict, d2: dict) -> dict:
     """
     diff = {}
     for key2, value2 in d2.items():
-        if key2 not in d1.keys() or value2 != d1[key2]:
+        if key2 not in d1.keys():
             diff[key2] = value2
         elif isinstance(d1[key2], dict) and isinstance(value2, dict):
-            diff[key2] = diff_dict(d1[key2], value2)
+            potential_diff = diff_dict(d1[key2], value2)
+            if potential_diff is not None:
+                diff[key2] = potential_diff
+        elif value2 != d1[key2]:
+            diff[key2] = value2
+    if diff == {}:
+        return None
     return diff
 
 
-def parse_scan_config(scan_config: dict) -> tuple:
+def parse_scan_config(scan_config: dict, path: str) -> tuple:
     """
     parse the different entries of the dictionary to create
     the configuration that can be passed to the higher_order_scan function
 
     The function returns a tuple that contains some of the information that
     needs to be passed to the scan task
+
+    The scan configuration allows it to override the parameters of a default
+    daq-system configuration with ones specified in the sever_override and
+    client_override section
+
+    Arguments:
+        scan_config: Dictionary that is the configuration for a single
+                     scan/measurement
+        path: Path to the file that contained the scan_config dict in yaml
+              format this is needed to be able to find the daq-system default
+              configuration
+    Returns:
+        the tuple of scan parameters, scan_requirement, scan_name and
+        daq_system configuration.
     """
     daq_label = scan_config['name']
+    scan_config_path = Path(path)
+    scan_file_dir = os.path.dirname(scan_config_path)
+
     # check if any calibrations need to be performed before taking data
     calibration = None
     if 'calibration' in scan_config.keys():
         calibration = scan_config['calibration']
 
+    # parse the daq-system configuration
+    if 'daq_settings' not in scan_config.keys():
+        raise ConfigFormatError("A daq Task must specify a 'daq_settings'"
+                                " section that at least contains the path"
+                                " to the default system config used")
+    if 'default' not in scan_config['daq_settings']:
+        raise ConfigFormatError("A daq Task must provide the full daq-system"
+                                " configuration via a link to a default file"
+                                " with the 'default' entry in the yaml file")
+    # build the path for the default config
+    default_daq_settings_path = scan_file_dir / \
+        Path(scan_config['daq_settings']['default'])
+    # load the default config
+    if not default_daq_settings_path.is_file():
+        raise ConfigFormatError(f"The path specified for the default config"
+                                f"of the daq_settings in {daq_label} does"
+                                " not exist")
+    default_daq_config = load_configuration(default_daq_settings_path)
+
+    # apply the override parameters for the server and the client
+    patched_daq_system_config = default_daq_config.copy()
+    for override_prefix in ['server', 'client']:
+        override_key = override_prefix+'_override'
+        if override_key in scan_config['daq_settings'] and \
+                isinstance(scan_config['daq_settings'][override_key], dict):
+            override_config = scan_config['daq_settings'][override_key]
+            override_config = {override_prefix: override_config}
+            patched_daq_system_config = update_dict(patched_daq_system_config,
+                                                    override_config)
+        # if the override entry is empty then don't do anything
+        elif override_key in scan_config['daq_settings'] and \
+                scan_config['daq_settings'][override_key] is None:
+            pass
+        else:
+            raise ConfigFormatError(f"The {override_key} section in the daq"
+                                    f"task {daq_label} must be a yaml dict")
+
     # parse the scan dimensions
     scan_parameters = []
-    if 'scan_parameters' not in scan_config.keys():
-        raise ConfigFormatError("There needs to be a 'scan_parameters' list"
+    if 'parameters' not in scan_config.keys():
+        raise ConfigFormatError("There needs to be a 'parameters' list"
                                 f" in the scan entry {daq_label}")
-    for scan_dimension in scan_config['scan_parameters']:
+    for scan_dimension in scan_config['parameters']:
         step = 1
         start = None
         stop = None
@@ -161,7 +235,7 @@ def parse_scan_config(scan_config: dict) -> tuple:
                                     " dimensions")
         scan_range = list(range(start, stop, step))
         scan_parameters.append((scan_dimension['key'], scan_range))
-    return (scan_parameters, calibration, daq_label)
+    return (scan_parameters, calibration, daq_label, patched_daq_system_config)
 
 
 def parse_analysis_config(analysis_config: dict) -> tuple:
@@ -192,14 +266,14 @@ def parse_analysis_config(analysis_config: dict) -> tuple:
     return (analysis_parameters, daq, analysis_label)
 
 
-def parse_config_entry(entry: dict):
+def parse_config_entry(entry: dict, path: str):
     """
     take care of calling the right function for the different configuration
     types calls the parse_scan_config and parse_analysis_config.
     """
     ptype = entry['type']
     if ptype.lower() == 'daq':
-        return parse_scan_config(entry)
+        return parse_scan_config(entry, path)
     if ptype.lower() == 'analysis':
         return parse_analysis_config(entry)
     raise ValueError("The type of a procedure must be"
@@ -244,19 +318,6 @@ def parse_config_file(config_path: str):
 
 
 #### TESTS ####
-def test_parse_scan_config():
-    test_fpath = Path('./test_configurations/scan_procedures.yaml')
-    scan_configs = []
-    with open(test_fpath, 'r') as test_file:
-        test_config = yaml.safe_load(test_file.read())
-        for scan in test_config:
-            scan_configs.append(parse_scan_config(scan))
-    assert len(scan_configs[0][0][0][0]) == 3  # number of keys
-    assert len(scan_configs) == 2  # number of different scans
-    assert len(scan_configs[1][0]) == 2  # number of dimensions in the second scan
-    assert scan_configs[0][0][0][0][0] == 'level1_key1'
-
-
 def test_load_config():
     test_fpath = Path('./test_configurations/scan_procedures.yaml')
     config = load_configuration(test_fpath)
@@ -264,14 +325,15 @@ def test_load_config():
     assert isinstance(config[0], dict)
 
 
-def test_config_updater():
+def test_update_dict():
     test_fpath = Path('./test_configurations/scan_procedures.yaml')
     config = load_configuration(test_fpath)
     original = config[0]
-    assert 'calibration' not in original
-    update = {'calibration': 'pedestal_calibration'}
-    updated_dict = update_dict(original, update)
+    assert 'calibration' in original
     assert original['calibration'] == 'pedestal_calibration'
+    update = {'calibration': 'vref_no_inv'}
+    updated_dict = update_dict(original, update)
+    assert updated_dict['calibration'] == 'vref_no_inv'
 
 
 def test_patch_generator():
@@ -286,11 +348,55 @@ def test_patch_generator():
 def test_diff_dict():
     test_dict_1 = {'a': 1, 'b': {'c': 2, 'f': 4}, 'e': 3}
     test_dict_2 = {'a': 2, 'b': {'c': 3, 'f': 4}, 'e': 3, 'g': 4}
+    diff = {'a': 2, 'b': {'c':3}, 'g': 4}
     result = diff_dict(test_dict_1, test_dict_2)
-    print(result)
-    assert result['g'] == 4
-    assert result['b']['c'] == 3
-    assert result['a'] == 2
+    assert result == diff
     result = diff_dict(test_dict_2, test_dict_1)
     assert result['b']['c'] == 2
     assert result['a'] == 1
+
+
+def test_parse_scan_config():
+    test_fpath = Path('./test_configurations/scan_procedures.yaml')
+    scan_configs = []
+    test_config = load_configuration(test_fpath)
+    for scan in test_config:
+        scan_configs.append(parse_scan_config(scan, test_fpath))
+    assert len(scan_configs[0][0][0][0]) == 3  # number of keys
+    assert len(scan_configs) == 3  # number of different scans
+    assert len(scan_configs[1][0]) == 2  # number of dimensions in the second scan
+    assert scan_configs[0][0][0][0][0] == 'level1_key1'
+
+
+def test_analysis_config():
+    test_fpath = Path('./test_configurations/analysis_procedures.yaml')
+    config = load_configuration(test_fpath)
+    ana_params, ana_daq, ana_label = parse_analysis_config(config[0])
+    assert ana_daq == 'pedestal_scan'
+    assert 'p1' in ana_params.keys()
+    assert 'p2' in ana_params.keys()
+    assert 'p3' in ana_params.keys()
+    assert ana_label == 'pedestal_calibration'
+    assert ana_params['p1'] == 346045
+    assert ana_params['p2'] == 45346
+    assert ana_params['p3'] == 'string option'
+
+
+def test_parse_config_entry():
+    scan_test_config = Path('./test_configurations/scan_procedures.yaml')
+    daq_system_test_config = Path('./default_configs/daq-system-config.yaml')
+    daq_reference_config = load_configuration(daq_system_test_config)
+    config = load_configuration(scan_test_config)
+    names = ['injection_scan', 'timewalk_scan', 'pedestal_scan']
+    lengths = [1, 2, 1]
+    expected_diffs = [{'server': {'NEvents': 4000}, 'client': {'hw_type': 'HD'}},
+                      {'server': {'port': 7777, 'IdelayStep': 3},
+                       'client': {'server_port': 7777}},
+                      None]
+    for entry, name, length, daq_diff in \
+            zip(config, names, lengths, expected_diffs):
+        params, requirement, cfg_name, daq_system_config = parse_config_entry(
+                entry, scan_test_config)
+        assert cfg_name == name
+        assert len(params) == length
+        assert daq_diff == diff_dict(daq_reference_config, daq_system_config)
