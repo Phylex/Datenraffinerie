@@ -38,8 +38,9 @@ class ControlAdapter:
         configuration after the initialisation will be written to the
         target program
         """
-        self.hostname = config['hostname']
-        self.port = config['port']
+        config, hostname, port = self._filter_out_network_config(config)
+        self.hostname = hostname
+        self.port = port
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
@@ -60,7 +61,7 @@ class ControlAdapter:
         send the configuration to the corresponding system component and wait
         for the configuration to be completed
         """
-        config = self._filter_out_network_config(config)
+        config, _, _= self._filter_out_network_config(config)
 
         if config is not None:
             write_config = diff_dict(self.configuration, config)
@@ -87,14 +88,28 @@ class ControlAdapter:
         As there is minimal network configuration inside the daq system config
         we need to filter this out to be able to pass along the parameters that
         are intended for the actual server and client
+
+        Also has to handle data weirdly because of technical debt in the daq c++
+        software
         """
         if config is None:
             return None
+        # this weird contraption needs to be build because the current zmq server
+        # and client expect the ENTIRE configuration (including hexaboard and every
+        # other component to be sent to them
+        top_level_key = (config.keys())[0]
+        config = config[top_level_key]
         out_config = {}
+        hostname = None
+        port = None
         for key, value in config.items():
-            if ('hostname' not in key) and ('port' not in key):
+            if 'hostname' == key:
+                hostname = value
+            elif 'port' == key:
+                port == value
+            else:
                 out_config[key] = value
-        return out_config
+        return {top_level_key: out_config}, hostname, port
 
 
 class TargetAdapter(ControlAdapter):
@@ -235,10 +250,12 @@ class DAQSystem:
         if 'client' not in daq_config.keys():
             raise DAQError("There mus be a 'client' key in the initial"
                            " configuration")
-        server_config, client_config = self._split_into_server_and_client(
+        server_config, client_config = self.create_valid_server_and_client_config(
                 daq_config)
         self.server = DAQAdapter(server_config)
         # set up the client part of the daq system (zmq-client)
+        # the wrapping with the global needs to be done so that the client
+        # accepts the configuration
         self.client = DAQAdapter(client_config)
         self.setup_data_taking_context()
 
@@ -246,32 +263,33 @@ class DAQSystem:
         self.tear_down_datat_taking_context()
 
     @staticmethod
-    def _split_into_server_and_client(daq_config: dict):
+    def create_valid_server_and_client_config(daq_config: dict):
         """
         convenience function to split the configuration passed to
-        the configure method into the client and server part
-        should not be called by the user code
+        the configure method into the client and server part.
+
+        It also compensates for all the config peculiarities of
+        the daq programs in their current state.
+
+        Should not be called by the user code!
         """
         server_config = None
         client_config = None
         if 'server' in daq_config.keys():
-            server_config = daq_config['server']
+            server_config = {'daq':daq_config['server']}
         if 'client' in daq_config.keys():
-            client_config = daq_config['client']
+            client_config = {'global': daq_config['client']}
         return server_config, client_config
 
     def configure(self, daq_config: dict = None):
         """
         configure the daq system before starting a data-taking run.
 
-        This function should not be run by user code. The user should
-        call 'start_run' to start a run, which configures the daq_system
-        appropriately and performs all other necessary steps.
         """
         server_config = None
         client_config = None
         if daq_config is not None:
-            server_config, client_config = self._split_into_server_and_client(
+            server_config, client_config = self.create_valid_server_and_client_config(
                     daq_config)
         self.client.configure(client_config)
         self.server.configure(server_config)
