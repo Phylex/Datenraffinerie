@@ -10,34 +10,36 @@ This file needs to be adapted if the underlying DAQ programs change
 their behaviour
 """
 from time import sleep
+import os
+from pathlib import Path
+import uuid
 import zmq
 import yaml
-from config_utilities import diff_dict
+import pid
+from config_utilities import diff_dict, update_dict
 
 
 class DAQError(Exception):
     def __init__(self, message):
         self.message = message
-
-
 class ControlAdapter:
     """
     Class that encapsulates the configuration and communication to either
     the client or the server of the daq-system
     """
 
-    def __init__(self, hostname, port, config):
+    def __init__(self, config):
         """
         Initialize the data structure on the control computer (the one
         coordinating everything) and connect to the system component.
         Do not load any configuraion yet
         """
-        self.hostname = hostname
-        self.port = port
+        self.hostname = config['hostname']
+        self.port = config['port']
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
-        self.confifguration = config
+        self.configuration = config
 
     def reset(self):
         """
@@ -49,15 +51,19 @@ class ControlAdapter:
         self.socket = context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
 
-    def configure(self, config):
+    def configure(self, config=None):
         """
         send the configuration to the corresponding system component and wait
         for the configuration to be completed
         """
         config = self._filter_out_network_config(config)
-        config_diff = diff_dict(self.confifguration, config)
+
+        if config is not None:
+            write_config = diff_dict(self.configuration, config)
+        else:
+            write_config = self.configuration
         # if there is no difference between the configs simply return
-        if len(config_diff.items()) == 0:
+        if len(write_config.items()) == 0:
             return
         self.socket.send_string("configure")
         rep = self.socket.recv_string()
@@ -66,8 +72,10 @@ class ControlAdapter:
                 "The configuration cannot be "
                 f" written to {self.hostname}. The target"
                 f"responded with {rep}")
-        self.socket.send_string(yaml.dump(config_diff))
+        self.socket.send_string(yaml.dump(write_config))
         rep = self.socket.recv_string()
+        self.configuration = update_dict(self.configuration, write_config)
+        return
 
     @staticmethod
     def _filter_out_network_config(config):
@@ -199,39 +207,80 @@ class DAQSystem:
     """
     A class that abstracts encapsulates the interactions
     with the DAQ-system (the hexacontroller, hexaboard and zmq-[server|client])
+
+    The class implements a small two-state state machine that only allows data-taking
+    via the 'take_data' function after the 'start_run' function has been called.
+    The data taking is stopped via the 'stop_run' function that 
     """
 
     def __init__(self, daq_config):
+        """ initialise the daq system by initializing it's components (the client and
+        server) during this step the actual system components are not loaded with
+        the configuration, as it is expected that 
+        """
         # set up the server part of the daq system (zmq-server)
         self.server_config = daq_config['server']
         self.client_config = daq_config['client']
-        # due to the way the zmq client works the files need to be written to
-        # a temporary directory and then moved to the file expected by the DAQ
-        # system
-        clean_server_config = self._filter_out_network_config(
-            self.server_config)
-        self.server = DAQAdapter(self.server_config['hostname'],
-                                 self.server_config['port'],
-                                 clean_server_config)
+        self.run_in_progress = False
+        self.daq_data_base_path = None
+        self.daq_data_folder = None
+        self.server = DAQAdapter(self.server_config)
         # set up the client part of the daq system (zmq-client)
-        clean_client_config = self._filter_out_network_config(
-            self.client_config)
-        self.client = DAQAdapter(self.client_config['hostname'],
-                                 self.client_config['port'],
-                                 clean_client_config)
+        self.client = DAQAdapter(self.client_config)
 
-    def configure(self, daq_config=None):
+    def __del__(self):
+        self.stop_run()
+
+    def _update_internal_configuration(self, daq_config: dict):
+        if 'server' in daq_config.keys():
+            self.server_config = update_dict(self.server_config,
+                                             daq_config['server'])
+        if 'client' in daq_config['client']:
+            self.client_config = update_dict(self.client_config,
+                                             daq_config['client'])
+
+    def configure(self, daq_config: dict = None):
         """
-        configure the daq system before starting a data-taking run
+        configure the daq system before starting a data-taking run.
+
+        This function should not be run by user code. The user should
+        call 'start_run' to start a run, which configures the daq_system
+        appropriately and performs all other necessary steps.
         """
         if daq_config is not None:
-            server_config = daq_config['server']
-            client_config = daq_config['client']
+            self._update_internal_configuration(daq_config)
+        self.client.configure(self.client_config)
+        self.server.configure(self.server_config)
+
+    def setup_data_taking_context(self):
+        """
+        Prepare a folder to save the raw data in and set up the client
+        configuration so that the zmq-client writes into that folder
+        It is expected that the folder is empty before every measurement
+        as the filename of the zmq-client is not easily predictable
+        """
+        if self.run_in_progress:
+            raise DAQError("A run has already been started")
+        # get the location for the placement of the files by the
+        # zmq-client, if one is already configured then use it
+        # otherwise generate a new one
+        if 'outputDirectory' in self.client_config.keys():
+            self.daq_data_base_path = Path(
+                    self.client_config['outputDirectory'])
         else:
-            server_config = self.server_config
-            client_config = self.client_config
-        self.client.configure(client_config)
-        self.server.configure(server_config)
+            self.daq_data_base_path = Path('/tmp')
+            self.client_config['outputDirectory'] = \
+                str(self.daq_data_base_path)
+        if 'run_type' in self.client_config.keys():
+            self.run_uuid = self.client_config['run_type']
+            self.daq_data_folder = self.daq_data_base_path /\
+                self.run_uuid
+        else:
+            self.run_uuid = uuid.uuid1().hex
+            self.daq_data_folder = self.daq_data_base_path /\
+                self.run_uuid
+        if not os.path.isdir(self.daq_data_folder):
+            os.mkdir(self.daq_data_folder)
 
     def take_data(self, output_data_path):
         """
@@ -247,9 +296,29 @@ class DAQSystem:
         the location given by the 'output_data_path' argument of the function
         after the daq for the run has concluded
         """
+        if not self.run_in_progress:
+            raise DAQError("A DAQ run has to be started via the 'start_run'"
+                           " function before data can be taken")
         if not self.server.is_done():
             raise DAQError("The server should not be running an acquisition")
-        if not self.client.is_done():
-            raise DAQError("The client should not be running an acquisition")
-        if 'output_dir' not in self.client_config:
+        self.client.start()
+        self.server.start()
+        while not self.server.is_done():
+            sleep(0.01)
+        files = list(self.daq_data_folder.glob('*.raw'))
+        if len(files) > 1:
+            raise DAQError("More than one file was found in the"
+                           f" {self.daq_data_folder.resolve()} folder")
+        os.rename(files[0], output_data_path)
+        self.server.stop()
+        self.client.stop()
 
+    def tear_down_datat_taking_context(self):
+        """
+        The complement to the 'start_run' function stops the run and cleans up
+        after the run has completed
+        """
+        if os.path.exists(self.daq_data_folder):
+            for file in self.daq_data_folder.iterdir():
+                os.remove(file)
+            os.rmdir(self.daq_data_folder)
