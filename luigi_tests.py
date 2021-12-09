@@ -1,4 +1,6 @@
+from multiprocessing import Lock
 import luigi
+from pid import PidFile
 from luigi.parameter import ParameterVisibility
 from time import sleep
 from pathlib import Path
@@ -58,13 +60,17 @@ class Format(luigi.Task):
 class pseudo_measurement(luigi.Task):
     path = luigi.Parameter(significant=True)
     identifier = luigi.Parameter(significant=True)
+    lock = Lock()
 
     def requires(self):
         return pseudo_configuration(self.path, self.identifier)
 
     def run(self):
+        self.lock.acquire()
+        sleep(1)
         with self.output()[0].open('w') as f:
             f.write("example data")
+        self.lock.release()
 
     def output(self):
         return (luigi.LocalTarget(self.path+'_'+str(self.identifier)+'-data'), self.input())
@@ -83,5 +89,7 @@ class pseudo_configuration(luigi.Task):
 
 
 if __name__ == "__main__":
-    run_result = luigi.build([scan([[f'a={i}_' for i in range(3)], [f'b={i}_' for i in range(3)], [f'c={i}' for i in range(3)]], './', 1)], local_scheduler=True)
+    run_result = luigi.build([scan([[f'a={i}_' for i in range(3)], [f'b={i}_' for i in range(3)], [f'c={i}' for i in range(3)]], './', 1)],
+                             local_scheduler=True,
+                             workers=5)
     print(run_result)

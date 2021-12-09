@@ -1,7 +1,7 @@
 client:
   hostname: localhost
   port: 6001
-  data_push_port: '8888'
+  data_push_port: 8888
   hw_type: LD
   serverIP: hc640256
 server:
@@ -70,41 +70,41 @@ server:
       polarity: 1
       idcode: 9
   l1a_enables:
-    random_l1a         : '0x0'
-    external_l1as      : '0x0'
-    block_sequencer    : '0x0'
+    random_l1a         : 0x0
+    external_l1as      : 0x0
+    block_sequencer    : 0x0
   l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
     A:
-      enable : '0'
-      BX : '0x10'
-      length : '1'
-      flavor: 'L1A'
-      prescale : '0x0'
-      followMode : 'DISABLE'
+      enable : 0
+      BX : 0x10
+      length : 1
+      flavor: L1A
+      prescale : 0x0
+      followMode : DISABLE
     B:
-      enable : '0'
-      BX : '0x20'
-      length : '1'
-      flavor : 'L1A'
-      prescale : '0x0'
-      followMode : 'DISABLE'
+      enable : 0
+      BX : 0x20
+      length : 1
+      flavor : L1A
+      prescale : 0x0
+      followMode : DISABLE
     C:
-      enable : '0'
-      BX : '0x30'
-      length : '1'
-      flavor : 'L1A'
-      prescale : '0x0'
-      followMode : 'DISABLE'
+      enable : 0
+      BX : 0x30
+      length : 1
+      flavor : L1A
+      prescale : 0x0
+      followMode : DISABLE
     D:
-      enable : '0'
-      BX : '0x40'
-      length : '1'
-      flavor : 'L1A'
-      prescale : '0x0'
-      followMode : 'DISABLE'
+      enable : 0
+      BX : 0x40
+      length : 1'
+      flavor : L1A
+      prescale : 0x0
+      followMode : DISABLE
   l1a_settings:
-    bx_spacing: '0x2b'         #Minimum bx spcing between random or external triggers i.e. here : 43 BX between 2 consecutive L1A (when reading 1 BX per event)
-    external_debounce: '0x0'   #flags to indicate if external L1A should be debounced (generally a fine idea)
-    length: '0x1'              #number of consequitive L1A to send in case of external trigger; don't know yet if it will have any effect on rand L1A gen
-    ext_delay: '0x0'           #8-bit delays for each external L1A input
-    log2_rand_bx_period: '0x0'  #LOG2(random period) (bigger numbers -> slower trigger rate)
+    bx_spacing: 0x2b         #Minimum bx spcing between random or external triggers i.e. here : 43 BX between 2 consecutive L1A (when reading 1 BX per event)
+    external_debounce: 0x0   #flags to indicate if external L1A should be debounced (generally a fine idea)
+    length: 0x1              #number of consequitive L1A to send in case of external trigger; don't know yet if it will have any effect on rand L1A gen
+    ext_delay: 0x0           #8-bit delays for each external L1A input
+    log2_rand_bx_period: 0x0  #LOG2(random period) (bigger numbers -> slower trigger rate)

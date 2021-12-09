@@ -15,13 +15,14 @@ from pathlib import Path
 import uuid
 import zmq
 import yaml
-import pid
 from config_utilities import diff_dict, update_dict
 
 
 class DAQError(Exception):
     def __init__(self, message):
         self.message = message
+
+
 class ControlAdapter:
     """
     Class that encapsulates the configuration and communication to either
@@ -32,7 +33,10 @@ class ControlAdapter:
         """
         Initialize the data structure on the control computer (the one
         coordinating everything) and connect to the system component.
-        Do not load any configuraion yet
+        Do not load any configuraion yet this is done to be able to
+        load the reset / power on configuration. any change of the
+        configuration after the initialisation will be written to the
+        target program
         """
         self.hostname = config['hostname']
         self.port = config['port']
@@ -84,6 +88,8 @@ class ControlAdapter:
         we need to filter this out to be able to pass along the parameters that
         are intended for the actual server and client
         """
+        if config is None:
+            return None
         out_config = {}
         for key, value in config.items():
             if ('hostname' not in key) and ('port' not in key):
@@ -135,17 +141,17 @@ class TargetAdapter(ControlAdapter):
         rep = self.socket.recv_string()
         return(yaml.safe_load(rep))
 
-    def measadc(self, yamlNode):
+    def measadc(self, yamlNode: dict = None) -> dict:
         # only valid for hexaboard/trophy systems
         self.socket.send_string("measadc")
         rep = self.socket.recv_string()
         if rep.lower().find("ready") < 0:
             print(rep)
             return
-        if yamlNode:
+        if yamlNode is not None:
             config = yamlNode
         else:
-            config = self.yamlConfig
+            config = self.configuration
         self.socket.send_string(yaml.dump(config))
         rep = self.socket.recv_string()
         adc = yaml.safe_load(rep)
@@ -197,11 +203,12 @@ class DAQAdapter(ControlAdapter):
             rep = self.socket.recv_string()
             print(rep)
 
-    def configure(self, config):
+    def configure(self, config=None):
         if not self.is_done():
             raise DAQError("DAQ system is running, it should not be")
         self.stop()
         super().configure(config)
+
 
 class DAQSystem:
     """
@@ -219,25 +226,39 @@ class DAQSystem:
         the configuration, as it is expected that 
         """
         # set up the server part of the daq system (zmq-server)
-        self.server_config = daq_config['server']
-        self.client_config = daq_config['client']
         self.run_in_progress = False
         self.daq_data_base_path = None
         self.daq_data_folder = None
-        self.server = DAQAdapter(self.server_config)
+        if 'server' not in daq_config.keys():
+            raise DAQError("There mus be a 'server' key in the initial"
+                           " configuration")
+        if 'client' not in daq_config.keys():
+            raise DAQError("There mus be a 'client' key in the initial"
+                           " configuration")
+        server_config, client_config = self._split_into_server_and_client(
+                daq_config)
+        self.server = DAQAdapter(server_config)
         # set up the client part of the daq system (zmq-client)
-        self.client = DAQAdapter(self.client_config)
+        self.client = DAQAdapter(client_config)
+        self.setup_data_taking_context()
 
     def __del__(self):
-        self.stop_run()
+        self.tear_down_datat_taking_context()
 
-    def _update_internal_configuration(self, daq_config: dict):
+    @staticmethod
+    def _split_into_server_and_client(daq_config: dict):
+        """
+        convenience function to split the configuration passed to
+        the configure method into the client and server part
+        should not be called by the user code
+        """
+        server_config = None
+        client_config = None
         if 'server' in daq_config.keys():
-            self.server_config = update_dict(self.server_config,
-                                             daq_config['server'])
-        if 'client' in daq_config['client']:
-            self.client_config = update_dict(self.client_config,
-                                             daq_config['client'])
+            server_config = daq_config['server']
+        if 'client' in daq_config.keys():
+            client_config = daq_config['client']
+        return server_config, client_config
 
     def configure(self, daq_config: dict = None):
         """
@@ -247,10 +268,13 @@ class DAQSystem:
         call 'start_run' to start a run, which configures the daq_system
         appropriately and performs all other necessary steps.
         """
+        server_config = None
+        client_config = None
         if daq_config is not None:
-            self._update_internal_configuration(daq_config)
-        self.client.configure(self.client_config)
-        self.server.configure(self.server_config)
+            server_config, client_config = self._split_into_server_and_client(
+                    daq_config)
+        self.client.configure(client_config)
+        self.server.configure(server_config)
 
     def setup_data_taking_context(self):
         """
@@ -264,15 +288,15 @@ class DAQSystem:
         # get the location for the placement of the files by the
         # zmq-client, if one is already configured then use it
         # otherwise generate a new one
-        if 'outputDirectory' in self.client_config.keys():
+        if 'outputDirectory' in self.client.configuration.keys():
             self.daq_data_base_path = Path(
-                    self.client_config['outputDirectory'])
+                    self.client.configuration['outputDirectory'])
         else:
             self.daq_data_base_path = Path('/tmp')
-            self.client_config['outputDirectory'] = \
+            self.client.configuration['outputDirectory'] = \
                 str(self.daq_data_base_path)
-        if 'run_type' in self.client_config.keys():
-            self.run_uuid = self.client_config['run_type']
+        if 'run_type' in self.client.configuration.keys():
+            self.run_uuid = self.client.configuration['run_type']
             self.daq_data_folder = self.daq_data_base_path /\
                 self.run_uuid
         else:
