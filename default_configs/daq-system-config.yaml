@@ -1,8 +1,9 @@
 client:
   hostname: localhost
   port: 6001
-  server_port: 8888
+  data_push_port: '8888'
   hw_type: LD
+  serverIP: hc640256
 server:
   hostname: hc640256
   port: 6000
