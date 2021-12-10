@@ -7,8 +7,9 @@ The tests can also be used as a guide on how to use the functions and
 what to expect of their behaviour
 """
 from pathlib import Path
-import yaml
 import os
+from copy import deepcopy
+import yaml
 
 
 class ConfigPatchError(Exception):
@@ -25,7 +26,7 @@ def load_configuration(config_path):
     """
     load the configuration dictionary from a yaml file
     """
-    with open(config_path, 'r') as config_file:
+    with open(config_path, 'r', encoding='utf-8') as config_file:
         return yaml.safe_load(config_file.read())
 
 
@@ -50,16 +51,33 @@ def update_dict(original: dict, update: dict, offset: bool = False):
                   do appear in the update dict overwrite/extend the values in
                   the original
     """
-    result = original.copy()
+    result = deepcopy(original)
     for update_key in update.keys():
         if update_key in result.keys():
-            if type(result[update_key]) is not type(update[update_key]):
+            if not isinstance(update[update_key], type(result[update_key])):
                 raise ConfigPatchError(
                         'The type of the patch does not match the '
                         'type of the original value')
             if isinstance(result[update_key], dict):
                 result[update_key] = update_dict(result[update_key],
                                                  update[update_key])
+            elif isinstance(result[update_key], list):
+                if len(result[update_key]) != len(update[update_key]):
+                    raise ConfigPatchError(
+                            'If a list is a value of the dict the list'
+                            ' lengths in the original and update need to'
+                            ' match')
+                for i, (orig_elem, update_elem) in enumerate(
+                        zip(result[update_key], update[update_key])):
+                    if not isinstance(update_elem, type(orig_elem)):
+                        raise ConfigPatchError(
+                                'The type of the patch does not match the '
+                                'type of the original value')
+                    if isinstance(orig_elem, dict):
+                        result[update_key][i] = update_dict(orig_elem,
+                                                            update_elem)
+                    else:
+                        result[update_key][i] = update_elem
             else:
                 if offset is True:
                     result[update_key] += update[update_key]
@@ -303,7 +321,7 @@ def parse_config_file(config_path: str):
                 for procedure in config['procedures']:
                     ptype = procedure['type']
                     if ptype.lower() == 'daq':
-                        procedures.append(parse_scan_config(procedure))
+                        procedures.append(parse_scan_config(procedure, path))
                     elif ptype.lower() == 'analysis':
                         procedures.append(parse_analysis_config(procedure))
                     else:
@@ -313,7 +331,7 @@ def parse_config_file(config_path: str):
                 raise ValueError("procedures must be a list, not a dictionary")
     elif isinstance(config, list):
         for entry in config:
-            procedures.append(parse_config_entry(entry))
+            procedures.append(parse_config_entry(entry, path))
     return procedures, workflows
 
 
@@ -326,6 +344,9 @@ def test_load_config():
 
 
 def test_update_dict():
+    """
+    test the update_dict function
+    """
     test_fpath = Path('./test_configurations/scan_procedures.yaml')
     config = load_configuration(test_fpath)
     original = config[0]
@@ -334,6 +355,18 @@ def test_update_dict():
     update = {'calibration': 'vref_no_inv'}
     updated_dict = update_dict(original, update)
     assert updated_dict['calibration'] == 'vref_no_inv'
+    original = {'this': [{'a': 1}, {'b': 2}, {'c': 3}, 3], 'that': 'what'}
+    update = {'this': [{'a': 3}, {'b': 3}, {'c': 5}, 5]}
+    expected_output = {'this': [{'a': 3}, {'b': 3}, {'c': 5}, 5],
+                       'that': 'what'}
+    updated_dict = update_dict(original, update)
+    assert updated_dict == expected_output
+    original = {'this': [{'a': 1}, {'b': 2}, {'c': 3}, 3], 'that': 'what'}
+    update = {}
+    expected_output = {'this': [{'a': 1}, {'b': 2}, {'c': 3}, 3],
+                       'that': 'what'}
+    updated_dict = update_dict(original, update)
+    assert updated_dict == expected_output
 
 
 def test_patch_generator():
@@ -347,6 +380,7 @@ def test_patch_generator():
                      'k3': {'k4': {'k5': 1}}}
     patch_dict = generate_patch(keys, value)
     assert patch_dict == expected_dict
+
 
 def test_diff_dict():
     test_dict_1 = {'a': 1, 'b': {'c': 2, 'f': 4}, 'e': 3}

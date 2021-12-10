@@ -45,6 +45,9 @@ class ControlAdapter:
         self.socket = self.context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
         self.configuration = config
+        # this is used to determin if to send the full config
+        #-to the target if 'configure' is called without an argument
+        self.config_written = False
 
     def reset(self):
         """
@@ -56,17 +59,24 @@ class ControlAdapter:
         self.socket = context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
 
+    def get_config(self):
+        top_level_key = list(self.configuration.keys())[0]
+        return self.configuration[top_level_key]
+
     def configure(self, config=None):
         """
         send the configuration to the corresponding system component and wait
         for the configuration to be completed
         """
-        config, _, _= self._filter_out_network_config(config)
-
         if config is not None:
+            config, _, _= self._filter_out_network_config(config)
             write_config = diff_dict(self.configuration, config)
         else:
-            write_config = self.configuration
+            if not self.config_written:
+                write_config = self.configuration
+                self.config_written = True
+            else:
+                write_config = {}
         # if there is no difference between the configs simply return
         if len(write_config.items()) == 0:
             return
@@ -97,7 +107,7 @@ class ControlAdapter:
         # this weird contraption needs to be build because the current zmq server
         # and client expect the ENTIRE configuration (including hexaboard and every
         # other component to be sent to them
-        top_level_key = (config.keys())[0]
+        top_level_key = list(config.keys())[0]
         config = config[top_level_key]
         out_config = {}
         hostname = None
@@ -106,7 +116,7 @@ class ControlAdapter:
             if 'hostname' == key:
                 hostname = value
             elif 'port' == key:
-                port == value
+                port = value
             else:
                 out_config[key] = value
         return {top_level_key: out_config}, hostname, port
@@ -236,9 +246,9 @@ class DAQSystem:
     """
 
     def __init__(self, daq_config):
-        """ initialise the daq system by initializing it's components (the client and
-        server) during this step the actual system components are not loaded with
-        the configuration, as it is expected that 
+        """
+        initialise the daq system by initializing it's components (the client and
+        server)
         """
         # set up the server part of the daq system (zmq-server)
         self.run_in_progress = False
@@ -258,6 +268,8 @@ class DAQSystem:
         # accepts the configuration
         self.client = DAQAdapter(client_config)
         self.setup_data_taking_context()
+        self.client.configure()
+        self.server.configure()
 
     def __del__(self):
         self.tear_down_datat_taking_context()
@@ -306,21 +318,23 @@ class DAQSystem:
         # get the location for the placement of the files by the
         # zmq-client, if one is already configured then use it
         # otherwise generate a new one
-        if 'outputDirectory' in self.client.configuration.keys():
+        client_config = self.client.get_config()
+        if 'outputDirectory' in client_config.keys():
             self.daq_data_base_path = Path(
-                    self.client.configuration['outputDirectory'])
+                    client_config['outputDirectory'])
         else:
             self.daq_data_base_path = Path('/tmp')
-            self.client.configuration['outputDirectory'] = \
+            client_config['outputDirectory'] = \
                 str(self.daq_data_base_path)
-        if 'run_type' in self.client.configuration.keys():
-            self.run_uuid = self.client.configuration['run_type']
+        if 'run_type' in client_config.keys():
+            self.run_uuid = client_config['run_type']
             self.daq_data_folder = self.daq_data_base_path /\
                 self.run_uuid
         else:
             self.run_uuid = uuid.uuid1().hex
             self.daq_data_folder = self.daq_data_base_path /\
                 self.run_uuid
+            client_config['run_type'] = self.run_uuid
         if not os.path.isdir(self.daq_data_folder):
             os.mkdir(self.daq_data_folder)
 
