@@ -46,7 +46,7 @@ def set_calibDAC(height):
     """
     set the step height of the injection circuit for the entire chip
     """
-    patch_key = [ROCS, 'sc', 'RefenceVoltage', 'all', 'Calib']
+    patch_key = [ROCS, 'ReferenceVoltage', list(range(2)), 'Calib']
     patch = cfu.generate_patch(patch_key, height)
     return patch
 
@@ -59,8 +59,8 @@ def configure_daq_server_for_injection_scan(number_of_events, bx_offset):
     that generate a fastcommand once every orbit
     """
     # configure the number of events to capture per run
-    compound_key = ['server', 'NEvents']
-    patch = cfu.generate_patch(compound_key, number_of_events)
+    patch_key = ['server', 'NEvents']
+    patch = cfu.generate_patch(patch_key, number_of_events)
 
     # enable fast commands
     patch_key = ['server', 'l1a_enables',
@@ -71,10 +71,10 @@ def configure_daq_server_for_injection_scan(number_of_events, bx_offset):
     # L1A generator A and B
     injection_bx = 0x10
     readout_bx = injection_bx + bx_offset
-    l1a_generator_settings = {'l1a_generator_settings': [
+    l1a_generator_settings = {'server': {'l1a_generator_settings': [
             {'enable': 1, 'BX': injection_bx, 'flavor': 'CALPULINT'},
-            {'enable': 1, 'BX': readout_bx, 'followMode': 'A'},
-            {}, {}]}
+            {'enable': 0, 'BX': readout_bx, 'followMode': 'A'},
+            {}, {}]}}
     patch = cfu.update_dict(patch, l1a_generator_settings)
     return patch
 
@@ -94,21 +94,21 @@ def timewalk_scan(hexaboard, daq_system, run_config):
     gain = run_config['gain']  # 0 for low range ; 1 for high range
 
     # build the patch that configures the daq server part of the daq_system
-    daq_system_server_config = configure_daq_server_for_injection_scan(1000, BXoffset)
+    daq_system_server_config = configure_daq_server_for_injection_scan('1000', BXoffset)
 
     # merge the patches together to form the complete daq_system configuration
     daq_system.configure(daq_system_server_config)
     # save the initial configuration of the ROC before starting the scan
     # of the TOA
     with open(Path(output_dir) / 'daq_system_config.yaml', 'w+') as daq_system_config_file:
-        yaml.dump(daq_system.server_config, daq_system_config_file)
+        yaml.dump(daq_system.server.get_config(), daq_system_config_file)
+
 
     hexaboard.resettdc()
-
     # set up the injection mechanism of the roc
     injector_config_patch = connect_injector_and_diff_capacitors(Channels, gain)
     # configure the phase for the injection for every roc in the config
-    phase_strobe_patch = cfu.generate_patch([ROCS, 'Top', '0', 'phase_strobe'], phase)
+    phase_strobe_patch = cfu.generate_patch([ROCS, 'Top', 0, 'phase_strobe'], phase)
     # merge the patches
     hexaboard_patch = cfu.update_dict(phase_strobe_patch, injector_config_patch)
     # run the scan and save the intermediate conifguration
@@ -116,10 +116,10 @@ def timewalk_scan(hexaboard, daq_system, run_config):
         calib_dac_patch = set_calibDAC(pulseheight)
         run_config = cfu.update_dict(hexaboard_patch, calib_dac_patch)
         hexaboard.configure(run_config)
-        with open(Path(output_dir) / 'run_' + str(index) + '.yaml', 'w+', encoding='utf-8')\
+        with open(Path(output_dir) / ('run_' + str(index) + '.yaml'), 'w+', encoding='utf-8')\
                 as run_conf_file:
             yaml.dump(hexaboard.configuration, run_conf_file)
-        daq_system.take_data(output_dir+'/run_'+str(index)+'.raw')
+        daq_system.take_data(output_dir /('run_'+str(index)+'.raw'))
 
 
 @click.command()

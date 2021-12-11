@@ -11,6 +11,7 @@ their behaviour
 """
 from time import sleep
 import os
+import shutil
 from pathlib import Path
 import uuid
 import zmq
@@ -59,10 +60,6 @@ class ControlAdapter:
         self.socket = context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
 
-    def get_config(self):
-        top_level_key = list(self.configuration.keys())[0]
-        return self.configuration[top_level_key]
-
     def configure(self, config=None):
         """
         send the configuration to the corresponding system component and wait
@@ -71,6 +68,12 @@ class ControlAdapter:
         if config is not None:
             config, _, _= self._filter_out_network_config(config)
             write_config = diff_dict(self.configuration, config)
+
+            # This case appears during the use of the zmq i2c server
+            # as there the first write access should not write the entire
+            # config as we expect the chip to be in the power on / reset
+            # state
+            self.config_written = True
         else:
             if not self.config_written:
                 write_config = self.configuration
@@ -84,13 +87,15 @@ class ControlAdapter:
         rep = self.socket.recv_string()
         if "ready" not in rep.lower():
             raise ValueError(
-                "The configuration cannot be "
-                f" written to {self.hostname}. The target"
-                f"responded with {rep}")
+                    "The configuration cannot be "
+                    f" written to {self.hostname}. The target"
+                    f"responded with {rep}")
         self.socket.send_string(yaml.dump(write_config))
         rep = self.socket.recv_string()
+        if not rep == 'Configured' and not rep == 'ROC(s) CONFIGURED\n...\n':
+            raise DAQError("The configuration endpoint did not indicate "
+                    " a successful configuration")
         self.configuration = update_dict(self.configuration, write_config)
-        return
 
     @staticmethod
     def _filter_out_network_config(config):
@@ -107,8 +112,6 @@ class ControlAdapter:
         # this weird contraption needs to be build because the current zmq server
         # and client expect the ENTIRE configuration (including hexaboard and every
         # other component to be sent to them
-        top_level_key = list(config.keys())[0]
-        config = config[top_level_key]
         out_config = {}
         hostname = None
         port = None
@@ -119,7 +122,7 @@ class ControlAdapter:
                 port = value
             else:
                 out_config[key] = value
-        return {top_level_key: out_config}, hostname, port
+        return out_config, hostname, port
 
 
 class TargetAdapter(ControlAdapter):
@@ -187,6 +190,42 @@ class DAQAdapter(ControlAdapter):
     """
     Encapsulate the Access to the daq-client and server of the daq system.
     """
+    variant_key_map = {'server': 'daq', 'client': 'global'}
+
+    def __init__(self, config: dict, variant: str):
+        """
+        The DAQ adapter needs to modify the configuration format of the
+        Datenraffinerie to make it compatible with the current zmq-server
+        and client
+
+        Arguments:
+            config, dict: The configuration of the DAQ endpoint
+            variant, str: either 'server' or 'client'. lets the DAQ adapter
+                make the neccesary changes to the config
+        """
+        self.variant = variant
+        super().__init__(config)
+        config, _, _ = self._filter_out_network_config(config)
+        self.configuration = {self.variant_key_map[self.variant]: config}
+
+    def configure(self, config: dict = None):
+        """
+        workaround for the way the zmq-client/zmq-server handles the
+        configuration together with necessary checks for the
+        """
+        if config is not None:
+            config, _, _ = self._filter_out_network_config(config)
+            self.configuration = update_dict(
+                    self.configuration,
+                    {self.variant_key_map[self.variant]: config})
+            self.config_written = False
+        if not self.is_done():
+            raise DAQError("DAQ system is running, it should not be")
+        self.stop()
+        super().configure()
+
+    def get_config(self):
+        return self.configuration[self.variant_key_map[self.variant]]
 
     def start(self):
         """
@@ -215,6 +254,10 @@ class DAQAdapter(ControlAdapter):
         self.socket.send_string("stop")
         rep = self.socket.recv_string()
         print(rep)
+        if not rep == 'Data puller stopped' and\
+                not rep == 'Stopped':
+            raise DAQError('Response of the zmq-client to'
+                           " the 'stop' command invalid")
 
     def delay_scan(self):
         """
@@ -227,12 +270,6 @@ class DAQAdapter(ControlAdapter):
             self.socket.send_string("delayscan")
             rep = self.socket.recv_string()
             print(rep)
-
-    def configure(self, config=None):
-        if not self.is_done():
-            raise DAQError("DAQ system is running, it should not be")
-        self.stop()
-        super().configure(config)
 
 
 class DAQSystem:
@@ -260,22 +297,20 @@ class DAQSystem:
         if 'client' not in daq_config.keys():
             raise DAQError("There mus be a 'client' key in the initial"
                            " configuration")
-        server_config, client_config = self.create_valid_server_and_client_config(
+        server_config, client_config = self.split_config_into_client_and_server(
                 daq_config)
-        self.server = DAQAdapter(server_config)
+        self.server = DAQAdapter(server_config, 'server')
         # set up the client part of the daq system (zmq-client)
         # the wrapping with the global needs to be done so that the client
         # accepts the configuration
-        self.client = DAQAdapter(client_config)
-        self.setup_data_taking_context()
-        self.client.configure()
-        self.server.configure()
+        self.client = DAQAdapter(client_config, 'client')
+        self._setup_data_taking_context()
 
     def __del__(self):
         self.tear_down_datat_taking_context()
 
     @staticmethod
-    def create_valid_server_and_client_config(daq_config: dict):
+    def split_config_into_client_and_server(daq_config: dict):
         """
         convenience function to split the configuration passed to
         the configure method into the client and server part.
@@ -288,9 +323,9 @@ class DAQSystem:
         server_config = None
         client_config = None
         if 'server' in daq_config.keys():
-            server_config = {'daq':daq_config['server']}
+            server_config = daq_config['server']
         if 'client' in daq_config.keys():
-            client_config = {'global': daq_config['client']}
+            client_config = daq_config['client']
         return server_config, client_config
 
     def configure(self, daq_config: dict = None):
@@ -301,40 +336,31 @@ class DAQSystem:
         server_config = None
         client_config = None
         if daq_config is not None:
-            server_config, client_config = self.create_valid_server_and_client_config(
+            server_config, client_config = self.split_config_into_client_and_server(
                     daq_config)
         self.client.configure(client_config)
         self.server.configure(server_config)
 
-    def setup_data_taking_context(self):
+    def _setup_data_taking_context(self):
         """
+        setup the folders and the zmq-client configuration
+
+        Function is called at initialisation and should not be called
+        by user code
+
         Prepare a folder to save the raw data in and set up the client
         configuration so that the zmq-client writes into that folder
         It is expected that the folder is empty before every measurement
         as the filename of the zmq-client is not easily predictable
         """
-        if self.run_in_progress:
-            raise DAQError("A run has already been started")
         # get the location for the placement of the files by the
         # zmq-client, if one is already configured then use it
         # otherwise generate a new one
         client_config = self.client.get_config()
-        if 'outputDirectory' in client_config.keys():
-            self.daq_data_base_path = Path(
-                    client_config['outputDirectory'])
-        else:
-            self.daq_data_base_path = Path('/tmp')
-            client_config['outputDirectory'] = \
-                str(self.daq_data_base_path)
-        if 'run_type' in client_config.keys():
-            self.run_uuid = client_config['run_type']
-            self.daq_data_folder = self.daq_data_base_path /\
-                self.run_uuid
-        else:
-            self.run_uuid = uuid.uuid1().hex
-            self.daq_data_folder = self.daq_data_base_path /\
-                self.run_uuid
-            client_config['run_type'] = self.run_uuid
+        self.run_uuid = uuid.uuid1().hex
+        self.daq_data_folder = Path('/tmp') / self.run_uuid
+        client_config['outputDirectory'] = str(self.daq_data_folder)
+        client_config['run_type'] = self.run_uuid
         if not os.path.isdir(self.daq_data_folder):
             os.mkdir(self.daq_data_folder)
 
@@ -352,20 +378,21 @@ class DAQSystem:
         the location given by the 'output_data_path' argument of the function
         after the daq for the run has concluded
         """
-        if not self.run_in_progress:
-            raise DAQError("A DAQ run has to be started via the 'start_run'"
-                           " function before data can be taken")
         if not self.server.is_done():
             raise DAQError("The server should not be running an acquisition")
+        self.client.config_written = False
+        self.client.configure()
         self.client.start()
         self.server.start()
-        while not self.server.is_done():
+        while not self.server.is_done() or\
+                len(os.listdir(self.daq_data_folder)) == 0:
             sleep(0.01)
-        files = list(self.daq_data_folder.glob('*.raw'))
-        if len(files) > 1:
+        data_files = os.listdir(self.daq_data_folder)
+        if len(data_files) > 1:
             raise DAQError("More than one file was found in the"
                            f" {self.daq_data_folder.resolve()} folder")
-        os.rename(files[0], output_data_path)
+        data_file = data_files[0]
+        shutil.move(self.daq_data_folder / data_file, output_data_path)
         self.server.stop()
         self.client.stop()
 

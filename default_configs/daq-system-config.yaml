@@ -7,12 +7,12 @@ client:
 server:
   hostname: hc640256
   port: 6000
-  IdelayStep: 8
-  NChips: 3
-  NEvents: 5000
+  IdelayStep: '8'
+  NChips: '3'
+  NEvents: '5000'
   Number_of_events_per_readout: '-1'
-  zmqPushPull_port: 8888
-  delayScanData_port: 8889
+  zmqPushPull_port: '8888'
+  delayScanData_port: '8889'
   elinks_daq:
     - {name: 'link0', polarity: 0, idcode: 0}
     - {name: 'link1', polarity: 1, idcode: 1}
@@ -43,8 +43,8 @@ server:
   - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
   - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
   l1a_settings:
-    bx_spacing: 0x2b         #Minimum bx spcing between random or external triggers i.e. here : 43 BX between 2 consecutive L1A (when reading 1 BX per event)
-    external_debounce: 0x0   #flags to indicate if external L1A should be debounced (generally a fine idea)
-    length: 0x1              #number of consequitive L1A to send in case of external trigger; don't know yet if it will have any effect on rand L1A gen
-    ext_delay: 0x0           #8-bit delays for each external L1A input
-    log2_rand_bx_period: 0x0  #LOG2(random period) (bigger numbers -> slower trigger rate)
+    bx_spacing: '0x2b'         #Minimum bx spcing between random or external triggers i.e. here : 43 BX between 2 consecutive L1A (when reading 1 BX per event)
+    external_debounce: '0x0'   #flags to indicate if external L1A should be debounced (generally a fine idea)
+    length: '0x1'              #number of consequitive L1A to send in case of external trigger; don't know yet if it will have any effect on rand L1A gen
+    ext_delay: '0x0'           #8-bit delays for each external L1A input
+    log2_rand_bx_period: '0x0'  #LOG2(random period) (bigger numbers -> slower trigger rate)
