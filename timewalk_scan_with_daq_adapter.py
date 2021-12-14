@@ -155,8 +155,8 @@ def main(data_dir: click.Path, systemconfig, targetconfig, targetpoweronstate):
     # connect to the hexaboard
     target_power_on_state = yaml.safe_load(targetpoweronstate)
     target_init_config = yaml.safe_load(targetconfig)
-    target_config = cfu.update_dict(target_power_on_state, target_init_config)
-    hexaboard = TargetAdapter(target_config)
+    hexaboard = TargetAdapter(target_power_on_state)
+    hexaboard.configure(target_init_config)
 
     # configure the run
     run_config = {
