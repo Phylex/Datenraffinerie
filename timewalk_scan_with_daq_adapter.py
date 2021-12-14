@@ -155,7 +155,7 @@ def main(data_dir: click.Path, systemconfig, targetconfig, targetpoweronstate):
     # connect to the hexaboard
     target_power_on_state = yaml.safe_load(targetpoweronstate)
     target_init_config = yaml.safe_load(targetconfig)
-    hexaboard = TargetAdapter(target_power_on_state)
+    hexaboard = TargetAdapter(target_power_on_state, target_init_config)
     hexaboard.configure(target_init_config)
 
     # configure the run
