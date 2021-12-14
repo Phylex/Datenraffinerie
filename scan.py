@@ -9,8 +9,7 @@ import operator
 import pandas as pd
 import luigi
 import yaml
-from config_utilities import generate_patch
-from config_utilities import patch_configuration
+import config_utilities as cfu
 from valve_yard import ValveYard
 
 class Configuration(luigi.Task):
@@ -27,6 +26,9 @@ class Configuration(luigi.Task):
     root_config_path = luigi.Parameter(significant=False)
 
     def requires(self):
+        # if a calibration is needed then the delegate finding
+        # the calibration and adding the subsequent tasks to the
+        # to the ValveYard
         if self.calibration is not None:
             return ValveYard(self.root_config_path,
                              self.calibration)
@@ -37,8 +39,15 @@ class Configuration(luigi.Task):
         return luigi.LocalTarget(output_path)
 
     def run(self):
-        with self.output().open('w') as conf_out:
-            yaml.dump(self.target_config, conf_out)
+        if self.calibration is not None:
+            calib_file = self.input()[0].open('r')
+            calibration = yaml.safe_load(calib_file)
+            out_config = cfu.update_dict(self.target_config, calibration)
+        else:
+            out_config = self.target_config
+        with self.output().open('w') as conf_out_file:
+            yaml.dump(out_config, conf_out_file)
+
 
 class Measurement(luigi.Task):
     """
@@ -46,7 +55,6 @@ class Measurement(luigi.Task):
     """
     # configuration and connection to the target
     # (aka hexaboard/SingleROC tester)
-    target_config = luigi.DictParameter()
     target_conn = luigi.Parameter()
 
     # Directory that the data should be stored in
@@ -60,8 +68,10 @@ class Measurement(luigi.Task):
 
     # calibration if one is required
     calibration = luigi.OptionalParameter(default=None,
-                                          significant=False)
+                                          significant=True)
     root_config_path = luigi.Parameter(significant=False)
+
+    recources = {'hexacontroller': 1}
 
     def requires(self):
         return Configuration(self.target_config,
@@ -93,7 +103,7 @@ class Measurement(luigi.Task):
         data_file = self.output()
         self.daq_system.configure(self.daq_system_config)
         self.target_conn.configure(target_config)
-        self.daq_system.acquire_measurement(data_file.path)
+        self.daq_system.take_data(data_file.path)
 
 
 class Format(luigi.Task):
@@ -177,7 +187,8 @@ class Scan(luigi.Task):
     daq_system_config = luigi.DictParameter(significant=False)
 
     # calibration if one is required
-    calibration = luigi.Parameter()
+    calibration = luigi.OptionalParameter(significant=True,
+                                          default=False)
 
     supported_formats = ['hdf5']
 
