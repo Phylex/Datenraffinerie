@@ -1,10 +1,14 @@
 - name: injection_scan
   type: daq
   calibration: 'pedestal_calibration'
+  target_settings:
+    power_on_default: ../default_configs/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../default_configs/initLDV3.yaml
+    overrides:
   daq_settings:
     default: ../default_configs/daq-system-config.yaml
     server_override:
-      NEvents: '4000'
+      NEvents: 4000
     client_override:
       hw_type: HD
   parameters:
@@ -17,11 +21,15 @@
 - name: timewalk_scan
   type: daq
   calibration: 'pedestal_calibration'
+  target_settings:
+    power_on_default: ../default_configs/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../default_configs/initLDV3.yaml
+    overrides:
   daq_settings:
     default: ../default_configs/daq-system-config.yaml
     server_override:
       port: 7777
-      IdelayStep: '3'
+      IdelayStep: 3
     client_override:
       server_port: 7777
   parameters:
@@ -38,6 +46,10 @@
 
 - name: pedestal_scan
   type: daq
+  target_settings:
+    power_on_default: ../default_configs/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../default_configs/initLDV3.yaml
+    overrides:
   daq_settings:
     default: ../default_configs/daq-system-config.yaml
     server_override:
