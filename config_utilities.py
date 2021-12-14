@@ -184,29 +184,27 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
     scan_file_dir = os.path.dirname(scan_config_path)
 
     # check if any calibrations need to be performed before taking data
-    calibration = None
-    if 'calibration' in scan_config.keys():
+    try:
         calibration = scan_config['calibration']
+    except KeyError:
+        calibration = None
 
     # parse the daq-system configuration
-    if 'daq_settings' not in scan_config.keys():
-        raise ConfigFormatError("A daq Task must specify a 'daq_settings'"
-                                " section that at least contains the path"
-                                " to the default system config used")
-    if 'default' not in scan_config['daq_settings']:
-        raise ConfigFormatError("A daq Task must provide the full daq-system"
-                                " configuration via a link to a default file"
-                                " with the 'default' entry in the yaml file")
     # build the path for the default config
-    default_daq_settings_path = scan_file_dir / \
-        Path(scan_config['daq_settings']['default'])
+    try:
+        default_daq_settings_path = scan_file_dir / \
+            Path(scan_config['daq_settings']['default'])
+    except KeyError as err:
+        raise ConfigFormatError("A daq Task must specify a 'daq_settings'"
+                                " section that at least contains the "
+                                "'default' key pointing"
+                                " to the default system config used") from err
     # load the default config
     if not default_daq_settings_path.is_file():
         raise ConfigFormatError(f"The path specified for the default config"
                                 f"of the daq_settings in {daq_label} does"
                                 " not exist")
     default_daq_config = load_configuration(default_daq_settings_path)
-
     # apply the override parameters for the server and the client
     patched_daq_system_config = default_daq_config.copy()
     for override_prefix in ['server', 'client']:
@@ -224,6 +222,34 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
         else:
             raise ConfigFormatError(f"The {override_key} section in the daq"
                                     f"task {daq_label} must be a yaml dict")
+
+    # load the power on and initial config for the target
+    try:
+        target_config = scan_config['target_settings']
+    except KeyError as err:
+        raise ConfigFormatError(f"The 'target_settings' section in the daq"
+                                f" task {daq_label} is missing") from err
+    try:
+        target_power_on_config_path = target_config['power_on_default']
+    except KeyError as err:
+        raise ConfigFormatError(f"The 'power_on_default' key in the daq"
+                                f" task {daq_label} is missing. It should"
+                                "be a path to the power on default config"
+                                " of the target") from err
+    target_power_on_config_path = scan_config_path /\
+        target_power_on_config_path
+    target_power_on_config = load_configuration(
+            target_power_on_config_path)
+    try:
+        initial_config_path = target_config['initial_config']
+    except KeyError as err:
+        raise ConfigFormatError(f"The 'initial_config' key in the daq"
+                                f" task {daq_label} is missing. It should"
+                                "be a path to the configuration of the "
+                                " target at the beginning of the measure"
+                                "ments") from err
+    initial_config_path = scan_config_path / initial_config_path
+    target_initial_config = load_configuration(initial_config_path)
 
     # parse the scan dimensions
     scan_parameters = []
@@ -253,7 +279,13 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
                                     " dimensions")
         scan_range = list(range(start, stop, step))
         scan_parameters.append((scan_dimension['key'], scan_range))
-    return (scan_parameters, calibration, daq_label, patched_daq_system_config)
+    return {'parameters': scan_parameters,
+            'calibration': calibration,
+            'name': daq_label,
+            'type': 'daq',
+            'target_power_on_default_config': target_power_on_config,
+            'target_init_config': target_initial_config,
+            'daq_system_config': patched_daq_system_config}
 
 
 def parse_analysis_config(analysis_config: dict) -> tuple:
@@ -281,7 +313,10 @@ def parse_analysis_config(analysis_config: dict) -> tuple:
             raise ConfigFormatError("The parameters of an analysis must be"
                                     " a dictionary")
         analysis_parameters = analysis_config['parameters']
-    return (analysis_parameters, daq, analysis_label)
+    return {'parameters': analysis_parameters,
+            'daq': daq,
+            'name': analysis_label,
+            'type': 'analysis'}
 
 
 def parse_config_entry(entry: dict, path: str):
@@ -426,8 +461,8 @@ def test_parse_config_entry():
     config = load_configuration(scan_test_config)
     names = ['injection_scan', 'timewalk_scan', 'pedestal_scan']
     lengths = [1, 2, 1]
-    expected_diffs = [{'server': {'NEvents': '4000'}, 'client': {'hw_type': 'HD'}},
-                      {'server': {'port': 7777, 'IdelayStep': '3'},
+    expected_diffs = [{'server': {'NEvents': 4000}, 'client': {'hw_type': 'HD'}},
+                      {'server': {'port': 7777, 'IdelayStep': 3},
                        'client': {'server_port': 7777}},
                       None]
     for entry, name, length, daq_diff in \
