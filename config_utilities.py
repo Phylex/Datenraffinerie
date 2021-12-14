@@ -104,16 +104,16 @@ def generate_patch(keys: list, value):
     and all the keys. This function does that
     """
     keys.reverse()
-    patch = {}
-    patch[keys[0]] = value
-    for key in keys[1:]:
+    current_root = value
+    for key in keys:
+        level = {}
         if isinstance(key, list):
-            patch = {key[0]: patch}
-            for subkey in key[1:]:
-                patch[subkey] = patch[key[0]]
+            for subkey in key:
+                level[subkey] = deepcopy(current_root)
         else:
-            patch = {key: patch}
-    return patch
+            level[key] = current_root
+        current_root = level
+    return current_root
 
 
 def diff_dict(d1: dict, d2: dict) -> dict:
@@ -426,8 +426,8 @@ def test_parse_config_entry():
     config = load_configuration(scan_test_config)
     names = ['injection_scan', 'timewalk_scan', 'pedestal_scan']
     lengths = [1, 2, 1]
-    expected_diffs = [{'server': {'NEvents': 4000}, 'client': {'hw_type': 'HD'}},
-                      {'server': {'port': 7777, 'IdelayStep': 3},
+    expected_diffs = [{'server': {'NEvents': '4000'}, 'client': {'hw_type': 'HD'}},
+                      {'server': {'port': 7777, 'IdelayStep': '3'},
                        'client': {'server_port': 7777}},
                       None]
     for entry, name, length, daq_diff in \
