@@ -3,8 +3,7 @@ timewalk scan that uses the tools and libraries developed for the
 datenraffinerie as a trial by fire for them
 """
 import os
-import datetime
-import copy
+import logging
 from pathlib import Path
 import yaml
 import click
@@ -15,12 +14,22 @@ import config_utilities as cfu
 ROCS = ['roc_s0', 'roc_s1', 'roc_s2']
 SCAN_NAME = 'timewalk_scan'
 
+logger = logging.getLogger('hexactrl_script')
+logger.setLevel(logging.DEBUG)
+fh = logging.FileHandler('new_daq_timewalk_scan.log')
+fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(levelname)s : %(name)s  -  %(message)s')
+fh.setFormatter(formatter)
+logger.addHandler(fh)
+
+
 def connect_injector_and_diff_capacitors(channels, gain):
     """
     Setup the internal injection circuit to do the pulse-height scan
     Connect the Internal injection circuit to the differentiating Capacitors
 
-    Depending on the gain connect different capacitors to the Internal injection circuit:
+    Depending on the gain connect different capacitors to the Internal
+    injection circuit:
     Gain = 2:
         10pF (HighRange) and the 500fF (LowRange) capacitor
     Gain = 1:
@@ -36,7 +45,8 @@ def connect_injector_and_diff_capacitors(channels, gain):
     # connect the internal injection circuit with the capacitor inputs
     patch_key = [ROCS, 'ReferenceVoltage', list(range(2)), 'IntCtest']
     test_mode_patch = cfu.generate_patch(patch_key, 1)
-    # connect the capacitors of the channels of interest to the injection circuit
+    # connect the capacitors of the channels of interest to the injection
+    # circuit
     patch_key = [ROCS, 'ch', channels, gain_map[gain]]
     channel_config_patch = cfu.generate_patch(patch_key, 1)
     return cfu.update_dict(test_mode_patch, channel_config_patch)
@@ -104,7 +114,6 @@ def timewalk_scan(hexaboard, daq_system, run_config):
         yaml.dump(daq_system.server.get_config(), daq_system_config_file)
 
 
-    hexaboard.resettdc()
     # set up the injection mechanism of the roc
     injector_config_patch = connect_injector_and_diff_capacitors(Channels, gain)
     # configure the phase for the injection for every roc in the config

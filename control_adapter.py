@@ -11,6 +11,7 @@ their behaviour
 """
 from time import sleep
 import os
+import logging
 import shutil
 from pathlib import Path
 import uuid
@@ -18,6 +19,7 @@ import zmq
 import yaml
 from config_utilities import diff_dict, update_dict
 
+module_logger = logging.getLogger('hexactrl_shostnameipt.control_adapter')
 
 class DAQError(Exception):
     def __init__(self, message):
@@ -39,6 +41,7 @@ class ControlAdapter:
         configuration after the initialisation will be written to the
         target program
         """
+        self.logger = logging.getLogger('hexactrl_script.contol_adapter.ControlAdapter')
         config, hostname, port = self._filter_out_network_config(config)
         self.hostname = hostname
         self.port = port
@@ -83,15 +86,22 @@ class ControlAdapter:
         # if there is no difference between the configs simply return
         if len(write_config.items()) == 0:
             return
+
+        self.logger.debug(f"Sending string 'configure' to {self.hostname}:{self.port}")
         self.socket.send_string("configure")
         rep = self.socket.recv_string()
+        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
         if "ready" not in rep.lower():
             raise ValueError(
                     "The configuration cannot be "
                     f" written to {self.hostname}. The target"
                     f"responded with {rep}")
-        self.socket.send_string(yaml.dump(write_config))
+        serialized_config = yaml.dump(write_config)
+        self.logger.debug(f"Sending configuration:\n {serialized_config}"
+                f" to {self.hostname}:{self.port}")
+        self.socket.send_string(serialized_config)
         rep = self.socket.recv_string()
+        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
         if not rep == 'Configured' and not rep == 'ROC(s) CONFIGURED\n...\n':
             raise DAQError("The configuration endpoint did not indicate "
                     " a successful configuration")
@@ -131,6 +141,11 @@ class TargetAdapter(ControlAdapter):
     Hexboards) currrently uses the zmq_i2c server
     """
 
+    def __init__(self, config):
+        super().__init__(config)
+        self.logger = logging.getLogger(
+                'hexactrl_script.contol_adapter.TargetAdapter')
+
     def read_config(self, parameter: dict):
         """
         Read the values set on the ROC directly from it
@@ -147,27 +162,45 @@ class TargetAdapter(ControlAdapter):
             values to this function which will in turn return these values
             to the caller
         """
-        self.socket.send_string("read")
-        _ = self.socket.recv_string()
+        msg = 'read'
+        self.logger.debug(f"Sending string '{msg}' to {self.hostname}:{self.port}")
+        self.socket.send_string(msg)
+        rep = self.socket.recv_string()
+        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
         if parameter:
-            self.socket.send_string(yaml.dump(parameter))
+            read_params = yaml.dump(parameter)
+            self.logger.debug(f"Sending parameters to read:\n {read_params}"
+                    f" to {self.hostname}:{self.port}")
+            self.socket.send_string(read_params)
         else:
             # this reads all the values in the cache of the zmq server
             # from the roc and then returns what is in the cache
+            self.logger.debug(f"Sending parameters to read:\n ''"
+                    f" to {self.hostname}:{self.port}")
             self.socket.send_string("")
-        return yaml.safe_load(self.socket.recv_string())
+            read_values = self.socket.recv_string()
+        self.logger.debug("Received params read from target on "
+                f"{self.hostname}:{self.port}:\n"
+                f"{read_values}")
+        return yaml.safe_load(read_values)
 
     def read_pwr(self):
         # only valid for hexaboard/trophy systems
-        self.socket.send_string("read_pwr")
+        msg = 'read_pwr'
+        self.logger.debug(f"Sending string '{msg}' to {self.hostname}:{self.port}")
+        self.socket.send_string(msg)
         rep = self.socket.recv_string()
+        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
         pwr = yaml.safe_load(rep)
-        return(pwr)
+        return pwr
 
     def resettdc(self):
-        self.socket.send_string("resettdc")
+        msg = 'resettdc'
+        self.logger.debug(f"Sending string '{msg}' to {self.hostname}:{self.port}")
+        self.socket.send_string(msg)
         rep = self.socket.recv_string()
-        return(yaml.safe_load(rep))
+        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+        return yaml.safe_load(rep)
 
     def measadc(self, yamlNode: dict = None) -> dict:
         # only valid for hexaboard/trophy systems
@@ -183,7 +216,7 @@ class TargetAdapter(ControlAdapter):
         self.socket.send_string(yaml.dump(config))
         rep = self.socket.recv_string()
         adc = yaml.safe_load(rep)
-        return(adc)
+        return adc
 
 
 class DAQAdapter(ControlAdapter):
@@ -205,6 +238,8 @@ class DAQAdapter(ControlAdapter):
         """
         self.variant = variant
         super().__init__(config)
+        self.logger = logging.getLogger(
+                f'hexactrl_script.contol_adapter.DAQAdapter.{self.variant}')
         config, _, _ = self._filter_out_network_config(config)
         self.configuration = {self.variant_key_map[self.variant]: config}
 
@@ -219,9 +254,6 @@ class DAQAdapter(ControlAdapter):
                     self.configuration,
                     {self.variant_key_map[self.variant]: config})
             self.config_written = False
-        if not self.is_done():
-            raise DAQError("DAQ system is running, it should not be")
-        self.stop()
         super().configure()
 
     def get_config(self):
@@ -233,16 +265,21 @@ class DAQAdapter(ControlAdapter):
         """
         rep = ""
         while "running" not in rep.lower():
-            self.socket.send_string("start")
+            msg = 'start'
+            self.logger.debug(f"Sending string {msg} to {self.hostname}:{self.port}")
+            self.socket.send_string(msg)
             rep = self.socket.recv_string()
-            print(rep)
+            self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
 
     def is_done(self):
         """
         check if the current aquisition is ongoing or not
         """
-        self.socket.send_string("run_done")
+        msg = 'run_done'
+        self.logger.debug(f"Sending string {msg} to {self.hostname}:{self.port}")
+        self.socket.send_string(msg)
         rep = self.socket.recv_string()
+        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
         if "notdone" in rep:
             return False
         return True
@@ -251,8 +288,11 @@ class DAQAdapter(ControlAdapter):
         """
         stop the currently running measurement
         """
-        self.socket.send_string("stop")
+        msg = 'stop'
+        self.logger.debug(f"Sending string {msg} to {self.hostname}:{self.port}")
+        self.socket.send_string(msg)
         rep = self.socket.recv_string()
+        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
         print(rep)
         if not rep == 'Data puller stopped' and\
                 not rep == 'Stopped':
@@ -267,9 +307,11 @@ class DAQAdapter(ControlAdapter):
         # only for daq server to run a delay scan
         rep = ""
         while "delay_scan_done" not in rep:
-            self.socket.send_string("delayscan")
+            msg = 'delayscan'
+            self.logger.debug(f"Sending string {msg} to {self.hostname}:{self.port}")
+            self.socket.send_string(msg)
             rep = self.socket.recv_string()
-            print(rep)
+            self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
 
 
 class DAQSystem:
@@ -378,8 +420,6 @@ class DAQSystem:
         the location given by the 'output_data_path' argument of the function
         after the daq for the run has concluded
         """
-        if not self.server.is_done():
-            raise DAQError("The server should not be running an acquisition")
         self.client.config_written = False
         self.client.configure()
         self.client.start()
