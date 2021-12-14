@@ -4,7 +4,7 @@
   daq_settings:
     default: ../default_configs/daq-system-config.yaml
     server_override:
-      NEvents: 4000
+      NEvents: '4000'
     client_override:
       hw_type: HD
   parameters:
@@ -21,7 +21,7 @@
     default: ../default_configs/daq-system-config.yaml
     server_override:
       port: 7777
-      IdelayStep: 3
+      IdelayStep: '3'
     client_override:
       server_port: 7777
   parameters:
