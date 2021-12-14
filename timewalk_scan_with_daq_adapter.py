@@ -124,7 +124,7 @@ def timewalk_scan(hexaboard, daq_system, run_config):
     for index, pulseheight in enumerate(run_config['calibDAC']):
         calib_dac_patch = set_calibDAC(pulseheight)
         run_config = cfu.update_dict(hexaboard_patch, calib_dac_patch)
-        hexaboard.configure(run_config)
+        hexaboard.configure(run_config, diff=True)
         with open(Path(output_dir) / ('run_' + str(index) + '.yaml'), 'w+', encoding='utf-8')\
                 as run_conf_file:
             yaml.dump(hexaboard.configuration, run_conf_file)
@@ -149,14 +149,13 @@ def main(data_dir: click.Path, systemconfig, targetconfig, targetpoweronstate):
     output_dir = data_dir
 
     # connect to the different daq programs to be able to configure them
-    systemconfig = yaml.safe_load(systemconfig)
-    daq_system = DAQSystem(systemconfig)
+    default_system_config = yaml.safe_load(systemconfig)
+    daq_system = DAQSystem(default_system_config)
 
     # connect to the hexaboard
     target_power_on_state = yaml.safe_load(targetpoweronstate)
     target_init_config = yaml.safe_load(targetconfig)
     hexaboard = TargetAdapter(target_power_on_state, target_init_config)
-    hexaboard.configure(target_init_config)
 
     # configure the run
     run_config = {
