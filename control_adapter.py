@@ -26,13 +26,17 @@ class DAQError(Exception):
         self.message = message
 
 
+class DAQConfigError(Exception):
+    def __init__(self, message):
+        self.message = message
+
 class ControlAdapter:
     """
     Class that encapsulates the configuration and communication to either
     the client or the server of the daq-system
     """
 
-    def __init__(self, config):
+    def __init__(self, config: dict, hostname: str = None, port: str = None):
         """
         Initialize the data structure on the control computer (the one
         coordinating everything) and connect to the system component.
@@ -41,8 +45,18 @@ class ControlAdapter:
         configuration after the initialisation will be written to the
         target program
         """
-        self.logger = logging.getLogger('hexactrl_script.contol_adapter.ControlAdapter')
-        config, hostname, port = self._filter_out_network_config(config)
+        self.logger = logging.getLogger(
+                'hexactrl_script.contol_adapter.ControlAdapter')
+        config, config_hostname, config_port = self._filter_out_network_config(
+                config)
+        if hostname is None:
+            if config_hostname is None:
+                raise DAQConfigError('No hostname given')
+            hostname = config_hostname
+        if port is None:
+            if config_port is None:
+                raise DAQConfigError('No port given')
+            port = config_port
         self.hostname = hostname
         self.port = port
         self.context = zmq.Context()
@@ -82,9 +96,9 @@ class ControlAdapter:
                 write_config = self.configuration
                 self.config_written = True
             else:
-                write_config = {}
+                write_config = None
         # if there is no difference between the configs simply return
-        if len(write_config.items()) == 0:
+        if write_config is None:
             return
 
         self.logger.debug(f"Sending string 'configure' to {self.hostname}:{self.port}")
@@ -141,8 +155,22 @@ class TargetAdapter(ControlAdapter):
     Hexboards) currrently uses the zmq_i2c server
     """
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, power_on_default: dict, initial_config: dict = None):
+        try:
+            hostname = power_on_default['hostname']
+            port = power_on_default['port']
+        except KeyError:
+            if initial_config is not None:
+                try:
+                    hostname = initial_config['hostname']
+                    port = initial_config['port']
+                except KeyError as err:
+                    raise DAQConfigError('A hostname and port are not '
+                                         ' present in any configuration'
+                                         ' received') from err
+        super().__init__(power_on_default, hostname=hostname, port=port)
+        if initial_config is not None:
+            self.configure(initial_config)
         self.logger = logging.getLogger(
                 'hexactrl_script.contol_adapter.TargetAdapter')
 
@@ -207,7 +235,6 @@ class TargetAdapter(ControlAdapter):
         self.socket.send_string("measadc")
         rep = self.socket.recv_string()
         if rep.lower().find("ready") < 0:
-            print(rep)
             return
         if yamlNode is not None:
             config = yamlNode
@@ -293,7 +320,6 @@ class DAQAdapter(ControlAdapter):
         self.socket.send_string(msg)
         rep = self.socket.recv_string()
         self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
-        print(rep)
         if not rep == 'Data puller stopped' and\
                 not rep == 'Stopped':
             raise DAQError('Response of the zmq-client to'
