@@ -30,6 +30,7 @@ class DAQConfigError(Exception):
     def __init__(self, message):
         self.message = message
 
+
 class ControlAdapter:
     """
     Class that encapsulates the configuration and communication to either
@@ -77,34 +78,52 @@ class ControlAdapter:
         self.socket = context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
 
-    def configure(self, config=None):
+    def configure(self, config=None, force=False, diff=False):
         """
         send the configuration to the corresponding system component and wait
         for the configuration to be completed
+
+        This function has to pick the right configuration to send depending on
+        the force and diff flags
+
+        Arguments:
+            diff: if this flag is set, the caller knows that this is only an
+            update to the configuration already on the system, so no diff
+            has to be performed first. If this flag is false/unset then the
+            entry is run through the cach first and only the difference of
+            the config passed and the cached config is sent to the endpoint
+
+            force: if this flag is set the cache is ignored. In this case
+            the cache is updated with the new values in the config passed
+            in (if there is any) and then every value in the cache is sent
+            to the endpoint.
+            if this flag is false/unset then the diff between the config
+            passed in and the cache is sent. If no config is passed, then
+            the function checks if the values of the cache have been sent
+            to the endpoint yet. If the 'config_written' flag is set it exits
+            otherwise it configures the endpoint with the current content
+            of the cache
         """
         if config is not None:
             config, _, _= self._filter_out_network_config(config)
-            write_config = diff_dict(self.configuration, config)
-
-            # This case appears during the use of the zmq i2c server
-            # as there the first write access should not write the entire
-            # config as we expect the chip to be in the power on / reset
-            # state
-            self.config_written = True
+            if diff is False:
+                if force is True:
+                    self.configuration = update_dict(self.configuration, config)
+                    write_config = self.configuration
+                else:
+                    write_config = diff_dict(self.configuration, config)
+            else:
+                write_config = config
         else:
-            if not self.config_written:
+            if not self.config_written or force is True:
                 write_config = self.configuration
-                self.config_written = True
             else:
                 write_config = None
         # if there is no difference between the configs simply return
         if write_config is None:
             return
 
-        self.logger.debug(f"Sending string 'configure' to {self.hostname}:{self.port}")
-        self.socket.send_string("configure")
-        rep = self.socket.recv_string()
-        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+        rep = self._send_and_log('configure')
         if "ready" not in rep.lower():
             raise ValueError(
                     "The configuration cannot be "
@@ -120,6 +139,14 @@ class ControlAdapter:
             raise DAQError("The configuration endpoint did not indicate "
                     " a successful configuration")
         self.configuration = update_dict(self.configuration, write_config)
+        self.config_written = True
+
+    def _send_and_log(self, msg: str):
+        self.logger.debug(f"Sending string '{msg}' to {self.hostname}:{self.port}")
+        self.socket.send_string(msg)
+        rep = self.socket.recv_string()
+        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+        return rep
 
     @staticmethod
     def _filter_out_network_config(config):
@@ -156,6 +183,18 @@ class TargetAdapter(ControlAdapter):
     """
 
     def __init__(self, power_on_default: dict, initial_config: dict = None):
+        """
+        Initializes the target Board and loads an initial config onto it
+
+        Arguments:
+            power_on_default: This dict should hold the power on default
+            configuration of the target system. The class assumes that
+            the system is in the power on reset state at initialisation
+
+            initial_config: This config is assumed to be the goal state
+            of the system, if it is passed during initialisation it is
+            written to the target system
+        """
         try:
             hostname = power_on_default['hostname']
             port = power_on_default['port']
@@ -169,10 +208,11 @@ class TargetAdapter(ControlAdapter):
                                          ' present in any configuration'
                                          ' received') from err
         super().__init__(power_on_default, hostname=hostname, port=port)
-        if initial_config is not None:
-            self.configure(initial_config)
         self.logger = logging.getLogger(
                 'hexactrl_script.contol_adapter.TargetAdapter')
+        self.config_written = True
+        if initial_config is not None:
+            self.configure(initial_config, diff=True)
 
     def read_config(self, parameter: dict):
         """
@@ -190,11 +230,7 @@ class TargetAdapter(ControlAdapter):
             values to this function which will in turn return these values
             to the caller
         """
-        msg = 'read'
-        self.logger.debug(f"Sending string '{msg}' to {self.hostname}:{self.port}")
-        self.socket.send_string(msg)
-        rep = self.socket.recv_string()
-        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+        _ = self._send_and_log('read')
         if parameter:
             read_params = yaml.dump(parameter)
             self.logger.debug(f"Sending parameters to read:\n {read_params}"
@@ -214,20 +250,12 @@ class TargetAdapter(ControlAdapter):
 
     def read_pwr(self):
         # only valid for hexaboard/trophy systems
-        msg = 'read_pwr'
-        self.logger.debug(f"Sending string '{msg}' to {self.hostname}:{self.port}")
-        self.socket.send_string(msg)
-        rep = self.socket.recv_string()
-        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+        rep = self._send_and_log('read_pwr')
         pwr = yaml.safe_load(rep)
         return pwr
 
     def resettdc(self):
-        msg = 'resettdc'
-        self.logger.debug(f"Sending string '{msg}' to {self.hostname}:{self.port}")
-        self.socket.send_string(msg)
-        rep = self.socket.recv_string()
-        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+        rep = self._send_and_log('resettdc')
         return yaml.safe_load(rep)
 
     def measadc(self, yamlNode: dict = None) -> dict:
@@ -248,7 +276,8 @@ class TargetAdapter(ControlAdapter):
 
 class DAQAdapter(ControlAdapter):
     """
-    Encapsulate the Access to the daq-client and server of the daq system.
+    A representation of the DAQ side of the system. It encapsulates the
+    zmq-server and zmq-client
     """
     variant_key_map = {'server': 'daq', 'client': 'global'}
 
@@ -267,8 +296,9 @@ class DAQAdapter(ControlAdapter):
         super().__init__(config)
         self.logger = logging.getLogger(
                 f'hexactrl_script.contol_adapter.DAQAdapter.{self.variant}')
-        config, _, _ = self._filter_out_network_config(config)
-        self.configuration = {self.variant_key_map[self.variant]: config}
+        self.configuration = {self.variant_key_map[self.variant]:
+                              self.configuration}
+        self.configure()
 
     def configure(self, config: dict = None):
         """
@@ -277,11 +307,10 @@ class DAQAdapter(ControlAdapter):
         """
         if config is not None:
             config, _, _ = self._filter_out_network_config(config)
-            self.configuration = update_dict(
-                    self.configuration,
-                    {self.variant_key_map[self.variant]: config})
-            self.config_written = False
-        super().configure()
+            super().configure({self.variant_key_map[self.variant]: config},
+                              force=True)
+        else:
+            super().configure(force=True)
 
     def get_config(self):
         return self.configuration[self.variant_key_map[self.variant]]
@@ -292,21 +321,13 @@ class DAQAdapter(ControlAdapter):
         """
         rep = ""
         while "running" not in rep.lower():
-            msg = 'start'
-            self.logger.debug(f"Sending string {msg} to {self.hostname}:{self.port}")
-            self.socket.send_string(msg)
-            rep = self.socket.recv_string()
-            self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+            rep = self._send_and_log('start')
 
     def is_done(self):
         """
         check if the current aquisition is ongoing or not
         """
-        msg = 'run_done'
-        self.logger.debug(f"Sending string {msg} to {self.hostname}:{self.port}")
-        self.socket.send_string(msg)
-        rep = self.socket.recv_string()
-        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+        rep = self._send_and_log('run_done')
         if "notdone" in rep:
             return False
         return True
@@ -315,11 +336,7 @@ class DAQAdapter(ControlAdapter):
         """
         stop the currently running measurement
         """
-        msg = 'stop'
-        self.logger.debug(f"Sending string {msg} to {self.hostname}:{self.port}")
-        self.socket.send_string(msg)
-        rep = self.socket.recv_string()
-        self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+        rep = self._send_and_log('stop')
         if not rep == 'Data puller stopped' and\
                 not rep == 'Stopped':
             raise DAQError('Response of the zmq-client to'
@@ -333,11 +350,7 @@ class DAQAdapter(ControlAdapter):
         # only for daq server to run a delay scan
         rep = ""
         while "delay_scan_done" not in rep:
-            msg = 'delayscan'
-            self.logger.debug(f"Sending string {msg} to {self.hostname}:{self.port}")
-            self.socket.send_string(msg)
-            rep = self.socket.recv_string()
-            self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
+            rep = self._send_and_log('delayscan')
 
 
 class DAQSystem:
@@ -356,7 +369,6 @@ class DAQSystem:
         server)
         """
         # set up the server part of the daq system (zmq-server)
-        self.run_in_progress = False
         self.daq_data_base_path = None
         self.daq_data_folder = None
         if 'server' not in daq_config.keys():
@@ -373,6 +385,7 @@ class DAQSystem:
         # accepts the configuration
         self.client = DAQAdapter(client_config, 'client')
         self._setup_data_taking_context()
+        self.client.configure()
 
     def __del__(self):
         self.tear_down_datat_taking_context()
@@ -446,7 +459,6 @@ class DAQSystem:
         the location given by the 'output_data_path' argument of the function
         after the daq for the run has concluded
         """
-        self.client.config_written = False
         self.client.configure()
         self.client.start()
         self.server.start()
