@@ -10,7 +10,6 @@ import pandas as pd
 import luigi
 import yaml
 import config_utilities as cfu
-from valve_yard import ValveYard
 
 class Configuration(luigi.Task):
     """
@@ -26,6 +25,7 @@ class Configuration(luigi.Task):
     root_config_path = luigi.Parameter(significant=False)
 
     def requires(self):
+        from valve_yard import ValveYard
         # if a calibration is needed then the delegate finding
         # the calibration and adding the subsequent tasks to the
         # to the ValveYard
@@ -56,6 +56,7 @@ class Measurement(luigi.Task):
     # configuration and connection to the target
     # (aka hexaboard/SingleROC tester)
     target_conn = luigi.Parameter()
+    target_config = luigi.Parameter()
 
     # Directory that the data should be stored in
     output_dir = luigi.Parameter()
@@ -100,7 +101,7 @@ class Measurement(luigi.Task):
         # task
         with self.input().open('r') as config_file:
             target_config = yaml.safe_load(config_file.read())
-        data_file = self.output()
+        data_file = self.output()[0]
         self.daq_system.configure(self.daq_system_config)
         self.target_conn.configure(target_config)
         self.daq_system.take_data(data_file.path)
