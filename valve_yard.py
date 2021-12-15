@@ -1,7 +1,10 @@
+import os
+from pathlib import Path
 import luigi
 from scan import Scan
 import config_utilities as cfu
 import control_adapter as ctrl
+
 
 class ValveYard(luigi.WrapperTask):
     root_config_file = luigi.Parameter(significant=True)
@@ -9,6 +12,17 @@ class ValveYard(luigi.WrapperTask):
     output_dir = luigi.Parameter(significant=True)
 
     def requires(self):
+        data_dir = Path(self.output_dir)
+        if data_dir.exists() and os.path.isfile(data_dir):
+            raise IOError(f"The path {data_dir} chosen for the data"
+                          " directory is occupied by a file, exiting...")
+        elif data_dir.exists() and os.path.isdir(data_dir) and\
+                len(list(data_dir.glob('*'))) > 0:
+            raise IOError(f"The data directory {data_dir} is already full,"
+                          " exititng...")
+        elif not data_dir.exists():
+            os.makedirs(data_dir)
+        output_dir = Path(data_dir)
         procedures, workflows = cfu.parse_config_file(self.root_config_file)
         procedure_names = list(map(lambda p: p['name'], procedures))
         if self.procedure_label in procedure_names:
@@ -30,7 +44,7 @@ class ValveYard(luigi.WrapperTask):
                     procedure['target_init_config'])
             return Scan(task_id=0,
                         label=self.procedure_label,
-                        output_dir=self.output_dir,
+                        output_dir=output_dir,
                         output_format='hdf5',
                         scan_parameters=procedure['parameters'],
                         target_conn=target_system,
