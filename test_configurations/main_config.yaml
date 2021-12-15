@@ -2,7 +2,7 @@ procedures:
   - name: timewalk_scan
     type: daq
     target_settings:
-      power_on_default: ../default_configs/V3LDHexaboard-poweron-default.yaml
+      power_on_default: ./default_configs/V3LDHexaboard-poweron-default.yaml
       initial_config: ./init_timewalk_scan.yaml
     daq_settings:
       default: ../default_configs/daq-system-config.yaml
