@@ -1,9 +1,18 @@
-libraries:
-  - "./calibration_procedures.yaml"
-  - "./scan_procedures.yaml"
-  - "./analysis_procedures.yaml"
-
-workflows:
-  - name: production_test
-    analyses:
-    - timewalk_analysis
+procedures:
+  - name: timewalk_scan
+    type: daq
+    target_settings:
+      power_on_default: ../default_configs/V3LDHexaboard-poweron-default.yaml
+      initial_config: ./initTimewalkScan.yaml
+    daq_settings:
+      default: ../default_configs/daq-system-config.yaml
+    parameters:
+      - key:
+        - ['roc_s0', 'roc_s1', 'roc_s2']
+        - 'ReferenceVoltage'
+        - [0, 1]
+        - 'Calib'
+        range:
+          start: 0
+          stop: 2048
+          step: 32
