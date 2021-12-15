@@ -5,7 +5,7 @@ procedures:
       power_on_default: ./default_configs/V3LDHexaboard-poweron-default.yaml
       initial_config: ./init_timewalk_scan.yaml
     daq_settings:
-      default: ../default_configs/daq-system-config.yaml
+      default: ./default_configs/daq-system-config.yaml
     parameters:
       - key:
         - ['roc_s0', 'roc_s1', 'roc_s2']
