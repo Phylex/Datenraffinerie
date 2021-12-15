@@ -5,6 +5,7 @@ hexaboard
 """
 from pathlib import Path
 from functools import reduce
+import os
 import operator
 import pandas as pd
 import luigi
@@ -18,11 +19,13 @@ class Configuration(luigi.Task):
     whole daq process
     """
     target_config = luigi.DictParameter(significant=False)
+    target_power_on_config = luigi.DictParameter(significant=False)
     label = luigi.Parameter(significant=True)
     output_dir = luigi.Parameter(significant=True)
     identifier = luigi.IntParameter(significant=True)
-    calibration = luigi.OptionalParameter(default=None)
-    root_config_path = luigi.Parameter(significant=False)
+    calibration = luigi.OptionalParameter(default=None,
+                                          significant=False)
+    root_config_path = luigi.Parameter(significant=True)
 
     def requires(self):
         from valve_yard import ValveYard
@@ -31,11 +34,12 @@ class Configuration(luigi.Task):
         # to the ValveYard
         if self.calibration is not None:
             return ValveYard(self.root_config_path,
-                             self.calibration)
+                             self.calibration,
+                             str(Path(self.output_dir).resolve()))
 
     def output(self):
-        output_path = Path(self.output_dir) / self.label +\
-            str(self.identifier) + '-config.yaml'
+        output_path = Path(self.output_dir) / (self.label +\
+            str(self.identifier) + '-config.yaml')
         return luigi.LocalTarget(output_path)
 
     def run(self):
@@ -55,27 +59,29 @@ class Measurement(luigi.Task):
     """
     # configuration and connection to the target
     # (aka hexaboard/SingleROC tester)
-    target_conn = luigi.Parameter()
-    target_config = luigi.Parameter()
-
-    # Directory that the data should be stored in
-    output_dir = luigi.Parameter()
-    label = luigi.Parameter()
-    identifier = luigi.IntParameter()
+    target_config = luigi.DictParameter(significant=False)
+    target_power_on_config = luigi.DictParameter(significant=False)
 
     # configuration of the (daq) system
-    daq_system = luigi.Parameter()
-    daq_system_config = luigi.DictParameter()
+    daq_system_config = luigi.DictParameter(significant=False)
+
+    # Directory that the data should be stored in
+    output_dir = luigi.Parameter(significant=True)
+    label = luigi.Parameter(significant=True)
+    identifier = luigi.IntParameter(significant=True)
+
+
+    root_config_path = luigi.Parameter(significant=False)
 
     # calibration if one is required
     calibration = luigi.OptionalParameter(default=None,
-                                          significant=True)
-    root_config_path = luigi.Parameter(significant=False)
+                                          significant=False)
 
     recources = {'hexacontroller': 1}
 
     def requires(self):
         return Configuration(self.target_config,
+                             self.target_power_on_config,
                              self.label,
                              self.output_dir,
                              self.identifier,
@@ -87,8 +93,8 @@ class Measurement(luigi.Task):
         Specify the output of this task to be the measured data along with the
         configuration of the target during the measurement
         """
-        data_path = Path(self.output_dir) / self.label +\
-            str(self.identifier) + '-data.raw'
+        data_path = Path(self.output_dir) / (self.label +\
+            str(self.identifier) + '-data.raw')
         return (luigi.LocalTarget(data_path), self.input())
 
     def run(self):
@@ -116,20 +122,21 @@ class Format(luigi.Task):
     # configuration and connection to the target
     # (aka hexaboard/SingleROC tester)
     target_config = luigi.DictParameter(significant=False)
-    target_conn = luigi.Parameter(significant=False)
-
-    # Directory that the data should be stored in
-    output_dir = luigi.Parameter(significant=False)
-    output_format = luigi.Parameter(significant=False)
-    label = luigi.Parameter(significant=False)
-    identifier = luigi.IntParameter(significant=True)
+    target_power_on_config = luigi.DictParameter(significant=False)
 
     # configuration of the (daq) system
-    daq_system = luigi.Parameter(significant=False)
     daq_system_config = luigi.DictParameter(significant=False)
 
+    # Directory that the data should be stored in
+    output_dir = luigi.Parameter(significant=True)
+    output_format = luigi.Parameter(significant=False)
+    label = luigi.Parameter(significant=True)
+    identifier = luigi.IntParameter(significant=True)
+
+
+    root_config_path = luigi.Parameter(significant=False)
     # calibration if one is required
-    calibration = luigi.Parameter()
+    calibration = luigi.Parameter(significant=False)
 
     def requires(self):
         """
@@ -137,12 +144,12 @@ class Format(luigi.Task):
         configuration file. These are returned by the 
         """
         return Measurement(self.target_config,
-                           self.target_conn,
+                           self.target_power_on_config,
+                           self.daq_system_config,
                            self.output_dir,
                            self.label,
                            self.identifier,
-                           self.daq_system,
-                           self.daq_system_config,
+                           self.root_config_path,
                            self.calibration)
 
     def output(self):
@@ -151,12 +158,19 @@ class Format(luigi.Task):
         the identifier is used to make the file unique from the other
         unpacking steps
         """
-        formatted_data_path = Path(self.output_dir) / self.label +\
-                str(self.identifier) + '.' + self.output_format
-        return luigi.LocalTarget(self.output_dir)
+        formatted_data_path = Path(self.output_dir) / \
+            (self.label + str(self.identifier) + '.' + self.output_format)
+        return luigi.LocalTarget(formatted_data_path.resolve())
 
     def run(self):
-        pass
+        data_file_path = Path(self.input()[0].path).resolve()
+        unpack_command = 'unpack'
+        input_file = '-i ' + str(data_file_path)
+        output_file = os.path.splitext(data_file_path)[0] + '.root'
+        output_command = '-o ' + output_file
+        full_unpack_command = unpack_command + input_file + output_command
+        print(full_unpack_command)
+        # os.system(full_unpack_command)
 
 
 class Scan(luigi.Task):
@@ -171,7 +185,7 @@ class Scan(luigi.Task):
     """
     # parameters describing the position of the parameters in the task
     # tree
-    task_id = luigi.Parameter(significant=True)
+    identifier = luigi.IntParameter(significant=True)
 
     # parameters describing to the type of measurement being taken
     # and the relevant information for the measurement/scan
@@ -182,14 +196,14 @@ class Scan(luigi.Task):
 
     # configuration of the target and daq system that is used to
     # perform the scan (This may be extended with an 'environment')
-    target_conn = luigi.Parameter(significant=False)
     target_config = luigi.DictParameter(significant=False)
-    daq_system = luigi.Parameter(significant=False)
+    target_power_on_config = luigi.DictParameter(significant=False)
     daq_system_config = luigi.DictParameter(significant=False)
 
+    root_config_path = luigi.Parameter(significant=True)
     # calibration if one is required
-    calibration = luigi.OptionalParameter(significant=True,
-                                          default=False)
+    calibration = luigi.OptionalParameter(significant=False,
+                                          default=None)
 
     supported_formats = ['hdf5']
 
@@ -205,7 +219,7 @@ class Scan(luigi.Task):
         """
         required_tasks = []
         values = self.scan_parameters[0][1]
-        parameter = self.scan_parameters[0][0]
+        parameter = list(self.scan_parameters[0][0])
         # if there are more than one entry in the parameter list the scan still
         # has more than one dimension. So spawn more scan tasks for the lower
         # dimension
@@ -216,37 +230,38 @@ class Scan(luigi.Task):
                                     [len(param[1]) for param in
                                      self.scan_parameters[1:]])
             for i, value in enumerate(values):
-                patch = generate_patch(
+                patch = cfu.generate_patch(
                             parameter, value)
-                subscan_target_config = patch_configuration(self.target_config,
-                                                            patch)
-                required_tasks.append(Scan(self.task_id + 1 + task_id_offset
+                subscan_target_config = cfu.update_dict(
+                        self.target_config,
+                        patch)
+                required_tasks.append(Scan(self.identifier + 1 + task_id_offset
                                            * i,
                                            self.label,
                                            self.output_dir,
                                            self.output_format,
                                            self.scan_parameters[1:],
-                                           self.target_conn,
                                            subscan_target_config,
-                                           self.daq_system,
+                                           self.target_power_on_config,
                                            self.daq_system_config,
+                                           self.root_config_path,
                                            self.calibration))
         # The scan has reached the one dimensional case. Spawn a measurement
         # for every value that takes part in the scan
         else:
             for i, value in enumerate(values):
-                patch = generate_patch(
-                        parameter, value)
-                measurement_config = patch_configuration(self.target_config,
-                                                         patch)
+                patch = cfu.generate_patch(parameter, value)
+                measurement_config = cfu.patch_configuration(
+                        self.target_config,
+                        patch)
                 required_tasks.append(Format(measurement_config,
-                                             self.target_conn,
+                                             self.target_power_on_config,
+                                             self.daq_system_config,
                                              self.output_dir,
                                              self.output_format,
                                              self.label,
-                                             self.task_id + i,
-                                             self.daq_system,
-                                             self.daq_system_config,
+                                             self.identifier + i,
+                                             self.root_config_path,
                                              self.calibration))
         return required_tasks
 
@@ -266,7 +281,10 @@ class Scan(luigi.Task):
         """
         generate the output file for the scan task
         """
-        if self.output_format not in self.supported_formats:
-            output_path = Path(self.output_dir) /\
-                          self.task_id + 'merged.' + self.output_format
-        return luigi.LocalTarget(output_path)
+        if self.output_format in self.supported_formats:
+            out_file = str(self.identifier) + 'merged.' + self.output_format
+            output_path = Path(self.output_dir) / out_file
+            return luigi.LocalTarget(output_path)
+        raise KeyError("The output format for the scans needs to"
+                       " one of the following:\n"
+                       f"{self.supported_formats}")

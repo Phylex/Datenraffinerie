@@ -35,20 +35,14 @@ class ValveYard(luigi.WrapperTask):
             raise NotImplementedError('starting analyses from the ValveYard'
                     ' has has not been implemented yet')
         elif procedure['type'] == 'daq':
-            daq_system = ctrl.DAQSystem(procedure['daq_system_config'])
-            target_system = ctrl.TargetAdapter(
-                    procedure['target_power_on_default_config'],
-                    procedure['target_init_config'])
-            target_config_initialized = cfu.update_dict(
-                    procedure['target_power_on_default_config'],
-                    procedure['target_init_config'])
-            return Scan(task_id=0,
+            return Scan(identifier=0,
                         label=self.procedure_label,
-                        output_dir=output_dir,
+                        output_dir=str(output_dir.resolve()),
                         output_format='hdf5',
                         scan_parameters=procedure['parameters'],
-                        target_conn=target_system,
-                        target_config=target_config_initialized,
-                        daq_system=daq_system,
+                        target_config=procedure['target_init_config'],
+                        target_power_on_config=procedure['target_power_on_default_config'],
                         daq_system_config=procedure['daq_system_config'],
+                        root_config_path=str(
+                            Path(self.root_config_file).resolve()),
                         calibration=procedure['calibration'])

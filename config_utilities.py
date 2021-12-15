@@ -61,7 +61,7 @@ def update_dict(original: dict, update: dict, offset: bool = False,
     if in_place is True:
         result = original
     else:
-        result = deepcopy(original)
+        result = dict(deepcopy(original))
     for update_key in update.keys():
         if update_key not in result.keys():
             if in_place is True:
@@ -80,24 +80,27 @@ def update_dict(original: dict, update: dict, offset: bool = False,
                                              update[update_key],
                                              offset=offset,
                                              in_place=in_place)
-        elif isinstance(result[update_key], list):
+        elif isinstance(result[update_key], list) or\
+             isinstance(result[update_key], tuple):
             if len(result[update_key]) != len(update[update_key]):
                 raise ConfigPatchError(
                     'If a list is a value of the dict the list'
                     ' lengths in the original and update need to'
                     ' match')
+            patch = []
             for i, (orig_elem, update_elem) in enumerate(
                     zip(result[update_key], update[update_key])):
                 if isinstance(orig_elem, dict):
-                    result[update_key][i] = update_dict(result[update_key][i],
-                                                        update_elem,
-                                                        offset=offset,
-                                                        in_place=in_place)
+                    patch.append(update_dict(result[update_key][i],
+                                             update_elem,
+                                             offset=offset,
+                                             in_place=in_place))
                 else:
                     if in_place is True:
-                        result[update_key][i] = update_elem
+                        patch.append(update_elem)
                     else:
-                        result[update_key][i] = deepcopy(update_elem)
+                        patch.append(deepcopy(update_elem))
+            result[update_key] = tuple(patch)
         else:
             if offset is True:
                 result[update_key] += update[update_key]
@@ -124,11 +127,14 @@ def generate_patch(keys: list, value):
     to generate a patch from one of the values of the list
     and all the keys. This function does that
     """
+    # this is needed to work with luigi as it turns stuffinto
+    # tuples
+    keys = list(keys)
     keys.reverse()
     current_root = value
     for key in keys:
         level = {}
-        if isinstance(key, list):
+        if isinstance(key, list) or isinstance(key, tuple):
             for subkey in key:
                 level[subkey] = deepcopy(current_root)
         else:
