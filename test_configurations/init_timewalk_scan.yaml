@@ -1,0 +1,176 @@
+hostname: hc640256.cern.ch
+port: 5555
+roc_s0:
+  DigitalHalf:
+    0:
+      CalibrationSC: 1
+      IdleFrame: 214748364
+      L1Offset: 10
+    1:
+      CalibrationSC: 1
+      IdleFrame: 214748364
+      L1Offset: 10
+  GlobalAnalog:
+    0:
+      Delay40: 2
+      Delay65: 3
+      Delay87: 3
+      Delay9: 3
+      range_inv: 6
+      range_tot: 4
+    1:
+      Delay40: 2
+      Delay65: 3
+      Delay87: 3
+      Delay9: 3
+      range_inv: 6
+      range_tot: 4
+  ReferenceVoltage:
+    0:
+      IntCtest: 1
+      Inv_vref: 300
+      Noinv_vref: 100
+      Refi: 1
+      Toa_vref: 400
+      Tot_vref: 700
+      Vbg_1v: 3
+    1:
+      IntCtest: 1
+      Inv_vref: 300
+      Noinv_vref: 100
+      Refi: 1
+      Toa_vref: 400
+      Tot_vref: 700
+      Vbg_1v: 3
+  Top:
+    0:
+      BIAS_I_PLL_D: 63
+      EN_HIGH_CAPA: 1
+      RunL: 1
+      RunR: 1
+      phase_strobe: 3
+  ch:
+    10:
+      HighRange: 1
+    20:
+      HighRange: 1
+    40:
+      HighRange: 1
+    50:
+      HighRange: 1
+roc_s1:
+  DigitalHalf:
+    0:
+      CalibrationSC: 1
+      IdleFrame: 214748364
+      L1Offset: 10
+    1:
+      CalibrationSC: 1
+      IdleFrame: 214748364
+      L1Offset: 10
+  GlobalAnalog:
+    0:
+      Delay40: 2
+      Delay65: 3
+      Delay87: 3
+      Delay9: 3
+      range_inv: 6
+      range_tot: 4
+    1:
+      Delay40: 2
+      Delay65: 3
+      Delay87: 3
+      Delay9: 3
+      range_inv: 6
+      range_tot: 4
+  ReferenceVoltage:
+    0:
+      IntCtest: 1
+      Inv_vref: 300
+      Noinv_vref: 100
+      Refi: 1
+      Toa_vref: 400
+      Tot_vref: 700
+      Vbg_1v: 3
+    1:
+      IntCtest: 1
+      Inv_vref: 300
+      Noinv_vref: 100
+      Refi: 1
+      Toa_vref: 400
+      Tot_vref: 700
+      Vbg_1v: 3
+  Top:
+    0:
+      BIAS_I_PLL_D: 63
+      EN_HIGH_CAPA: 1
+      RunL: 1
+      RunR: 1
+      phase_strobe: 3
+  ch:
+    10:
+      HighRange: 1
+    20:
+      HighRange: 1
+    40:
+      HighRange: 1
+    50:
+      HighRange: 1
+roc_s2:
+  DigitalHalf:
+    0:
+      CalibrationSC: 1
+      IdleFrame: 214748364
+      L1Offset: 10
+    1:
+      CalibrationSC: 1
+      IdleFrame: 214748364
+      L1Offset: 10
+  GlobalAnalog:
+    0:
+      Delay40: 2
+      Delay65: 3
+      Delay87: 3
+      Delay9: 3
+      range_inv: 6
+      range_tot: 4
+    1:
+      Delay40: 2
+      Delay65: 3
+      Delay87: 3
+      Delay9: 3
+      range_inv: 6
+      range_tot: 4
+  ReferenceVoltage:
+    0:
+      IntCtest: 1
+      Inv_vref: 300
+      Noinv_vref: 100
+      Refi: 1
+      Toa_vref: 400
+      Tot_vref: 700
+      Vbg_1v: 3
+    1:
+      IntCtest: 1
+      Inv_vref: 300
+      Noinv_vref: 100
+      Refi: 1
+      Toa_vref: 400
+      Tot_vref: 700
+      Vbg_1v: 3
+  Top:
+    0:
+      BIAS_I_PLL_D: 63
+      EN_HIGH_CAPA: 1
+      RunL: 1
+      RunR: 1
+      phase_strobe: 3
+  ch:
+    10:
+      HighRange: 1
+    20:
+      HighRange: 1
+    40:
+      HighRange: 1
+    50:
+      HighRange: 1
