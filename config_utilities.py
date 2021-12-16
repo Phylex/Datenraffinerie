@@ -9,6 +9,7 @@ what to expect of their behaviour
 from pathlib import Path
 import os
 from copy import deepcopy
+from luigi.freezing import FrozenOrderedDict
 import yaml
 
 
@@ -28,6 +29,28 @@ def load_configuration(config_path):
     """
     with open(config_path, 'r', encoding='utf-8') as config_file:
         return yaml.safe_load(config_file.read())
+
+
+def unfreeze(config):
+    """
+    unfreeze the dictionary that is frozen to serialize it
+    and send it from one luigi task to another
+    """
+    try:
+        unfrozen_dict = {}
+        for key in config.keys():
+            unfrozen_dict[key] = unfreeze(config[key])
+        return unfrozen_dict
+    except AttributeError:
+        try:
+            unfrozen_list = []
+            if not isinstance(config, str):
+                for elem in config:
+                    unfrozen_list.append(unfreeze(elem))
+                return unfrozen_list
+            return config
+        except TypeError:
+            return config
 
 
 def update_dict(original: dict, update: dict, offset: bool = False,
@@ -100,7 +123,9 @@ def update_dict(original: dict, update: dict, offset: bool = False,
                         patch.append(update_elem)
                     else:
                         patch.append(deepcopy(update_elem))
-            result[update_key] = tuple(patch)
+            if isinstance(result[update_key], tuple):
+                patch = tuple(patch)
+            result[update_key] = patch
         else:
             if offset is True:
                 result[update_key] += update[update_key]
@@ -525,3 +550,10 @@ def test_parse_config_entry():
         assert len(parsed_config['parameters']) == length
         assert daq_diff == diff_dict(daq_reference_config,
                                     parsed_config['daq_system_config'])
+
+def test_unfreeze():
+    input_dict = FrozenOrderedDict({'a': 1, 'b': (1,2,3),
+                                    'd': FrozenOrderedDict({'e': 4})})
+    expected_dict = {'a': 1, 'b': [1,2,3],
+                     'd': {'e': 4}}
+    assert expected_dict == unfreeze(input_dict)
