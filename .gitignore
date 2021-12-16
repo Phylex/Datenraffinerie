@@ -1,4 +1,5 @@
 __pycache__/
 venv/
 presentations/
+test_data/
 *.log
