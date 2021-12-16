@@ -182,32 +182,23 @@ class TargetAdapter(ControlAdapter):
     Hexboards) currrently uses the zmq_i2c server
     """
 
-    def __init__(self, power_on_default: dict, initial_config: dict = None):
+    def __init__(self, initial_config: dict):
         """
         Initializes the target Board and loads an initial config onto it
 
         Arguments:
-            power_on_default: This dict should hold the power on default
-            configuration of the target system. The class assumes that
-            the system is in the power on reset state at initialisation
-
             initial_config: This config is assumed to be the goal state
             of the system, if it is passed during initialisation it is
             written to the target system
         """
         try:
-            hostname = power_on_default['hostname']
-            port = power_on_default['port']
-        except KeyError:
-            if initial_config is not None:
-                try:
-                    hostname = initial_config['hostname']
-                    port = initial_config['port']
-                except KeyError as err:
-                    raise DAQConfigError('A hostname and port are not '
-                                         ' present in any configuration'
-                                         ' received') from err
-        super().__init__(power_on_default, hostname=hostname, port=port)
+            hostname = initial_config['hostname']
+            port = initial_config['port']
+        except KeyError as err:
+            raise DAQConfigError('A hostname and port are not '
+                                 ' present in any configuration'
+                                 ' received') from err
+        super().__init__({}, hostname=hostname, port=port)
         self.logger = logging.getLogger(
                 'hexactrl_script.contol_adapter.TargetAdapter')
         self.config_written = True
