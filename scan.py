@@ -158,18 +158,20 @@ class Format(luigi.Task):
         unpacking steps
         """
         formatted_data_path = Path(self.output_dir) / \
-            (self.label + str(self.identifier) + '.' + self.output_format)
+            (self.label + str(self.identifier) + '-data.' + self.output_format)
         return luigi.LocalTarget(formatted_data_path.resolve())
 
     def run(self):
         data_file_path = Path(self.input()[0].path).resolve()
         unpack_command = 'unpack'
-        input_file = '-i ' + str(data_file_path)
-        output_file = os.path.splitext(data_file_path)[0] + '.root'
-        output_command = '-o ' + output_file
-        full_unpack_command = unpack_command + input_file + output_command
+        input_file = ' -i ' + str(data_file_path)
+        output_file = self.output().path
+        output_command = ' -o ' + output_file
+        output_type = ' -t unpacked'
+        full_unpack_command = unpack_command + input_file + output_command\
+            + output_type
         print(full_unpack_command)
-        # os.system(full_unpack_command)
+        os.system(full_unpack_command)
 
 
 class Scan(luigi.Task):
@@ -203,7 +205,7 @@ class Scan(luigi.Task):
     calibration = luigi.OptionalParameter(significant=False,
                                           default=None)
 
-    supported_formats = ['hdf5']
+    supported_formats = ['hdf5', 'root']
 
     def requires(self):
         """
@@ -218,6 +220,7 @@ class Scan(luigi.Task):
         required_tasks = []
         values = self.scan_parameters[0][1]
         parameter = list(self.scan_parameters[0][0])
+        target_config = cfu.unfreeze(self.target_config)
         # if there are more than one entry in the parameter list the scan still
         # has more than one dimension. So spawn more scan tasks for the lower
         # dimension
@@ -231,7 +234,7 @@ class Scan(luigi.Task):
                 patch = cfu.generate_patch(
                             parameter, value)
                 subscan_target_config = cfu.update_dict(
-                        self.target_config,
+                        target_config,
                         patch)
                 required_tasks.append(Scan(self.identifier + 1 + task_id_offset
                                            * i,
@@ -249,7 +252,7 @@ class Scan(luigi.Task):
             for i, value in enumerate(values):
                 patch = cfu.generate_patch(parameter, value)
                 measurement_config = cfu.patch_configuration(
-                        self.target_config,
+                        target_config,
                         patch)
                 required_tasks.append(Format(measurement_config,
                                              self.daq_system_config,

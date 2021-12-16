@@ -198,12 +198,10 @@ class TargetAdapter(ControlAdapter):
             raise DAQConfigError('A hostname and port are not '
                                  ' present in any configuration'
                                  ' received') from err
-        super().__init__({}, hostname=hostname, port=port)
+        super().__init__(initial_config, hostname=hostname, port=port)
         self.logger = logging.getLogger(
                 'hexactrl_script.contol_adapter.TargetAdapter')
-        self.config_written = True
-        if initial_config is not None:
-            self.configure(initial_config, diff=True)
+        self.configure()
 
     def read_config(self, parameter: dict):
         """

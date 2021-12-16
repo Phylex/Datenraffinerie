@@ -13,16 +13,9 @@ class ValveYard(luigi.WrapperTask):
 
     def requires(self):
         data_dir = Path(self.output_dir)
-        if data_dir.exists() and os.path.isfile(data_dir):
-            raise IOError(f"The path {data_dir} chosen for the data"
-                          " directory is occupied by a file, exiting...")
-        elif data_dir.exists() and os.path.isdir(data_dir) and\
-                len(list(data_dir.glob('*'))) > 0:
-            raise IOError(f"The data directory {data_dir} is already full,"
-                          " exititng...")
-        elif not data_dir.exists():
+        if not data_dir.exists():
             os.makedirs(data_dir)
-        output_dir = Path(data_dir)
+        output_dir = data_dir
         procedures, workflows = cfu.parse_config_file(self.root_config_file)
         procedure_names = list(map(lambda p: p['name'], procedures))
         if self.procedure_label in procedure_names:
@@ -38,7 +31,7 @@ class ValveYard(luigi.WrapperTask):
             return Scan(identifier=0,
                         label=self.procedure_label,
                         output_dir=str(output_dir.resolve()),
-                        output_format='hdf5',
+                        output_format='root',
                         scan_parameters=procedure['parameters'],
                         target_config=procedure['target_init_config'],
                         daq_system_config=procedure['daq_system_config'],
