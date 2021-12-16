@@ -11,6 +11,8 @@ import pandas as pd
 import luigi
 import yaml
 import config_utilities as cfu
+from control_adapter import DAQSystem, TargetAdapter
+
 
 class Configuration(luigi.Task):
     """
@@ -19,7 +21,6 @@ class Configuration(luigi.Task):
     whole daq process
     """
     target_config = luigi.DictParameter(significant=False)
-    target_power_on_config = luigi.DictParameter(significant=False)
     label = luigi.Parameter(significant=True)
     output_dir = luigi.Parameter(significant=True)
     identifier = luigi.IntParameter(significant=True)
@@ -43,12 +44,13 @@ class Configuration(luigi.Task):
         return luigi.LocalTarget(output_path)
 
     def run(self):
+        target_config = cfu.unfreeze(self.target_config)
         if self.calibration is not None:
             calib_file = self.input()[0].open('r')
             calibration = yaml.safe_load(calib_file)
-            out_config = cfu.update_dict(self.target_config, calibration)
+            out_config = cfu.update_dict(target_config, calibration)
         else:
-            out_config = self.target_config
+            out_config = target_config
         with self.output().open('w') as conf_out_file:
             yaml.dump(out_config, conf_out_file)
 
@@ -60,7 +62,6 @@ class Measurement(luigi.Task):
     # configuration and connection to the target
     # (aka hexaboard/SingleROC tester)
     target_config = luigi.DictParameter(significant=False)
-    target_power_on_config = luigi.DictParameter(significant=False)
 
     # configuration of the (daq) system
     daq_system_config = luigi.DictParameter(significant=False)
@@ -81,7 +82,6 @@ class Measurement(luigi.Task):
 
     def requires(self):
         return Configuration(self.target_config,
-                             self.target_power_on_config,
                              self.label,
                              self.output_dir,
                              self.identifier,
@@ -107,10 +107,11 @@ class Measurement(luigi.Task):
         # task
         with self.input().open('r') as config_file:
             target_config = yaml.safe_load(config_file.read())
+        daq_system = DAQSystem(cfu.unfreeze(self.daq_system_config))
+        target = TargetAdapter(cfu.unfreeze(target_config))
+        target.configure()
         data_file = self.output()[0]
-        self.daq_system.configure(self.daq_system_config)
-        self.target_conn.configure(target_config)
-        self.daq_system.take_data(data_file.path)
+        daq_system.take_data(data_file.path)
 
 
 class Format(luigi.Task):
@@ -122,7 +123,6 @@ class Format(luigi.Task):
     # configuration and connection to the target
     # (aka hexaboard/SingleROC tester)
     target_config = luigi.DictParameter(significant=False)
-    target_power_on_config = luigi.DictParameter(significant=False)
 
     # configuration of the (daq) system
     daq_system_config = luigi.DictParameter(significant=False)
@@ -144,7 +144,6 @@ class Format(luigi.Task):
         configuration file. These are returned by the 
         """
         return Measurement(self.target_config,
-                           self.target_power_on_config,
                            self.daq_system_config,
                            self.output_dir,
                            self.label,
@@ -197,7 +196,6 @@ class Scan(luigi.Task):
     # configuration of the target and daq system that is used to
     # perform the scan (This may be extended with an 'environment')
     target_config = luigi.DictParameter(significant=False)
-    target_power_on_config = luigi.DictParameter(significant=False)
     daq_system_config = luigi.DictParameter(significant=False)
 
     root_config_path = luigi.Parameter(significant=True)
@@ -242,7 +240,6 @@ class Scan(luigi.Task):
                                            self.output_format,
                                            self.scan_parameters[1:],
                                            subscan_target_config,
-                                           self.target_power_on_config,
                                            self.daq_system_config,
                                            self.root_config_path,
                                            self.calibration))
@@ -255,7 +252,6 @@ class Scan(luigi.Task):
                         self.target_config,
                         patch)
                 required_tasks.append(Format(measurement_config,
-                                             self.target_power_on_config,
                                              self.daq_system_config,
                                              self.output_dir,
                                              self.output_format,

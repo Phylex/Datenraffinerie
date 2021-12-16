@@ -41,7 +41,6 @@ class ValveYard(luigi.WrapperTask):
                         output_format='hdf5',
                         scan_parameters=procedure['parameters'],
                         target_config=procedure['target_init_config'],
-                        target_power_on_config=procedure['target_power_on_default_config'],
                         daq_system_config=procedure['daq_system_config'],
                         root_config_path=str(
                             Path(self.root_config_file).resolve()),
