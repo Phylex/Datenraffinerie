@@ -400,7 +400,12 @@ def parse_config_entry(entry: dict, path: str):
 
 
 def parse_config_file(config_path: str):
-    path = Path(config_path)
+    """
+    Parse the root config file and return a list of workflows and
+    procedures that are fully parsed so that with them the analyses
+    and scan can be properly initialized
+    """
+    path = Path(config_path).resolve()
     if not path.exists():
         raise ValueError("The filepath given does not exist")
     procedures = []
@@ -408,15 +413,27 @@ def parse_config_file(config_path: str):
     config = load_configuration(path)
     if isinstance(config, dict):
         if 'libraries' in config.keys():
+            # resolve the path to the library files taking
+            # into account that both relative and absolute
+            # paths can be specified in the libraries
+            # section
+            lib_root_dir = Path(os.path.dirname(path))
             other_paths = config['libraries']
-            for path in other_paths:
-                other_procedures, other_workflows = parse_config_file(path)
+            for lib_path in other_paths:
+                if not str(lib_path).startswith('/'):
+                    resolved_lib_path = lib_root_dir / lib_path
+                else:
+                    resolved_lib_path = Path(lib_path).resolve()
+                other_procedures, other_workflows = parse_config_file(
+                        resolved_lib_path)
                 for procedure in other_procedures:
                     procedures.append(procedure)
                 for workflow in other_workflows:
                     workflows.append(workflow)
         if 'workflows' in config.keys():
             pass
+        # The root configuration file can also specify new
+        # procedures, similar to libraries
         if 'procedures' in config.keys():
             if isinstance(config['procedures'], list):
                 for procedure in config['procedures']:
@@ -508,7 +525,6 @@ def test_parse_scan_config():
     assert len(scan_configs) == 3  # number of different scans
     test_config = scan_configs[0]
     for key in test_config.keys():
-        print(key)
         assert key in expected_config_keys
     assert len(test_config.keys()) == len(expected_config_keys)
     assert test_config['name'] == 'injection_scan'

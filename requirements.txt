@@ -1,8 +1,8 @@
 docutils==0.18.1
 lockfile==0.12.2
 luigi==3.0.3
-numpy==1.19.5
-pandas==1.1.5
+numpy
+pandas
 python-daemon==2.3.0
 python-dateutil==2.8.2
 pytz==2021.3

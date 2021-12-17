@@ -14,6 +14,21 @@ import config_utilities as cfu
 from control_adapter import DAQSystem, TargetAdapter
 
 
+class ScanConfiguration(luigi.Task):
+    output_path = luigi.Parameter(significant=True)
+    target_power_on_config = luigi.DictParameter(significant=False)
+
+    def output(self):
+        output_config_path = Path(self.output_path).resolve()
+        output_config_path = output_config_path / 'target_reset_config.yaml'
+        return luigi.LocalTarget(output_config_path)
+
+    def run(self):
+        run_config = cfu.unfreeze(self.target_power_on_config)
+        with self.output().open('w') as target_pwr_on_config_file:
+            yaml.safe_dump(run_config, target_pwr_on_config_file)
+
+
 class Configuration(luigi.Task):
     """
     Write the configuration file for every run this way the
@@ -123,6 +138,7 @@ class Format(luigi.Task):
     # configuration and connection to the target
     # (aka hexaboard/SingleROC tester)
     target_config = luigi.DictParameter(significant=False)
+    target_default_config = luigi.DictParameter(significant=False)
 
     # configuration of the (daq) system
     daq_system_config = luigi.DictParameter(significant=False)
@@ -133,8 +149,9 @@ class Format(luigi.Task):
     label = luigi.Parameter(significant=True)
     identifier = luigi.IntParameter(significant=True)
 
-
-    root_config_path = luigi.Parameter(significant=False)
+    # the path to the root config file so that the Configuration
+    # task can call the valveyard if a calibration is required
+    root_config_path = luigi.Parameter(True)
     # calibration if one is required
     calibration = luigi.Parameter(significant=False)
 
@@ -143,13 +160,15 @@ class Format(luigi.Task):
         to be able to unpack the data we need the data and the
         configuration file. These are returned by the 
         """
-        return Measurement(self.target_config,
-                           self.daq_system_config,
-                           self.output_dir,
-                           self.label,
-                           self.identifier,
-                           self.root_config_path,
-                           self.calibration)
+        return (Measurement(self.target_config,
+                            self.daq_system_config,
+                            self.output_dir,
+                            self.label,
+                            self.identifier,
+                            self.calibration),
+                ScanConfiguration(self.output_dir,
+                                  self.target_default_config))
+
 
     def output(self):
         """
@@ -170,7 +189,6 @@ class Format(luigi.Task):
         output_type = ' -t unpacked'
         full_unpack_command = unpack_command + input_file + output_command\
             + output_type
-        print(full_unpack_command)
         os.system(full_unpack_command)
 
 
@@ -198,6 +216,7 @@ class Scan(luigi.Task):
     # configuration of the target and daq system that is used to
     # perform the scan (This may be extended with an 'environment')
     target_config = luigi.DictParameter(significant=False)
+    target_default_config = luigi.DictParameter(significant=False)
     daq_system_config = luigi.DictParameter(significant=False)
 
     root_config_path = luigi.Parameter(significant=True)
@@ -243,6 +262,7 @@ class Scan(luigi.Task):
                                            self.output_format,
                                            self.scan_parameters[1:],
                                            subscan_target_config,
+                                           self.target_default_config,
                                            self.daq_system_config,
                                            self.root_config_path,
                                            self.calibration))
@@ -255,6 +275,7 @@ class Scan(luigi.Task):
                         target_config,
                         patch)
                 required_tasks.append(Format(measurement_config,
+                                             self.target_default_config,
                                              self.daq_system_config,
                                              self.output_dir,
                                              self.output_format,
