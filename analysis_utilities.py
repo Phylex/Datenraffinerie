@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import pytest
 import uproot
 import os
 import yaml
@@ -126,5 +127,17 @@ def merge_in_config_params(run_data: pd.DataFrame, run_config: dict):
             run_data = pd.concat([run_data, run_param], axis=1)
     return run_data
 
-def test_extract_data():
 
+@pytest.mark.xfail
+def test_extract_data():
+    test_root_path = Path('./tests/data/run.root')
+    frame = extract_data(test_root_path.resolve())
+    expected_columns = ['chip', 'channel', 'channeltype',
+                        'adc_median', 'adc_iqr', 'tot_median',
+                        'tot_iqr', 'toa_median', 'toa_iqr', 'adc_mean',
+                        'adc_stdd', 'tot_mean',
+                        'tot_stdd', 'toa_mean', 'toa_stdd', 'tot_efficiency',
+                        'tot_efficiency_error', 'toa_efficiency',
+                        'toa_efficiency_error']
+    for col in expected_columns:
+        _ = frame[col]
