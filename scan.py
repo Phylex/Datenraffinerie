@@ -11,6 +11,7 @@ import pandas as pd
 import luigi
 import yaml
 import config_utilities as cfu
+import analysis_utilities as anu
 from control_adapter import DAQSystem, TargetAdapter
 
 
@@ -181,7 +182,18 @@ class Format(luigi.Task):
         return luigi.LocalTarget(formatted_data_path.resolve())
 
     def run(self):
-        data_file_path = Path(self.input()[0].path).resolve()
+        # get the target configuration of this particular run
+        # from the target power on config and the run patch
+        data_file_path = Path(self.input()[0][0].path).resolve()
+        with self.input()[1].open('r') as pwr_on_default_config_file:
+            power_on_default_config = cfu.unfreeze(yaml.safe_load(
+                pwr_on_default_config_file.read()))
+        with self.input()[0][1].open('r') as run_config_file:
+            run_config = cfu.unfreeze(yaml.safe_load(run_config_file.read()))
+        complete_config = cfu.patch_configuration(power_on_default_config, run_config)
+
+        # 'unpack' the data from the raw data gathered into a root file that
+        # can then be merged with the configuration into a large table
         unpack_command = 'unpack'
         input_file = ' -i ' + str(data_file_path)
         output_file = self.output().path
@@ -190,6 +202,9 @@ class Format(luigi.Task):
         full_unpack_command = unpack_command + input_file + output_command\
             + output_type
         os.system(full_unpack_command)
+
+        anu.
+
 
 
 class Scan(luigi.Task):
@@ -290,10 +305,10 @@ class Scan(luigi.Task):
         concatenate the files of a measurement together into a single file
         and write the merged data
         """
-        data_segments = []
+        data_seg = []
         for data_file in self.input():
-            data_segments.append(pd.read_hdf(data_file))
-        merged_data = pd.concat(data_segments, ignore_index=True, axis=0)
+            data_seg.append(pd.read_hdf(data_file))
+        merged_data = pd.concat(data_seg, ignore_index=True, axis=0)
         with self.output().open('wb') as outfile:
             merged_data.to_hdf(outfile)
 
