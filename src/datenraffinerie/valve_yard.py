@@ -40,7 +40,7 @@ class ValveYard(luigi.WrapperTask):
             return Scan(identifier=0,
                         label=self.procedure_label,
                         output_dir=str(output_dir.resolve()),
-                        output_format='root',
+                        output_format='hdf5',
                         scan_parameters=procedure['parameters'],
                         target_config=procedure['target_init_config'],
                         target_default_config=procedure['target_power_on_default_config'],

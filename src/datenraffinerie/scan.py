@@ -196,17 +196,21 @@ class Format(luigi.Task):
         # can then be merged with the configuration into a large table
         unpack_command = 'unpack'
         input_file = ' -i ' + str(data_file_path)
-        data_file = self.output().path
+        data_file = self.output().path + '.root'
         output_command = ' -o ' + data_file
         output_type = ' -t unpacked'
         full_unpack_command = unpack_command + input_file + output_command\
             + output_type
         os.system(full_unpack_command)
 
+        # load the data from the unpacked root file and merge in the data from the
+        # configuration for that run with the data
         measurement_data = anu.extract_data(data_file)
+        os.remove(data_file)
         measurement_data = anu.add_channel_wise_data(measurement_data, complete_config)
         measurement_data = anu.add_half_wise_data(measurement_data, complete_config)
-        measurement_data.to_hdf(self.output().path)
+        with self.output().temporary_path() as self.tmp_out_path:
+            measurement_data.to_hdf(self.tmp_out_path, 'data')
 
 
 
@@ -242,7 +246,7 @@ class Scan(luigi.Task):
     calibration = luigi.OptionalParameter(significant=False,
                                           default=None)
 
-    supported_formats = ['hdf5', 'root']
+    supported_formats = ['hdf5']
 
     def requires(self):
         """
@@ -310,10 +314,11 @@ class Scan(luigi.Task):
         """
         data_seg = []
         for data_file in self.input():
-            data_seg.append(pd.read_hdf(data_file))
+            print(data_file.path)
+            data_seg.append(pd.read_hdf(data_file.path))
         merged_data = pd.concat(data_seg, ignore_index=True, axis=0)
-        with self.output().open('wb') as outfile:
-            merged_data.to_hdf(outfile)
+        with self.output().temporary_path() as outfile:
+            merged_data.to_hdf(outfile, 'data')
 
     def output(self):
         """
