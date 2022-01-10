@@ -1,6 +1,33 @@
 # Datenraffinerie
 
-A set of luigi tasks to handle the processing of the characterisation of HGCAL test system data
+A tool to acquire and analyse HGCROCv3 Data for the HGCAL subdetector of the CMS at CERN.
+
+To characterise the HGCROCv3 many measurements need to be acquired using different chip configurations. As the HGCROCv3 has built-in testing circuits
+these are used for chip characterisation. The Datenraffinerie is a tool/framework that tries to simplify the execution of such data acquisition and
+analysis tasks.
+
+## Definition of the Terms used in this Document
+- Target: The device/system that acquires the measurements and accepts the configuration. This can be either an LD/HD Hexaboard or a
+Single-roc-tester. In future the Train might also be supported
+- Procedure: A sequence of steps that are performed together and use a common configuration. Examples of procedures are daq-procedures that acquire
+measurements from a target; analysis-procedures take the data acquired by daq-procedures and try to derive meaningful insights from that.
+- Task: The smallest unit of a procedure. This term is taken from the library luigi used in this framework. A task produces a file at completion.
+- Acquisition: The procedure that acquires data from the target also known as daq-procedure
+
+## Concepts
+Data acquisition is performed by a target, that accepts some configuration and produces measurements where the HGCROCv3 along with other target
+systems have been configured according to the configuration received. The Datenraffinerie computes the configuration for every measurement of the
+acquisition. To do this the user needs to provide a 'power-on default configuration' that describes the state of every register of the device at power
+on and the configuration for the acquisition to be performed. An acquisition normally consists of a scan of one or more chip parameters. The
+parameters and scan ranges need to be provided by the acquisition configuration.
+
+After computing the configuration for a single measurement from the aforementioned inputs the measurement is scheduled for execution on the target.
+After the measurements have been acquired the data and configuration are merged into a single `hdf5` file that should contain all information needed.
+The single hdf-5 file does not only contain data/configuration for a single measurement but for 
+HDF-5 files can be loaded into pandas DataFrames using `pd.read_hdf('/path/to/file')`.
+
+
+
 
 ## Folder Structure
 A measurement is usually conducted with a chip or board as it's target. A Measurement may require Analyses and/or calibrations to be performed.
