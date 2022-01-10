@@ -14,6 +14,10 @@ setup(
         'numpy',
         'scipy',
         'uproot',
-        'pyyaml'
+        'pyyaml',
+        'zmq',
+        'uuid',
+        'logging',
+        'shutil'
     ]
 )
