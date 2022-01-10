@@ -3,3 +3,5 @@ venv/
 presentations/
 test_data/
 *.log
+dist/
+src/*.egg-info/
