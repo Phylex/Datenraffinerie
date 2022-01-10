@@ -1,3 +1,7 @@
+"""
+Utilities for the use with the handling of the gathered data 
+in the datenraffinerie.
+"""
 import pandas as pd
 import numpy as np
 import pytest
@@ -76,8 +80,7 @@ def extract_metadata(run_config_file):
     """
     with open(run_config_file, 'r') as file:
         meta_Data = yaml.safe_load(file.read())
-        run_configuration = meta_Data['run_params']
-        return run_configuration
+        return meta_Data['run_params']
 
 
 def extract_data(rootfile, raw_data=False):
@@ -93,8 +96,7 @@ def extract_data(rootfile, raw_data=False):
                 run_data[cname] = pd.Series(
                     np.array(ttree[cname].array()),
                     list(range(len(ttree[cname].array()))))
-            run_data = pd.DataFrame(run_data)
-            return run_data
+            return pd.DataFrame(run_data)
         else:
             raise NotImplementedError(
                 "The extraction of individual events"
@@ -112,7 +114,7 @@ def add_channel_wise_data(measurement_data: pd.DataFrame, complete_config: dict)
               parameter that is channel specific the channels are determined by the
               names and types present in the measurement data.
     """
-    channel_keys = roc_get_channel_keys(complete_config)
+    channel_keys = roc_channel_to_dict(0, 0, 0, complete_config)
     for key in channel_keys:
         measurement_data[key] = measurement_data.apply(
                 lambda x: roc_channel_to_dict(
@@ -127,9 +129,12 @@ def add_half_wise_data(measurement_data: pd.DataFrame, complete_config: dict) ->
     """add the config information of the chip half that corresponds to the particular
     channel
 
-    :measurement_data: TODO
-    :complete_config: TODO
-    :returns: TODO
+    :measurement_data: data measured from the rocs
+    :complete_config: configuration of the rocs at the time of measurement.
+        the half wise parameters of the rocs from this config will be added to every
+        channel of the corresponding half in the `measurement_data`
+    :returns: the dataframe measurement_data with added columns for the half wise
+              parameters
 
     """
     channel_keys = roc_channel_to_globals(0, 0, 1, complete_config)
@@ -142,6 +147,20 @@ def add_half_wise_data(measurement_data: pd.DataFrame, complete_config: dict) ->
                     complete_config)[key], axis=1)
     return measurement_data
 
+
+def add_global_data(measurement_data: pd.DataFrame, global_config: dict) -> pd.DataFrame:
+    """add global Data to the dataframe. Currently there is no global data
+    so there is nothing to add
+
+    :measurement_data: the dataframe that the global parameters should be added to
+    :global_config: the configuration containing the global parameter that should
+        be added to the measurement dataframe (it will be added to every channel of every
+        chip)
+    :returns: Data with the the global parameters added to every channel currently nothing
+        is done
+
+    """
+    return measurement_data
 
 def roc_channel_to_dict(chip_id, channel_id, channel_type, complete_config):
     """Map a channel identifier to the correct part of the config
@@ -210,7 +229,6 @@ def merge_in_config_params(run_data: pd.DataFrame, run_config: dict):
     return run_data
 
 
-@pytest.mark.xfail
 def test_extract_data():
     test_root_path = Path('./tests/data/run.root')
     frame = extract_data(test_root_path.resolve())
@@ -223,3 +241,48 @@ def test_extract_data():
                         'toa_efficiency_error']
     for col in expected_columns:
         _ = frame[col]
+
+
+def test_add_channel_wise_data():
+    """ test that all the channel wise parameters appear as a
+    column in the dataframe
+    """
+    import config_utilities as cfu
+    test_data_path = Path('./tests/data/run.root')
+    frame = extract_data(test_data_path.resolve())
+    configuration = cfu.load_configuration('tests/data/default.yaml')
+    overlay = cfu.load_configuration('tests/data/run.yaml')
+    configuration = cfu.update_dict(configuration, overlay)
+    frame = add_channel_wise_data(frame, configuration)
+    expected_columns = ['Adc_pedestal',
+                        'Channel_off',
+                        'DAC_CAL_CTDC_TOA',
+                        'DAC_CAL_CTDC_TOT',
+                        'DAC_CAL_FTDC_TOA',
+                        'DAC_CAL_FTDC_TOT',
+                        'DIS_TDC',
+                        'ExtData',
+                        'HZ_inv',
+                        'HZ_noinv',
+                        'HighRange',
+                        'IN_FTDC_ENCODER_TOA',
+                        'IN_FTDC_ENCODER_TOT',
+                        'Inputdac',
+                        'LowRange',
+                        'mask_AlignBuffer',
+                        'mask_adc',
+                        'mask_toa',
+                        'mask_tot',
+                        'probe_inv',
+                        'probe_noinv',
+                        'probe_pa',
+                        'probe_toa',
+                        'probe_tot',
+                        'sel_trig_toa',
+                        'sel_trig_tot',
+                        'trim_inv',
+                        'trim_toa',
+                        'trim_tot'
+                       ]
+    for col in expected_columns:
+        print(col, frame[col])
