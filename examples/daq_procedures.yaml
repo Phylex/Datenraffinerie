@@ -2,11 +2,11 @@
   type: daq
   calibration: 'pedestal_calibration'
   target_settings:
-    power_on_default: ../default_configs/V3LDHexaboard-poweron-default.yaml
-    initial_config: ../default_configs/initLDV3.yaml
+    power_on_default: ../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../tests/configuration/defaults/initLDV3.yaml
     overrides:
   daq_settings:
-    default: ../default_configs/daq-system-config.yaml
+    default: ../tests/configuration/defaults/daq-system-config.yaml
     server_override:
       NEvents: 4000
     client_override:
@@ -22,11 +22,11 @@
   type: daq
   calibration: 'pedestal_calibration'
   target_settings:
-    power_on_default: ../default_configs/V3LDHexaboard-poweron-default.yaml
-    initial_config: ../default_configs/initLDV3.yaml
+    power_on_default: ../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../tests/configuration/defaults/initLDV3.yaml
     overrides:
   daq_settings:
-    default: ../default_configs/daq-system-config.yaml
+    default: ../tests/configuration/defaults/daq-system-config.yaml
     server_override:
       port: 7777
       IdelayStep: 3
@@ -47,11 +47,11 @@
 - name: pedestal_scan
   type: daq
   target_settings:
-    power_on_default: ../default_configs/V3LDHexaboard-poweron-default.yaml
-    initial_config: ../default_configs/initLDV3.yaml
+    power_on_default: ../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../tests/configuration/defaults/initLDV3.yaml
     overrides:
   daq_settings:
-    default: ../default_configs/daq-system-config.yaml
+    default: ../tests/configuration/defaults/daq-system-config.yaml
     server_override:
     client_override:
   parameters:

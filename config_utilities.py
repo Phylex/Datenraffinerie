@@ -455,7 +455,7 @@ def parse_config_file(config_path: str):
 
 #### TESTS ####
 def test_load_config():
-    test_fpath = Path('./test_configurations/scan_procedures.yaml')
+    test_fpath = Path('./tests/configuration/scan_procedures.yaml')
     config = load_configuration(test_fpath)
     assert isinstance(config, list)
     assert isinstance(config[0], dict)
@@ -465,7 +465,7 @@ def test_update_dict():
     """
     test the update_dict function
     """
-    test_fpath = Path('./test_configurations/scan_procedures.yaml')
+    test_fpath = Path('./examples/daq_procedures.yaml')
     config = load_configuration(test_fpath)
     original = config[0]
     assert 'calibration' in original
@@ -512,7 +512,7 @@ def test_diff_dict():
 
 
 def test_parse_scan_config():
-    test_fpath = Path('./test_configurations/scan_procedures.yaml')
+    test_fpath = Path('./examples/daq_procedures.yaml')
     scan_configs = []
     test_config = load_configuration(test_fpath)
     expected_config_keys = ['parameters', 'name', 'type',
@@ -533,7 +533,7 @@ def test_parse_scan_config():
 
 
 def test_analysis_config():
-    test_fpath = Path('./test_configurations/analysis_procedures.yaml')
+    test_fpath = Path('./examples/analysis_procedures.yaml')
     config = load_configuration(test_fpath)
     parsed_config = parse_analysis_config(config[0])
     assert parsed_config['daq'] == 'pedestal_scan'
@@ -547,9 +547,9 @@ def test_analysis_config():
 
 
 def test_parse_config_entry():
-    scan_test_config = Path('./test_configurations/scan_procedures.yaml')
+    scan_test_config = Path('./examples/daq_procedures.yaml')
     daq_system_test_config = Path(
-            './test_configurations/default_configs/daq-system-config.yaml')
+            './tests/configuration/defaults/daq-system-config.yaml')
     daq_reference_config = load_configuration(daq_system_test_config)
     config = load_configuration(scan_test_config)
     names = ['injection_scan', 'timewalk_scan', 'pedestal_scan']
