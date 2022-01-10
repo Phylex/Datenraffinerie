@@ -196,14 +196,17 @@ class Format(luigi.Task):
         # can then be merged with the configuration into a large table
         unpack_command = 'unpack'
         input_file = ' -i ' + str(data_file_path)
-        output_file = self.output().path
-        output_command = ' -o ' + output_file
+        data_file = self.output().path
+        output_command = ' -o ' + data_file
         output_type = ' -t unpacked'
         full_unpack_command = unpack_command + input_file + output_command\
             + output_type
         os.system(full_unpack_command)
 
-        anu.
+        measurement_data = anu.extract_data(data_file)
+        measurement_data = anu.add_channel_wise_data(measurement_data, complete_config)
+        measurement_data = anu.add_half_wise_data(measurement_data, complete_config)
+        measurement_data.to_hdf(self.output().path)
 
 
 

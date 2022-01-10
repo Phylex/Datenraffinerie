@@ -100,10 +100,92 @@ def extract_data(rootfile, raw_data=False):
                 "The extraction of individual events"
                 " has not been implemented")
 
-def __run_unpacker(self,fin,fout,fmeta,flog):
-    cmd='unpack -i ' + fin + ' -o ' + fout + ' -M ' + fmeta
-    with open(flog, 'w') as logout:
-        subprocess.check_output(cmd, shell=True, stderr=logout)
+
+def add_channel_wise_data(measurement_data: pd.DataFrame, complete_config: dict) -> pd.DataFrame:
+    """Add channel wise data adds the data from the configuration
+    to every channel that is specific to that channel
+
+    :measurement_data: data that was gathered from the chip
+    :complete_config: the complete configuration (so the default config with the
+                      patch appled that is the measurement configuration
+    :returns: a pandas dataframe where a column has been added for each configuration
+              parameter that is channel specific the channels are determined by the
+              names and types present in the measurement data.
+    """
+    channel_keys = roc_get_channel_keys(complete_config)
+    for key in channel_keys:
+        measurement_data[key] = measurement_data.apply(
+                lambda x: roc_channel_to_dict(
+                    x['chip'],
+                    x['channel'],
+                    x['channeltype'],
+                    complete_config)[key], axis=1)
+    return measurement_data
+
+
+def add_half_wise_data(measurement_data: pd.DataFrame, complete_config: dict) -> pd.DataFrame:
+    """add the config information of the chip half that corresponds to the particular
+    channel
+
+    :measurement_data: TODO
+    :complete_config: TODO
+    :returns: TODO
+
+    """
+    channel_keys = roc_channel_to_globals(0, 0, 1, complete_config)
+    for key in channel_keys:
+        measurement_data[key] = measurement_data.apply(
+                lambda x: roc_channel_to_globals(
+                    x['chip'],
+                    x['channel'],
+                    x['channeltype'],
+                    complete_config)[key], axis=1)
+    return measurement_data
+
+
+def roc_channel_to_dict(chip_id, channel_id, channel_type, complete_config):
+    """Map a channel identifier to the correct part of the config
+
+    :chip_id: chip_id from the measurement in range 0,1,2 for LD hexaboard
+    :channel_id: the channel number of the channel
+    :channel_type: the channel type from the measurement
+    :complete_config: the complete config of the chip
+    :returns: TODO
+
+    """
+    id_map = {0: 'roc_s0', 1: 'roc_s1', 2: 'roc_s2'}
+    channel_type_map = {0: 'ch', 1: 'calib', 100: 'cm'}
+    return complete_config[id_map[int(chip_id)]]\
+        [channel_type_map[int(channel_type)]][int(channel_id)]
+
+
+def roc_channel_to_globals(chip_id, channel_id, channel_type, complete_config):
+    """get the chip-half wise configuration from the 
+
+    :chip_id: TODO
+    :channel_id: TODO
+    :channel_type: the channel type either a normal channel.
+                   calibration channel or common mode channel
+    :complete_config: The complete configuration of the chip at time of measurement
+    :returns: a dictionary of all global setting for the given channel
+
+    """
+    id_map = {0: 'roc_s0', 1: 'roc_s1', 2: 'roc_s2'}
+    channel_type_map = {0: 'ch', 1: 'calib', 100: 'cm'}
+    roc_global_keys = ['DigitalHalf', 'GlobalAnalog', 'HalfWise', 'MasterTdc', 'ReferenceVoltage']
+    channel_type = channel_type_map[channel_type]
+    if channel_type == 'ch':
+        chip_half = 0 if channel_id < 36 else 1
+    if channel_type == 'cm':
+        chip_half = 0 if channel_id < 2 else 1
+    if channel_type == 'calib':
+        chip_half = channel_id
+    roc_config = complete_config[id_map[chip_id]]
+    result = {}
+    for gl_key in roc_global_keys:
+        for key, val in roc_config[gl_key][chip_half].items():
+            result[key] = val
+    return result
 
 
 def merge_in_config_params(run_data: pd.DataFrame, run_config: dict):
