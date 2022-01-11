@@ -26,9 +26,15 @@ class ConfigFormatError(Exception):
 def load_configuration(config_path):
     """
     load the configuration dictionary from a yaml file
+
+    :raises: ConfigFormatError if the input cannot be parsed by the yaml
+    parser
     """
     with open(config_path, 'r', encoding='utf-8') as config_file:
-        return yaml.safe_load(config_file.read())
+        try:
+            return yaml.safe_load(config_file.read())
+        except yaml.YAMLError as e:
+            raise ConfigFormatError from e
 
 
 def unfreeze(config):
@@ -407,7 +413,7 @@ def parse_config_file(config_path: str):
     """
     path = Path(config_path).resolve()
     if not path.exists():
-        raise ValueError("The filepath given does not exist")
+        raise FileNotFoundError("The filepath given does not exist")
     procedures = []
     workflows = []
     config = load_configuration(path)

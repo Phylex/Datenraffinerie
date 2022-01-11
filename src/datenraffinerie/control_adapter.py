@@ -17,7 +17,7 @@ from pathlib import Path
 import uuid
 import zmq
 import yaml
-from config_utilities import diff_dict, update_dict
+from .config_utilities import diff_dict, update_dict
 
 module_logger = logging.getLogger('hexactrl_shostnameipt.control_adapter')
 

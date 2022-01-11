@@ -10,9 +10,9 @@ import operator
 import pandas as pd
 import luigi
 import yaml
-import config_utilities as cfu
-import analysis_utilities as anu
-from control_adapter import DAQSystem, TargetAdapter
+from . import config_utilities as cfu
+from . import analysis_utilities as anu
+from .control_adapter import DAQSystem, TargetAdapter
 
 
 class ScanConfiguration(luigi.Task):
@@ -94,7 +94,7 @@ class Measurement(luigi.Task):
     calibration = luigi.OptionalParameter(default=None,
                                           significant=False)
 
-    recources = {'hexacontroller': 1}
+    resources = {'hexacontroller': 1}
 
     def requires(self):
         return Configuration(self.target_config,

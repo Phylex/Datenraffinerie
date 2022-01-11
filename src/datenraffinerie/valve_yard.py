@@ -10,9 +10,9 @@ Date: 2021-12-16
 import os
 from pathlib import Path
 import luigi
-from scan import Scan
-import config_utilities as cfu
-import control_adapter as ctrl
+from .scan import Scan
+from . import config_utilities as cfu
+from . import control_adapter as ctrl
 
 
 class ValveYard(luigi.WrapperTask):
@@ -21,6 +21,13 @@ class ValveYard(luigi.WrapperTask):
     output_dir = luigi.Parameter(significant=True)
 
     def requires(self):
+        """ A wrapper that parses the configuration and starts the procedure
+        with the corresponding procedure label
+
+        :raises: ConfigFormatError if either the type of the configuration entry
+            does not match the allowed ones or if the YAML is malformed
+        :raises: DAQConfigError if the DAQ configuration is malformed
+        """
         data_dir = Path(self.output_dir)
         if not data_dir.exists():
             os.makedirs(data_dir)

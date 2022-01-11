@@ -8,16 +8,14 @@ setup(
     },
     install_requires=[
         'Click',
-        'luigi',
-        'pandas',
+        'luigi==3.0.3',
+        'pandas==1.3.5',
         'matplotlib',
         'numpy',
         'scipy',
         'uproot',
         'pyyaml',
         'zmq',
-        'uuid',
-        'logging',
-        'shutil'
+        'pytest',
     ]
 )
