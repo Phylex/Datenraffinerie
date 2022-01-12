@@ -175,6 +175,13 @@ class ControlAdapter:
                 out_config[key] = value
         return out_config, hostname, port
 
+    def read(self):
+        """read the current config from the target
+        :returns: Dictionary with the current config
+            of the target
+        """
+        return self._send_and_log('read')
+
 
 class TargetAdapter(ControlAdapter):
     """
@@ -377,7 +384,7 @@ class DAQSystem:
         self.client.configure()
 
     def __del__(self):
-        self.tear_down_datat_taking_context()
+        self.tear_down_data_taking_context()
 
     @staticmethod
     def split_config_into_client_and_server(daq_config: dict):
@@ -463,7 +470,7 @@ class DAQSystem:
         self.server.stop()
         self.client.stop()
 
-    def tear_down_datat_taking_context(self):
+    def tear_down_data_taking_context(self):
         """
         The complement to the 'start_run' function stops the run and cleans up
         after the run has completed

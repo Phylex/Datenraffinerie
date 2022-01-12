@@ -16,6 +16,10 @@ from .control_adapter import DAQSystem, TargetAdapter
 
 
 class ScanConfiguration(luigi.Task):
+    """ builds the configuration for a single measurement from the
+    default power on config of the target and the scan config of the
+    measurement
+    """
     output_path = luigi.Parameter(significant=True)
     target_power_on_config = luigi.DictParameter(significant=False)
 
@@ -43,20 +47,24 @@ class Configuration(luigi.Task):
     calibration = luigi.OptionalParameter(default=None,
                                           significant=False)
     root_config_path = luigi.Parameter(significant=True)
+    analysis_module_path = luigi.OptionalParameter(significant=False,
+                                                   default=None)
 
     def requires(self):
-        from valve_yard import ValveYard
+        from .valve_yard import ValveYard
         # if a calibration is needed then the delegate finding
         # the calibration and adding the subsequent tasks to the
         # to the ValveYard
         if self.calibration is not None:
             return ValveYard(self.root_config_path,
                              self.calibration,
-                             str(Path(self.output_dir).resolve()))
+                             str(Path(self.output_dir).resolve()),
+                             str(Path(self.analysis_module_path).resolve()))
 
     def output(self):
-        output_path = Path(self.output_dir) / (self.label +\
-            str(self.identifier) + '-config.yaml')
+        output_path = Path(self.output_dir) / (self.label +
+                                               str(self.identifier) +
+                                               '-config.yaml')
         return luigi.LocalTarget(output_path)
 
     def run(self):
@@ -87,12 +95,13 @@ class Measurement(luigi.Task):
     label = luigi.Parameter(significant=True)
     identifier = luigi.IntParameter(significant=True)
 
-
     root_config_path = luigi.Parameter(significant=False)
 
     # calibration if one is required
     calibration = luigi.OptionalParameter(default=None,
                                           significant=False)
+    analysis_module_path = luigi.OptionalParameter(default=None,
+                                                   significant=False)
 
     resources = {'hexacontroller': 1}
 
@@ -102,15 +111,17 @@ class Measurement(luigi.Task):
                              self.output_dir,
                              self.identifier,
                              self.calibration,
-                             self.root_config_path)
+                             self.root_config_path,
+                             self.analysis_module_path)
 
     def output(self):
         """
         Specify the output of this task to be the measured data along with the
         configuration of the target during the measurement
         """
-        data_path = Path(self.output_dir) / (self.label +\
-            str(self.identifier) + '-data.raw')
+        data_path = Path(self.output_dir) / (self.label +
+                                             str(self.identifier) +
+                                             '-data.raw')
         return (luigi.LocalTarget(data_path), self.input())
 
     def run(self):
@@ -154,22 +165,23 @@ class Format(luigi.Task):
     # task can call the valveyard if a calibration is required
     root_config_path = luigi.Parameter(True)
     # calibration if one is required
-    calibration = luigi.Parameter(significant=False)
+    calibration = luigi.OptionalParameter(significant=False)
+    analysis_module_path = luigi.OptionalParameter(significant=False)
 
     def requires(self):
         """
         to be able to unpack the data we need the data and the
-        configuration file. These are returned by the 
+        configuration file. These are returned by the
         """
         return (Measurement(self.target_config,
                             self.daq_system_config,
                             self.output_dir,
                             self.label,
                             self.identifier,
-                            self.calibration),
+                            self.calibration,
+                            self.analysis_module_path),
                 ScanConfiguration(self.output_dir,
                                   self.target_default_config))
-
 
     def output(self):
         """
@@ -190,7 +202,8 @@ class Format(luigi.Task):
                 pwr_on_default_config_file.read()))
         with self.input()[0][1].open('r') as run_config_file:
             run_config = cfu.unfreeze(yaml.safe_load(run_config_file.read()))
-        complete_config = cfu.patch_configuration(power_on_default_config, run_config)
+        complete_config = cfu.patch_configuration(power_on_default_config,
+                                                  run_config)
 
         # 'unpack' the data from the raw data gathered into a root file that
         # can then be merged with the configuration into a large table
@@ -203,15 +216,16 @@ class Format(luigi.Task):
             + output_type
         os.system(full_unpack_command)
 
-        # load the data from the unpacked root file and merge in the data from the
-        # configuration for that run with the data
+        # load the data from the unpacked root file and merge in the
+        # data from the configuration for that run with the data
         measurement_data = anu.extract_data(data_file)
         os.remove(data_file)
-        measurement_data = anu.add_channel_wise_data(measurement_data, complete_config)
-        measurement_data = anu.add_half_wise_data(measurement_data, complete_config)
-        with self.output().temporary_path() as self.tmp_out_path:
-            measurement_data.to_hdf(self.tmp_out_path, 'data')
-
+        measurement_data = anu.add_channel_wise_data(measurement_data,
+                                                     complete_config)
+        measurement_data = anu.add_half_wise_data(measurement_data,
+                                                  complete_config)
+        with self.output().temporary_path() as tmp_out_path:
+            measurement_data.to_hdf(tmp_out_path, 'data')
 
 
 class Scan(luigi.Task):
@@ -245,7 +259,8 @@ class Scan(luigi.Task):
     # calibration if one is required
     calibration = luigi.OptionalParameter(significant=False,
                                           default=None)
-
+    analysis_module_path = luigi.OptionalParameter(significant=False,
+                                                   default=None)
     supported_formats = ['hdf5']
 
     def requires(self):
@@ -287,7 +302,8 @@ class Scan(luigi.Task):
                                            self.target_default_config,
                                            self.daq_system_config,
                                            self.root_config_path,
-                                           self.calibration))
+                                           self.calibration,
+                                           self.analysis_module_path))
         # The scan has reached the one dimensional case. Spawn a measurement
         # for every value that takes part in the scan
         else:
@@ -304,7 +320,8 @@ class Scan(luigi.Task):
                                              self.label,
                                              self.identifier + i,
                                              self.root_config_path,
-                                             self.calibration))
+                                             self.calibration,
+                                             self.analysis_module_path))
         return required_tasks
 
     def run(self):

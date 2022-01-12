@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import luigi
 from .scan import Scan
+from .distillery import DistilleryAdapter
 from . import config_utilities as cfu
 from . import control_adapter as ctrl
 
@@ -19,6 +20,7 @@ class ValveYard(luigi.WrapperTask):
     root_config_file = luigi.Parameter(significant=True)
     procedure_label = luigi.Parameter(significant=True)
     output_dir = luigi.Parameter(significant=True)
+    analysis_module_path = luigi.Parameter(significant=True)
 
     def requires(self):
         """ A wrapper that parses the configuration and starts the procedure
@@ -41,8 +43,13 @@ class ValveYard(luigi.WrapperTask):
                                       " the config files")
         procedure = procedures[procedure_index]
         if procedure['type'] == 'analysis':
-            raise NotImplementedError('starting analyses from the ValveYard'
-                                      ' has has not been implemented yet')
+            return DistilleryAdapter(name=self.procedure_label,
+                              daq=procedure['daq'],
+                              output_dir=str(
+                                  (output_dir/self.procedure_label).resolve()),
+                              parameters=procedure['parameters'],
+                              root_config_path=self.root_config_file,
+                              analysis_module_path=self.analysis_module_path)
         if procedure['type'] == 'daq':
             return Scan(identifier=0,
                         label=self.procedure_label,
@@ -54,6 +61,7 @@ class ValveYard(luigi.WrapperTask):
                         daq_system_config=procedure['daq_system_config'],
                         root_config_path=str(
                             Path(self.root_config_file).resolve()),
-                        calibration=procedure['calibration'])
+                        calibration=procedure['calibration'],
+                        analysis_module_path=self.analysis_module_path)
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")
