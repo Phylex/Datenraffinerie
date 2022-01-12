@@ -11,13 +11,18 @@ import luigi
 @click.argument('config', type=click.Path(exists=True))
 @click.argument('procedure', type=str)
 @click.argument('output', type=click.Path())
+@click.option('-a', '--analysis_path', 'analysis_path', type=click.Path(exists=True))
 @click.option('-w', '--workers', 'workers', type=int, default=4)
-def cli(config, procedure, workers, output):
+def cli(config, procedure, workers, output, analysis_path):
+    """ The command line interface to the datenraffinerie intended to
+    be one of the primary interfaces for the users.
+    """
     try:
         run_result = luigi.build([ValveYard(
             click.format_filename(config),
             procedure,
-            output)],
+            output,
+            analysis_path)],
             local_scheduler=True,
             workers=workers,
         )
