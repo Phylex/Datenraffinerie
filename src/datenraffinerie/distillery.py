@@ -1,4 +1,6 @@
 import luigi
+import importlib
+import os
 import sys
 from pathlib import Path
 import pandas as pd
@@ -29,27 +31,45 @@ class DistilleryAdapter(luigi.Task):
         """ Define the files that are produced by the analysis
         :returns: list of strings 
         """
-        if self.analysis_module_path is not None:
-            pathstr = str(Path(self.analysis_module_path).resolve())
-            sys.path.append(pathstr)
-            import distilleries
-        else:
-            import datenraffinerie_distilleries as distilleries
-        distillery = getattr(distilleries, self.name)
-        output_paths = distillery.output(self.output_dir)
-        return [luigi.LocalTarget(path) for path in output_paths]
+        distillery = self.import_distillery(self.analysis_module_path,
+                                            self.name)
+        distillery = distillery(self.parameters)
+        output_paths = distillery.output()
+        return [luigi.LocalTarget(Path(path).resolve())
+                for path in output_paths]
 
     def run(self):
         """ perform the analysis using the imported distillery
         :returns: TODO
 
         """
-        if self.analysis_module_path is not None:
-            pathstr = str(Path(self.analysis_module_path).resolve())
-            sys.path.append(pathstr)
-            import distilleries
+        # import the class definition
+        distillery = self.import_distillery(self.analysis_module_path,
+                                            self.name)
+        # instantiate an analysis object from the imported analysis class
+        distillery = distillery(self.parameters)
+
+        # open and read the data
+        data = pd.read_hdf(self.input().path)
+        distillery.run(data, self.output_dir)
+
+    @staticmethod
+    def import_distillery(distillery_path: str, name: str):
+        """ Import the distillery for the analysis.
+
+        :distillery_path: The path in which to find the distilleries
+            module
+        :name: The name of the distillery to load
+        :returns: the distillery loaded into the local namespace
+        """
+        if distillery_path is not None:
+            pathstr = str(Path(distillery_path).resolve())
+            pythonpath_entry = os.path.split(pathstr)[0]
+            module_name = os.path.split(pathstr)[1]
+            sys.path.append(pythonpath_entry)
+            i = importlib.import_module(module_name)
+            distillery = getattr(i, name)
         else:
             import datenraffinerie_distilleries as distilleries
-        distillery = getattr(distilleries, self.name)
-        analysis_data = pd.read_hdf(self.input().path)
-        distillery.run(analysis_data, self.output_dir)
+            distillery = getattr(distilleries, name)
+        return distillery

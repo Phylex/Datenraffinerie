@@ -70,7 +70,13 @@ class Configuration(luigi.Task):
     def run(self):
         target_config = cfu.unfreeze(self.target_config)
         if self.calibration is not None:
-            calib_file = self.input()[0].open('r')
+            try:
+                calib_file = self.input()['calibration'].open('r')
+            except KeyError as err:
+                raise FileNotFoundError(f'the scan {self.label} expects a calibration'
+                                        f' but no `calibration` key  was found in the'
+                                        f' output of the analysis specified by the '
+                                        f'calibration procedure') from err
             calibration = yaml.safe_load(calib_file)
             out_config = cfu.update_dict(target_config, calibration)
         else:
