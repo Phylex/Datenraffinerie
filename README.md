@@ -13,125 +13,68 @@ Single-roc-tester. In future the Train might also be supported
 measurements from a target; analysis-procedures take the data acquired by daq-procedures and try to derive meaningful insights from that.
 - Task: The smallest unit of a procedure. This term is taken from the library luigi used in this framework. A task produces a file at completion.
 - Acquisition: The procedure that acquires data from the target also known as daq-procedure
+- Analysis: An analysis takes data that was acquired during an acquisition and derives some sort of 'insight' from it. An 'insight' might be a plot or
+the decision to keep/discard the chip that the data was acquired on.
+- Distillery: Analyses are performed in 'Distilleries' which are the part of the datenraffinerie framework and provide the analysis code with the data
+and the output directory where the analysis is expected to place it's outputs.
 
 ## Concepts
-Data acquisition is performed by a target, that accepts some configuration and produces measurements where the HGCROCv3 along with other target
-systems have been configured according to the configuration received. The Datenraffinerie computes the configuration for every measurement of the
-acquisition. To do this the user needs to provide a 'power-on default configuration' that describes the state of every register of the device at power
-on and the configuration for the acquisition to be performed. An acquisition normally consists of a scan of one or more chip parameters. The
-parameters and scan ranges need to be provided by the acquisition configuration.
+The Datenraffinerie expresses the Creation of plots as a sequence of two types of procedures. There is a DAQ procedure and an Analysis procedure.
+A daq-procedure is expressed as a scan over a set of values of a configuration parameter of the target. If multiple target parameters are passed to an
+acquisition procedure, it computes the Cartesian product of the parameters and performs a measurement for every target configuration from that set.
+The daq-procedure is fully configurable, the daq-task structure is derived from a yaml configuration, more on that later.
+
+Analyses derive useful information from the data provided by the acquisitions. The module that contains the Analysis code is loaded at runtime by the
+datenraffinerie and does therefore not need to be aware of the context it is executed in. The context for the analysis code is also provided by `yaml`
+configuration files in a similar format to the daq-configuration.
+
+Data acquisition is performed by a target, that accepts some configuration and produces measurements where the it has configured itself and the HGCROCv3
+chips that are part of it according to the configuration received. The Datenraffinerie computes the entire configuration of target and daq system 
+for every measurement of the acquisition, guaranteeing that the system is in the desired state when taking data.
+To be able to do this the user needs to provide a 'power-on default configuration' that describes the state of every parameter of the target at power on and the
+configuration for the acquisition system.
+parameters and scan ranges need to be provided by the acquisition configuration.\*
 
 After computing the configuration for a single measurement from the aforementioned inputs the measurement is scheduled for execution on the target.
 After the measurements have been acquired the data and configuration are merged into a single `hdf5` file that should contain all information needed.
 The single hdf-5 file does not only contain data/configuration for a single measurement but for 
 HDF-5 files can be loaded into pandas DataFrames using `pd.read_hdf('/path/to/file')`.
 
-
-
-
-## Folder Structure
-A measurement is usually conducted with a chip or board as it's target. A Measurement may require Analyses and/or calibrations to be performed.
-Running a measurement will create the following folder structure
-```
-Target
-├── Calibration
-├── Measurements
-└── Analyses
-```
-The `Target` name will be specified by the user as a command line argument when launching a workflow. If the `Target` folder does not exist it will be
-created along with the subfolders for the three stages. The subfolder for each stage will in turn have one folder for a variant of that stage.
-So if three different calibrations have been performed on the target `ROCv3-539345` then the following folder structure will be
-```
-ROCv3-539345
-├── Calibration
-│   ├── adc
-│   ├── pedestal
-│   └── toa-acg
-├── Measurements
-└── Analyses
-```
-The same rules apply to the Measurement and Analyses folders.
-
-### Handling of intermediate files
-Every stage of the measurement, calibration and Analysis procedure may produce intermediate files, as a means of moving data from one task to the
-next. To avoid clutter and duplicate or even contradicting information these files SHOULD NOT be placed in the above folder structure.
-Intermediate files may be placed in the `/tmp` directory of the filesystem if needed.
-
-### Idempotency of Stages
-As no intermediate information is stored in the Folder the tasks that perform Calibration and Analysis must produce the same result when run with the
-same data. This is what is meant with idempotency. Thus if Data for a Target has been taken once, a new measurement of the same data should not be needed.
+---
+\*It may seem odd that the configuration for the entire chip is
+computed for every measurement instead of changing only the parameter that is being scanned over. This needs to be done as every task is run in a
+separate process and does not know when the luigi scheduler schedules it for execution. The order of measurements is not known and as such a task
+cannot rely on a the configuration being in a predefined state, without creating that state itself.
 
 ---
-## Keeping Track of State
-Beside the raw data taken from the target, other information like the state of the targets slow-control  and it's environment are important to contextualize the
-measurements. Depending on the amount of change expected for these parameters there may be 2 different types of state tracking files, one that defines
-the state of the system/environment for one stage and one that defines the state/environment for every 'atomic' data-taking step.
 
-### Keeping Track of slow changing State
-Things like temperature or humidity might affect the operation/calibration/performance of the target. These variables, when controlled for, tend not
-to change quickly. Therefore these would be recorded once for every execution of a stage. There could, for example be a calibration for the pedestals
-at -30C and at +25C. As such there would be one folder inside the pedestal folder of the Calibration stage.
+## Execution Model
+At the beginning of the Execution, the datenraffinerie is invoked by a cli command by the user. The user needs to provide some parameters to the
+command to provide it with the location of the configuration to be used and the location at which to find the analysis code along with the name of the
+procedure that the user wishes to execute and the location where the data needs to be written to.
+
+The datenraffinerie then starts the ValveYard task. The job of the ValveYard is to parse the configuration provided by the user and schedule the
+appropriate tasks with the luigi scheduler. The ValveYard reads in all configuration and then looks for an entry in the configuration that matches
+with the name of the procedure that the user wishes to execute. Upon finding a matching entry it schedules either a `DistilleryAdapter` task (if the type of task is
+`analysis` or a Scan task (if the type is `daq`). It uses the configuration of the user to determine the correct parameters to pass to either of the
+tasks. At this point the initial call of the ValveYard returns, forcing the scheduler to schedule either the `Scan` or `DistilleryAdapter` task.
+
+### Execution of a Scan and Measurement tasks
+To tackle the problem of multi-dimensional scans, the `Scan` task uses recursion to keep the amount of code needed to perform a general
+multi-dimensional scan small. The (simplified) input to a Scan task consists of a base configuration and a list of parameters and ranges to scan the
+parameters over.
+```python
+Scan(base_target_configuration, [[param1, [0,1,2,3,...]], [param2, [0,2,4,5,...]]])
 ```
-ROCv3-539345
-├── Calibration
-│   ├── adc
-│   │   ├── 1
-│   │   └── 2
-│   ├── pedestal
-│   └── toa-acg
-├── Measurements
-└── Analyses
-```
+If the list of parameters to scan over is longer that one (which is the case in the previous example) it schedules a `Scan` task for each value of
+`param1` to execute. To each of these `Scan` tasks it passes a copy of it's `base_target_config` where the `param1` of that copy was set to one of the
+values that `param1` should be scanned over.
 
-After successful execution of two `adc` calibrations with different environmental conditions there would be two folders inside the `adc` folder of the
-calibration stage as shown above. Each of these directories will contain two top-level files, one corresponding to the calibration overlay that calibrates
-the different slow control parameters of the target, named `calibration_overlay.yaml` and one that contains the state of the environment during the
-execution called `environment.yaml`. The concept of the environment should also include settings of the Target that do not vary for an entire
-measurement, but may vary from one measurement to the next.
+If the list of parameters is exactly one the `Scan` task Schedules the collection of tasks that together perform a single `Measurement` for every
+value of the single parameter in the parameter list.
 
-### Taking new data if the environment is different
-When a Stage is executed, environmental information in form of a `*.yaml` file may be passed to the Stage.
-The environmental information received by the task will be checked against any `environment.yaml` file that exists in the folder corresponding to the task.
-If the specific combination is not encountered, the task will create a new folder, take new measurements and produce new output files.
-If the configuration of the environment matches the state in an existing `environment.yaml` file, the data in the folder containing it will be used and no
-further actions are performed.
+When a measurement is executed it checks if it needs a calibration to be present. If it is present it applies the calibrated values and preforms the
+measurement (there is a bit more involved here but we shall get to that later). If a calibration is not present it is expected to be created by an
+analysis (inside a distillery) and passed to the daq task.
 
-In the example case of an `adc` calibration, when the state in the `environment.yaml` of `Target/Calibration/adc/2` matches the state passed to the task,
-the `configuration_overlay.yaml` of the directory in `Target/Calibration/adc/2` will be returned as the output of the stage to the following one.
-If there is no subsequent stage, the execution terminates.
-
-### Keeping track of quickly changing state:
-When performing the scan, the configuration parameters are changed from one 'atomic' measurement to the next. To be able to reconstruct the state of
-the Target during any of these 'atomic' measurements all parameters of the target that are changed from measurement to measurement are saved as a
-`parameters_*.yaml`. This parameters file will be linked to the corresponding data file via matching filenames. For example, the
-`parameters_tws_01.yaml` would store the parameters for the `tws_01.root` file.
-
-Using this approach, a multi dimensional scan would only create data in one directory. It would rely on the analysis software to properly associate
-and sort the information of the scan to produce the output of said analysis. The measurement tasks MUST NOT impose a directory structure in their
-respective output directory, as this would duplicate structure that is contained in the `.yaml` files.
-
-## State of the Measurement System
-Things like the firmware/software version and the default configuration of the diffrerent system components that where used to perform the measurement
-are assumed to be Identical for all Procedures in the `Target` folder. These parameters are stored in the `Defaults` directory. There is one file per
-system component. So for example the hexacontroller settings, and the ROC default configuration used for all subsequent actions is stored in this
-directory. The following is an example with a LD hexaboard as target.
-```
-HEXB-LD-539345
-├── Defaults
-│   ├── daq-server.yaml
-│   ├── daq-client.yaml
-│   ├── slow-control-server.yaml
-│   └── ld_hexaboard.yaml
-├── Calibration
-│   ├── adc
-│   │   ├── 1
-│   │   └── 2
-│   ├── pedestal
-│   └── toa-acg
-├── Measurements
-└── Analyses
-```
-
-As can be seen each of the different system components has a default configuration that is stored as part of the `Target` directory and is used as
-default for all measurements within that target directory. If the user wants to run measurements with a different default configuration then they must
-create a new target directory.
+### Execution of the Distillery task
