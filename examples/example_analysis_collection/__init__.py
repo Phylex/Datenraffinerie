@@ -1,1 +1,1 @@
-from . import example_analysis_1
+from .example_analysis_1 import ExampleAnalysis1 as the_analysis_name_in_the_config
