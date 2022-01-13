@@ -1,0 +1,62 @@
+- name: injection_scan
+  type: daq
+  calibration: 'pedestal_calibration'
+  target_settings:
+    power_on_default: ../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../tests/configuration/defaults/initLDV3.yaml
+    overrides:
+  daq_settings:
+    default: ../tests/configuration/defaults/daq-system-config.yaml
+    server_override:
+      NEvents: 4000
+    client_override:
+      hw_type: HD
+  parameters:
+    - key: ['level1_key1', 'level2_key2', 'CalibDAC']
+      range:
+        start: 10
+        stop: 50
+        step: 4
+
+- name: timewalk_scan
+  type: daq
+  calibration: 'pedestal_calibration'
+  target_settings:
+    power_on_default: ../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../tests/configuration/defaults/initLDV3.yaml
+    overrides:
+  daq_settings:
+    default: ../tests/configuration/defaults/daq-system-config.yaml
+    server_override:
+      port: 7777
+      IdelayStep: 3
+    client_override:
+      server_port: 7777
+  parameters:
+    - key: ['level1_key1', 'level2_key2', 'injection_phase']
+      range:
+        start: 10
+        stop: 50
+        step: 4
+    - key: ['level1_key1', 'level2_key1', 'CalibDAC']
+      range:
+        start: 25
+        stop: 100
+        step: 5
+
+- name: pedestal_scan
+  type: daq
+  target_settings:
+    power_on_default: ../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ../tests/configuration/defaults/initLDV3.yaml
+    overrides:
+  daq_settings:
+    default: ../tests/configuration/defaults/daq-system-config.yaml
+    server_override:
+    client_override:
+  parameters:
+    - key: [['roc_s0', 'roc_s1', 'roc_s2'], 'ch', 'pedestal_vref']
+      range:
+        start: 0
+        stop: 20
+        step: 2

@@ -1,0 +1,8 @@
+__pycache__/
+venv/
+presentations/
+test_out/
+*.log
+dist/
+src/*.egg-info/
+build/
