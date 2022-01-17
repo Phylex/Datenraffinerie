@@ -87,7 +87,7 @@ class ExampleAnalysis1(object):
                     signal_channels['chip'] == chip).where(
                             signal_channels['channel'] == chan).dropna()
             plot_data.append((chip, chan, channel_data['adc_mean'].mean()))
-        with open(output_dir + self.output()['summary']) as summary:
+        with open(output_dir + "/" + self.output()['summary'],'w') as summary:
             summary.write('chip,channel,total_adc_mean\n')
             for elem in plot_data:
                 for item in elem:
