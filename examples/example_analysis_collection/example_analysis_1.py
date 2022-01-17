@@ -53,8 +53,12 @@ class ExampleAnalysis1(object):
         A calibration is not mandatory (nor are any of the other files) except
         for analyses that are used explicitly as calibration analyses.
         """
-        return {'summary': './summary.csv', 'plots': [], 'calibration': None}
-
+        
+        return {
+            'summary': 'summary.csv'#,
+            #'plots': ['plot1.png','plot2.png'],
+            #'calibration': 'calibration.yaml'
+        }
 
     def run(self, data: pd.DataFrame, output_dir: Path):
         """ Perform the analysis in this function. don't forget to create the all

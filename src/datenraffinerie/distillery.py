@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 import pandas as pd
 
-
 class DistilleryAdapter(luigi.Task):
     """ Task that encapsulates analysis tasks and makes them executable
     inside the Datenraffinerie
@@ -33,10 +32,19 @@ class DistilleryAdapter(luigi.Task):
         """
         distillery = self.import_distillery(self.analysis_module_path,
                                             self.name)
-        distillery = distillery(self.parameters)
-        output_paths = distillery.output()
-        return [luigi.LocalTarget(Path(path).resolve())
-                for path in output_paths]
+        distillery = distillery(analysis_parameters = self.parameters.get_wrapped())
+        output_keys =  distillery.output().keys()
+        output_paths = distillery.output().values()
+
+        output_targets = []
+        for output_path in output_paths:
+            if type(output_path)==list:
+                output_targets.append( [luigi.LocalTarget(Path(self.output_dir+"/"+path).resolve())
+                                        for path in output_path] )
+            else:
+                output_targets.append( luigi.LocalTarget(Path(self.output_dir+"/"+output_path).resolve()) )
+
+        return dict(zip(output_keys, output_targets))
 
     def run(self):
         """ perform the analysis using the imported distillery
@@ -47,7 +55,7 @@ class DistilleryAdapter(luigi.Task):
         distillery = self.import_distillery(self.analysis_module_path,
                                             self.name)
         # instantiate an analysis object from the imported analysis class
-        distillery = distillery(self.parameters)
+        distillery = distillery(analysis_parameters = self.parameters.get_wrapped())
 
         # open and read the data
         data = pd.read_hdf(self.input().path)

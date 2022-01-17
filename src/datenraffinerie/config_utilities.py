@@ -413,7 +413,7 @@ def parse_config_file(config_path: str):
     """
     path = Path(config_path).resolve()
     if not path.exists():
-        raise FileNotFoundError("The filepath given does not exist")
+        raise FileNotFoundError("The filepath %s given does not exist"%path)
     procedures = []
     workflows = []
     config = load_configuration(path)
