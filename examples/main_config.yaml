@@ -1,6 +1,5 @@
 libraries:
-  - "./calibration_procedures.yaml"
-  - "./scan_procedures.yaml"
+  - "./daq_procedures.yaml"
   - "./analysis_procedures.yaml"
 
 workflows:
