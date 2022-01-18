@@ -53,8 +53,12 @@ class ExampleAnalysis1(object):
         A calibration is not mandatory (nor are any of the other files) except
         for analyses that are used explicitly as calibration analyses.
         """
-        return {'summary': './summary.csv', 'plots': [], 'calibration': None}
-
+        
+        return {
+            'summary': 'summary.csv'#,
+            #'plots': ['plot1.png','plot2.png'],
+            #'calibration': 'calibration.yaml'
+        }
 
     def run(self, data: pd.DataFrame, output_dir: Path):
         """ Perform the analysis in this function. don't forget to create the all
@@ -83,7 +87,7 @@ class ExampleAnalysis1(object):
                     signal_channels['chip'] == chip).where(
                             signal_channels['channel'] == chan).dropna()
             plot_data.append((chip, chan, channel_data['adc_mean'].mean()))
-        with open(output_dir + self.output()['summary']) as summary:
+        with open(output_dir + "/" + self.output()['summary'],'w') as summary:
             summary.write('chip,channel,total_adc_mean\n')
             for elem in plot_data:
                 for item in elem:

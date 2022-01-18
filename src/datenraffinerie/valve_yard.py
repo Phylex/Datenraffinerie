@@ -22,6 +22,9 @@ class ValveYard(luigi.WrapperTask):
     output_dir = luigi.Parameter(significant=True)
     analysis_module_path = luigi.Parameter(significant=True)
 
+    def output(self):
+        return self.input()
+    
     def requires(self):
         """ A wrapper that parses the configuration and starts the procedure
         with the corresponding procedure label
