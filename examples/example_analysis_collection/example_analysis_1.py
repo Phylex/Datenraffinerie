@@ -90,7 +90,12 @@ class ExampleAnalysis1():
                     signal_channels['chip'] == chip).where(
                             signal_channels['channel'] == chan).dropna()
             plot_data.append((chip, chan, channel_data['adc_mean'].mean()))
+        print(self._analysis_parameters)
         with open(output_dir + "/" + self.output()['summary'],'w') as summary:
+            summary.write('scan parameters:\n')
+            for key, value in self._analysis_parameters.items():
+                summary.write(f'{key}: {value}\n')
+            summary.write('\n\n')
             summary.write('chip,channel,total_adc_mean\n')
             for elem in plot_data:
                 for item in elem:
