@@ -1,6 +1,6 @@
-- name: pedestal_calibration
+- name: example_analysis
   type: analysis
-  daq: pedestal_scan
+  daq: example_scan
   parameters:
     p1: 346045
     p2: 45346

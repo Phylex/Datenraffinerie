@@ -4,6 +4,8 @@ import os
 import sys
 from pathlib import Path
 import pandas as pd
+from .config_utilities import unfreeze
+from .errors import OutputError
 
 class DistilleryAdapter(luigi.Task):
     """ Task that encapsulates analysis tasks and makes them executable
@@ -28,23 +30,35 @@ class DistilleryAdapter(luigi.Task):
 
     def output(self):
         """ Define the files that are produced by the analysis
-        :returns: list of strings 
+        :returns: dictionary with the keys 'summary', 'calibration'
+            and 'plots', where 'summary's value is a string for a
+            relative path to the summary, same as calibration is a
+            relative path to the calibration yaml file
+            and the value associated to 'plots' is a list of relative
+            paths. All paths should be strings.
         """
         distillery = self.import_distillery(self.analysis_module_path,
                                             self.name)
-        distillery = distillery(analysis_parameters = self.parameters.get_wrapped())
-        output_keys =  distillery.output().keys()
-        output_paths = distillery.output().values()
-
-        output_targets = []
-        for output_path in output_paths:
-            if type(output_path)==list:
-                output_targets.append( [luigi.LocalTarget(Path(self.output_dir+"/"+path).resolve())
-                                        for path in output_path] )
+        analysis_parameters = unfreeze(self.parameters)
+        distillery = distillery(analysis_parameters)
+        output = {}
+        for key, paths in distillery.output().items():
+            if key == 'plots':
+                try:
+                    if len(paths) == 0:
+                        continue
+                    output[key] = [luigi.LocalTarget(
+                        (Path(self.output_dir) / path).resolve())
+                        for path in paths]
+                except TypeError as err:
+                    raise OutputError('The plots output must be a list ' +
+                                      'of paths. Use an empty list if ' +
+                                      'no plots are generated') from err
             else:
-                output_targets.append( luigi.LocalTarget(Path(self.output_dir+"/"+output_path).resolve()) )
-
-        return dict(zip(output_keys, output_targets))
+                if paths is None:
+                    continue
+                output[key] = (Path(self.output_dir) / paths).resolve()
+        return output
 
     def run(self):
         """ perform the analysis using the imported distillery
@@ -55,7 +69,7 @@ class DistilleryAdapter(luigi.Task):
         distillery = self.import_distillery(self.analysis_module_path,
                                             self.name)
         # instantiate an analysis object from the imported analysis class
-        distillery = distillery(analysis_parameters = self.parameters.get_wrapped())
+        distillery = distillery(unfreeze(self.parameters))
 
         # open and read the data
         data = pd.read_hdf(self.input().path)

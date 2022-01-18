@@ -34,10 +34,10 @@ class DAQConfigError(Exception):
 class ControlAdapter:
     """
     Class that encapsulates the configuration and communication to either
-    the client or the server of the daq-system
+    the client and server of the daq-system or target.
     """
 
-    def __init__(self, config: dict, hostname: str = None, port: str = None):
+    def __init__(self, default_config: dict, hostname: str = None, port: str = None):
         """
         Initialize the data structure on the control computer (the one
         coordinating everything) and connect to the system component.
@@ -49,7 +49,7 @@ class ControlAdapter:
         self.logger = logging.getLogger(
                 'hexactrl_script.contol_adapter.ControlAdapter')
         config, config_hostname, config_port = self._filter_out_network_config(
-                config)
+                default_config)
         if hostname is None:
             if config_hostname is None:
                 raise DAQConfigError('No hostname given')
@@ -64,6 +64,7 @@ class ControlAdapter:
         self.socket = self.context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
         self.configuration = config
+        self.default_config = config
         # this is used to determin if to send the full config
         #-to the target if 'configure' is called without an argument
         self.config_written = False
@@ -78,7 +79,7 @@ class ControlAdapter:
         self.socket = context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
 
-    def configure(self, config=None, force=False, diff=False):
+    def configure(self, config=None, force=False, default_overlay=True):
         """
         send the configuration to the corresponding system component and wait
         for the configuration to be completed
@@ -87,16 +88,14 @@ class ControlAdapter:
         the force and diff flags
 
         Arguments:
-            diff: if this flag is set, the caller knows that this is only an
-            update to the configuration already on the system, so no diff
-            has to be performed first. If this flag is false/unset then the
-            entry is run through the cach first and only the difference of
-            the config passed and the cached config is sent to the endpoint
+            default_overlay: Specifies that the config received is an overlay
+            of the default_configuration. Using that information an appropriate
+            diff is calculated and sent to the backend system
 
             force: if this flag is set the cache is ignored. In this case
-            the cache is updated with the new values in the config passed
-            in (if there is any) and then every value in the cache is sent
-            to the endpoint.
+            the cache is updated with the new values from the config passed
+            in (if there is any) and then the new configuration is sent to
+            the backend.
             if this flag is false/unset then the diff between the config
             passed in and the cache is sent. If no config is passed, then
             the function checks if the values of the cache have been sent
@@ -105,18 +104,20 @@ class ControlAdapter:
             of the cache
         """
         if config is not None:
-            config, _, _= self._filter_out_network_config(config)
-            if diff is False:
-                if force is True:
-                    self.configuration = update_dict(self.configuration, config)
-                    write_config = self.configuration
-                else:
-                    write_config = diff_dict(self.configuration, config)
+            config, _, _ = self._filter_out_network_config(config)
+            if default_overlay is True:
+                config = update_dict(self.default_config, config)
+                write_config = diff_dict(self.configuration, config)
             else:
-                write_config = config
+                write_config = diff_dict(self.configuration, config)
+                if force is True:
+                    write_config = self.configuration
         else:
-            if not self.config_written or force is True:
+            if force is True:
                 write_config = self.configuration
+            elif self.config_written is False:
+                write_config = diff_dict(self.default_config,
+                                         self.configuration)
             else:
                 write_config = None
         # if there is no difference between the configs simply return
@@ -137,8 +138,10 @@ class ControlAdapter:
         self.logger.debug(f"Received string '{rep}' from {self.hostname}:{self.port}")
         if not rep == 'Configured' and not rep == 'ROC(s) CONFIGURED\n...\n':
             raise DAQError("The configuration endpoint did not indicate "
-                    " a successful configuration")
-        self.configuration = update_dict(self.configuration, write_config)
+                           " a successful configuration")
+        self.configuration = update_dict(self.configuration,
+                                         write_config,
+                                         in_place=True)
         self.config_written = True
 
     def _send_and_log(self, msg: str):
