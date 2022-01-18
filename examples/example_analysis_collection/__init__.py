@@ -1,1 +1,1 @@
-from .example_analysis_1 import ExampleAnalysis1 as pedestal_calibration
+from .example_analysis_1 import ExampleAnalysis1 as example_analysis

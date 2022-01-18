@@ -42,7 +42,7 @@ class DistilleryAdapter(luigi.Task):
         analysis_parameters = unfreeze(self.parameters)
         distillery = distillery(analysis_parameters)
         output = {}
-        for key, paths in distillery.output():
+        for key, paths in distillery.output().items():
             if key == 'plots':
                 try:
                     if len(paths) == 0:
