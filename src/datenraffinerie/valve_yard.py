@@ -51,7 +51,8 @@ class ValveYard(luigi.WrapperTask):
                               output_dir=str(
                                   (output_dir/self.procedure_label).resolve()),
                               parameters=procedure['parameters'],
-                              root_config_path=self.root_config_file,
+                              root_config_path=str(
+                                  Path(self.root_config_file).resolve()),
                               analysis_module_path=self.analysis_module_path)
         if procedure['type'] == 'daq':
             return Scan(identifier=0,

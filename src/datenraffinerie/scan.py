@@ -101,7 +101,7 @@ class Measurement(luigi.Task):
     label = luigi.Parameter(significant=True)
     identifier = luigi.IntParameter(significant=True)
 
-    root_config_path = luigi.Parameter(significant=False)
+    root_config_path = luigi.Parameter(significant=True)
 
     # calibration if one is required
     calibration = luigi.OptionalParameter(default=None,
@@ -184,6 +184,7 @@ class Format(luigi.Task):
                             self.output_dir,
                             self.label,
                             self.identifier,
+                            self.root_config_path,
                             self.calibration,
                             self.analysis_module_path),
                 ScanConfiguration(self.output_dir,
