@@ -44,7 +44,7 @@
         stop: 100
         step: 5
 
-- name: pedestal_scan
+- name: example_scan
   type: daq
   target_settings:
     power_on_default: ../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml

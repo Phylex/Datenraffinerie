@@ -1,12 +1,15 @@
+"""
+Module to illustrate the layout of the analysis and the functions needed
+by the datenraffinerie to work correctly.
+"""
 from pathlib import Path
-import pandas as pd
-import numpy as np
-import scipy.optimize as scopt
 import time
+import pandas as pd
 
 # global variables can be used and are only visible to the analysis class
 # and anything else defined in this file
 SIGNAL_THRESH = 400
+
 
 # helper functions can also be defined here but are again only accessible
 # to objects defined inside this file
@@ -20,7 +23,7 @@ def example_helper_1(some_input):
     return 'some_result'
 
 
-class ExampleAnalysis1(object):
+class ExampleAnalysis1():
 
     """This analysis is an example analysis that shows
     the calling convention used by the Datenraffinerie.
@@ -53,11 +56,11 @@ class ExampleAnalysis1(object):
         A calibration is not mandatory (nor are any of the other files) except
         for analyses that are used explicitly as calibration analyses.
         """
-        
+
         return {
-            'summary': 'summary.csv'#,
-            #'plots': ['plot1.png','plot2.png'],
-            #'calibration': 'calibration.yaml'
+            'summary': 'summary.csv',
+            'plots': [],
+            'calibration': None
         }
 
     def run(self, data: pd.DataFrame, output_dir: Path):
