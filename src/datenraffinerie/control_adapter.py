@@ -320,10 +320,11 @@ class DAQAdapter(ControlAdapter):
             super().configure(force=True, overlays_default=overlays_default)
 
     def reset(self):
+        self.configuration = self.default_config
         self.configure()
 
     def load_default_config(self, default_config):
-        super.load_default_config({self.variant_key_map[self.variant]:
+        super().load_default_config({self.variant_key_map[self.variant]:
                                    default_config})
 
     def get_config(self):
