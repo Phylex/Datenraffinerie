@@ -18,6 +18,7 @@ class DistilleryAdapter(luigi.Task):
     root_config_path = luigi.Parameter(significant=True)
     analysis_module_path = luigi.OptionalParameter(significant=True,
                                                    default=None)
+    network_config = luigi.DictParameter(significant=False)
 
     def requires(self):
         from .valve_yard import ValveYard
@@ -26,7 +27,7 @@ class DistilleryAdapter(luigi.Task):
         :returns: The acquisition procedure needed to produce the data
         """
         return ValveYard(self.root_config_path, self.daq, self.output_dir,
-                         self.analysis_module_path)
+                         self.analysis_module_path, self.network_config)
 
     def output(self):
         """ Define the files that are produced by the analysis

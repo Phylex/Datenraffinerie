@@ -14,6 +14,8 @@ from .scan import Scan
 from .distillery import DistilleryAdapter
 from . import config_utilities as cfu
 from . import control_adapter as ctrl
+import zmq
+import yaml
 
 
 class ValveYard(luigi.WrapperTask):
@@ -21,10 +23,11 @@ class ValveYard(luigi.WrapperTask):
     procedure_label = luigi.Parameter(significant=True)
     output_dir = luigi.Parameter(significant=True)
     analysis_module_path = luigi.Parameter(significant=True)
+    network_config = luigi.DictParameter(significant=True)
 
     def output(self):
         return self.input()
-    
+
     def requires(self):
         """ A wrapper that parses the configuration and starts the procedure
         with the corresponding procedure label
@@ -53,8 +56,32 @@ class ValveYard(luigi.WrapperTask):
                               parameters=procedure['parameters'],
                               root_config_path=str(
                                   Path(self.root_config_file).resolve()),
-                              analysis_module_path=self.analysis_module_path)
+                              analysis_module_path=self.analysis_module_path,
+                              network_config=self.network_config)
         if procedure['type'] == 'daq':
+            # the default values for the DAQ system and the target need to be loaded
+            # on to the backend
+            context = zmq.Context()
+            socket = context.socket(zmq.REQ)
+            socket.connect(
+                    f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
+                    f"{self.network_config['daq_coordinator']['port']}")
+            with open(procedure['daq_system_default_config'], 'r')\
+                    as daq_default_config_file:
+                daq_default_config = yaml.safe_load(
+                        daq_default_config_file.read())
+            with open(procedure['target_power_on_default_config'], 'r')\
+                    as target_default_config_file:
+                target_default_config = yaml.safe_load(
+                        target_default_config_file.read())
+            complete_default_config = {'daq': daq_default_config,
+                                       'target': target_default_config}
+            socket.send_string('load defaults;'+
+                               yaml.safe_dump(complete_default_config))
+            resp = socket.recv()
+            if resp != b'defaults loaded':
+                raise DAQConfigError('Default config could not be loaded into the backend')
+
             return Scan(identifier=0,
                         label=self.procedure_label,
                         output_dir=str(output_dir.resolve()),
@@ -66,6 +93,8 @@ class ValveYard(luigi.WrapperTask):
                         root_config_path=str(
                             Path(self.root_config_file).resolve()),
                         calibration=procedure['calibration'],
-                        analysis_module_path=self.analysis_module_path)
+                        analysis_module_path=self.analysis_module_path,
+                        network_config=network_config,
+                        defaults_configured=False)
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")

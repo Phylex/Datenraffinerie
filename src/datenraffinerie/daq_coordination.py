@@ -44,5 +44,6 @@ def coordinate_daq_access(network_config: dict):
             daq_default_config = default_config['daq']
             target.load_default_config(target_default_config)
             daq_system.load_default_config(daq_default_config)
+            socket.send_string('defaults loaded')
         else:
             socket.send_string('invalid command')
