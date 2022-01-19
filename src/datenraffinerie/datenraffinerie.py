@@ -1,14 +1,12 @@
 import sys
 import multiprocessing
 import click
-from .valve_yard import ValveYard
-from .config_utilities import ConfigFormatError, parse_config_file
-from .control_adapter import DAQConfigError
-from .daq_coordination import coordinate_daq_access
-import .config_utilities as cfu
-import logging
 import luigi
 import yaml
+from .valve_yard import ValveYard
+from .config_utilities import ConfigFormatError
+from .control_adapter import DAQConfigError
+from .daq_coordination import coordinate_daq_access
 
 
 @click.command()
@@ -28,7 +26,8 @@ def cli(netcfg, config, procedure, workers, output, analysis_path):
         print('Error reading in the network config:\n'
               + str(err) + '\nexiting ..')
         sys.exit(1)
-    p = multiprocessing.Process(target=coordinate_daq_access, args=netcfg)
+    daq_coordination_process = multiprocessing.Process(target=coordinate_daq_access, args=netcfg)
+    daq_coordination_process.start()
     try:
         run_result = luigi.build([ValveYard(
             click.format_filename(config),
@@ -42,13 +41,14 @@ def cli(netcfg, config, procedure, workers, output, analysis_path):
         print(run_result)
     except ConfigFormatError as err:
         print(err.message)
-        sys.exit(1)
     except DAQConfigError as err:
         print("The Configuration of one of the executed"
               " DAQ procedures is malformed: ")
         print(err.message)
-        sys.exit(1)
     except Exception as err:
         print("An error occured that was not properly caught")
         print(err)
+    finally:
         sys.exit(1)
+        daq_coordination_process.kill()
+        daq_coordination_process.join()
