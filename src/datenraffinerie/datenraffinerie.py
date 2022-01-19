@@ -26,7 +26,7 @@ def cli(netcfg, config, procedure, workers, output, analysis_path):
         print('Error reading in the network config:\n'
               + str(err) + '\nexiting ..')
         sys.exit(1)
-    daq_coordination_process = multiprocessing.Process(target=coordinate_daq_access, args=netcfg)
+    daq_coordination_process = multiprocessing.Process(target=coordinate_daq_access, args=(netcfg, ))
     daq_coordination_process.start()
     try:
         run_result = luigi.build([ValveYard(
