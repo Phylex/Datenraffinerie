@@ -23,12 +23,12 @@ def coordinate_daq_access(network_config: dict):
                      f"{network_config['daq_coordinator']['port']}"
     socket.bind(socket_address)
     logging.debug('bound to: %s' % socket_address)
-    target = ctrl.TargetAdapter(network_config['target_hostname'],
-                                network_config['target_port'])
-    daq_system = ctrl.DAQSystem(network_config['daq_server']['hostname'],
-                                network_config['daq_server']['port'],
-                                network_config['daq_client']['hostname'],
-                                network_config['daq_client']['port'])
+    target = ctrl.TargetAdapter(network_config['target'['hostname'],
+                                network_config['target'['port'])
+    daq_system = ctrl.DAQSystem(network_config['server']['hostname'],
+                                network_config['server']['port'],
+                                network_config['client']['hostname'],
+                                network_config['client']['port'])
     logging.debug('created the target and daq systems')
     while True:
         logging.debug('waiting for message')
