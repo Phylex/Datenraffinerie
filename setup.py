@@ -8,8 +8,8 @@ setup(
     },
     install_requires=[
         'Click',
-        'luigi==3.0.3',
-        'pandas==1.3.5',
+        'luigi',
+        'pandas',
         'matplotlib',
         'numpy',
         'scipy',
@@ -17,5 +17,7 @@ setup(
         'pyyaml',
         'zmq',
         'pytest',
+        'awkward',
+        'tables'
     ]
 )
