@@ -6,6 +6,52 @@ To characterise the HGCROCv3 many measurements need to be acquired using differe
 these are used for chip characterisation. The Datenraffinerie is a tool/framework that tries to simplify the execution of such data acquisition and
 analysis tasks.
 
+## Installation
+### PyPi
+The Datenraffinerie is available on pypi. This means that it can be installed via pip. To be able to use the datenraffine Python 3.9 is needed. Python 2
+is _not_ supported. It is recommended that a python virtual environment is used for installation. Python 3.9 can be installed on centos7 by compiling
+from source. To set up a python environment run:
+```
+$ python3.9 -m venv venv
+```
+this creates a virtual environment in the `./venv` directory. The virtual environment can be activated by running
+```
+$ source ./venv/bin/activate
+```
+in a bash shell. For other options on virtual environments see [here](https://docs.python.org/3/library/venv.html).
+To deactivate the virtual environment, run:
+```
+$ deactivate
+```
+
+In the virtual environment simply install the datenraffinerie via pip with the command
+```
+pip install datenraffinerie
+```
+This will install the latest version released on the python package index. The package available can be checked
+[here](https://pypi.org/project/datenraffinerie/).
+
+
+### from Source
+To install the datenraffinerie it is assumed that python 3.9 is available and is executed via the `python` shell command.
+To install the datenraffinerie from the git repository clone the repository and then change the working directory to the root of the git repository
+then initialize a virtual environment as shown in [PyPi](#PyPi). Then activate the virtual environment and run the command
+```
+$ pip install .
+```
+This should install all needed runtime requirements for and datenraffinerie itself.
+
+## Running Datenraffinerie
+After the installation the command `datenraffinerie` is available.
+To find out about the options of the command line tool run:
+```
+$ datenraffinerie --help
+```
+
+To get going with the Datenraffinerie, a daq and analysis configuration is needed. Configuraions for these components can be found in the `examples`
+and `tests/configuration` directories of the repository. See [configuration](#Configuration) for more details. Along with the analysis configuration
+a network configuration is also needed. An example for this configuration can be found in the `tests/configuration' directory. For the 
+
 ## Definition of the Terms used in this Document
 - Target: The device/system that acquires the measurements and accepts the configuration. This can be either an LD/HD Hexaboard or a
 Single-roc-tester. In future the Train might also be supported
