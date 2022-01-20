@@ -9,7 +9,7 @@ import os
 import operator
 import pandas as pd
 import luigi
-from luigi.Targets import Nop
+from luigi.format import Nop
 import yaml
 import zmq
 from . import config_utilities as cfu
