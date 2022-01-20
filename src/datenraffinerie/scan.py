@@ -143,8 +143,8 @@ class Measurement(luigi.Task):
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
         socket.connect(
-                f"tcp://{self.network_config['datenraffinerie_hostname']}:" +
-                f"{self.network_config['datenraffinerie_port']}")
+                f"tcp://{self.network_config['daq_coordinator']['hostname']}:" +
+                f"{self.network_config['daq_coordinator']['port']}")
         socket.send_string('measure;'+config_string)
         data = socket.recv()
         with self.output()[0].open('wb') as data_file:
