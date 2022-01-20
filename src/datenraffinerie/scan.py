@@ -15,7 +15,6 @@ from . import config_utilities as cfu
 from . import analysis_utilities as anu
 from .control_adapter import DAQSystem, TargetAdapter
 
-
 class ScanConfiguration(luigi.Task):
     """ builds the configuration for a single measurement from the
     default power on config of the target and the scan config of the
@@ -140,12 +139,16 @@ class Measurement(luigi.Task):
         # task
         with self.input().open('r') as config_file:
             config_string = config_file.read()
+        target_config = yaml.safe_load(config_string)
+        daq_system_config = cfu.unfreeze(self.daq_system_config)
+        complete_config = {'daq': daq_system_config,
+                           'target': target_config}
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
         socket.connect(
                 f"tcp://{self.network_config['daq_coordinator']['hostname']}:" +
                 f"{self.network_config['daq_coordinator']['port']}")
-        socket.send_string('measure;'+config_string)
+        socket.send_string('measure;'+yaml.safe_dump(complete_config))
         data = socket.recv()
         with self.output()[0].open('wb') as data_file:
             data_file.write(data)

@@ -41,6 +41,7 @@ def coordinate_daq_access(network_config: dict):
                 socket.send_string('error: no defaults loaded')
                 continue
             config = yaml.safe_load(message[message_delimiter+1:].decode())
+            logger.debug('received "measure" message:\n' + yaml.dump(config))
             daq_config = config['daq']
             target_config = config['target']
             target.configure(target_config, overlays_default=True)
