@@ -9,6 +9,7 @@ import os
 import operator
 import pandas as pd
 import luigi
+from luigi.Targets import Nop
 import yaml
 import zmq
 from . import config_utilities as cfu
@@ -127,7 +128,7 @@ class Measurement(luigi.Task):
         data_path = Path(self.output_dir) / (self.label +
                                              str(self.identifier) +
                                              '-data.raw')
-        return (luigi.LocalTarget(data_path), self.input())
+        return (luigi.LocalTarget(data_path, format=Nop), self.input())
 
     def run(self):
         """
@@ -150,7 +151,7 @@ class Measurement(luigi.Task):
                 f"{self.network_config['daq_coordinator']['port']}")
         socket.send_string('measure;'+yaml.safe_dump(complete_config))
         data = socket.recv()
-        with self.output()[0].open('wb') as data_file:
+        with self.output()[0].open('w') as data_file:
             data_file.write(data)
 
 
