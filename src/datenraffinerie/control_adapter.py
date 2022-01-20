@@ -416,6 +416,7 @@ class DAQSystem:
         self.client.load_default_config(client_config)
         self.server.load_default_config(server_config)
         self._setup_data_taking_context()
+        self.client.configure()
 
     @staticmethod
     def get_server_and_client_config(config: dict):
