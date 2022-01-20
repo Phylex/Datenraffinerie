@@ -16,22 +16,23 @@ def coordinate_daq_access(network_config: dict):
     logging.basicConfig(filename='/home/daq/daq_coordinator.log',
                         encoding='utf-8',
                         level=logging.DEBUG)
-    logging.debug('creating zmq context and socket')
+    logger = logging.getLogger('daq_coordinator')
+    logger.debug('creating zmq context and socket')
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket_address = f"tcp://{network_config['daq_coordinator']['hostname']}:" +\
                      f"{network_config['daq_coordinator']['port']}"
     socket.bind(socket_address)
-    logging.debug('bound to: %s' % socket_address)
+    logger.debug('bound to: %s' % socket_address)
     target = ctrl.TargetAdapter(network_config['target']['hostname'],
                                 network_config['target']['port'])
     daq_system = ctrl.DAQSystem(network_config['server']['hostname'],
                                 network_config['server']['port'],
                                 network_config['client']['hostname'],
                                 network_config['client']['port'])
-    logging.debug('created the target and daq systems')
+    logger.debug('created the target and daq systems')
     while True:
-        logging.debug('waiting for message')
+        logger.debug('waiting for message')
         message = socket.recv()
         message_delimiter = message.find(b';')
         command = message[:message_delimiter]

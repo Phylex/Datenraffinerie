@@ -19,7 +19,7 @@ import zmq
 import yaml
 from .config_utilities import diff_dict, update_dict
 
-module_logger = logging.getLogger('hexactrl_shostnameipt.control_adapter')
+module_logger = logging.getLogger(__name__)
 
 class DAQError(Exception):
     def __init__(self, message):
@@ -47,7 +47,7 @@ class ControlAdapter:
         target program
         """
         self.logger = logging.getLogger(
-                'hexactrl_script.contol_adapter.ControlAdapter')
+                __name__+'.ControlAdapter')
         if default_config is None:
             self.configuration = {}
             self.default_config = {}
@@ -218,7 +218,7 @@ class TargetAdapter(ControlAdapter):
         """
         super().__init__(hostname, port, default_config)
         self.logger = logging.getLogger(
-                'hexactrl_script.contol_adapter.TargetAdapter')
+                __name__+'.TargetAdapter')
 
     def read_config(self, parameter: dict):
         """
@@ -305,7 +305,7 @@ class DAQAdapter(ControlAdapter):
                              config}
         super().__init__(hostname, port, config)
         self.logger = logging.getLogger(
-                f'hexactrl_script.contol_adapter.DAQAdapter.{self.variant}')
+                __name__+f'.DAQAdapter.{self.variant}')
 
     def configure(self, config: dict = None, overlays_default=False):
         """
@@ -385,6 +385,7 @@ class DAQSystem:
         server)
         """
         # set up the server part of the daq system (zmq-server)
+        self.logger = logging.getLogger(__name__+'.DAQSystem')
         self.daq_data_base_path = None
         self.daq_data_folder = None
         if daq_config is not None:
