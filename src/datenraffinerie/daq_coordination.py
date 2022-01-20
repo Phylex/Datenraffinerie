@@ -37,11 +37,12 @@ def coordinate_daq_access(network_config: dict):
         message_delimiter = message.find(b';')
         command = message[:message_delimiter]
         if command == b'measure':
+            logger.debug('received message "measure"')
             if not target.has_default() and not daq_system.has_default():
                 socket.send_string('error: no defaults loaded')
                 continue
             config = yaml.safe_load(message[message_delimiter+1:].decode())
-            logger.debug('received "measure" message:\n' + yaml.dump(config))
+            logger.debug('Received Configuration:\n' + yaml.dump(config))
             daq_config = config['daq']
             target_config = config['target']
             target.configure(target_config, overlays_default=True)
@@ -51,6 +52,9 @@ def coordinate_daq_access(network_config: dict):
             with open(measurement_data_path, 'rb') as data_file:
                 socket.send(data_file.read())
         elif command == b'load defaults':
+            logger.debug('received message: %s' % command.decode())
+            logger.debug('received default config:\n%s' %
+                         message[message_delimiter+1:].decode())
             default_config = yaml.safe_load(
                     message[message_delimiter+1:].decode())
             target_default_config = default_config['target']
@@ -59,4 +63,6 @@ def coordinate_daq_access(network_config: dict):
             daq_system.load_default_config(daq_default_config)
             socket.send_string('defaults loaded')
         else:
+            logger.warning('invalid command message received: %s' %
+                           command.decode())
             socket.send_string('invalid command')
