@@ -13,7 +13,7 @@ def coordinate_daq_access(network_config: dict):
     :returns: Nothing
 
     """
-    logging.basicConfig(filename='/home/daq/daq_coordinator.log',
+    logging.basicConfig(filename='daq_coordinator.log',
                         encoding='utf-8',
                         level=logging.DEBUG)
     logger = logging.getLogger('daq_coordinator')
