@@ -6,6 +6,19 @@ To characterise the HGCROCv3 many measurements need to be acquired using differe
 these are used for chip characterisation. The Datenraffinerie is a tool/framework that tries to simplify the execution of such data acquisition and
 analysis tasks.
 
+## Definition of the Terms used in this Document
+- Target: The device/system that acquires the measurements and accepts the configuration. This can be either an LD/HD Hexaboard or a
+Single-roc-tester. In future the Train might also be supported.
+- backend: The combination of both the daq system and the Target.
+- Procedure: A sequence of steps that are performed together and use a common configuration. Examples of procedures are daq-procedures that acquire
+measurements from a target; analysis-procedures take the data acquired by daq-procedures and try to derive meaningful insights from that.
+- Task: The smallest unit of a procedure. This term is taken from the library luigi used in this framework. A task produces a file at completion.
+- Acquisition: The procedure that acquires data from the target also known as daq-procedure
+- Analysis: An analysis takes data that was acquired during an acquisition and derives some sort of 'insight' from it. An 'insight' might be a plot or
+the decision to keep/discard the chip that the data was acquired on.
+- Distillery: Analyses are performed in 'Distilleries' which are the part of the datenraffinerie framework and provide the analysis code with the data
+and the output directory where the analysis is expected to place it's outputs.
+
 ## Installation
 ### PyPi
 The Datenraffinerie is available on pypi. This means that it can be installed via pip. To be able to use the datenraffine Python 3.9 is needed. Python 2
@@ -48,79 +61,236 @@ To find out about the options of the command line tool run:
 $ datenraffinerie --help
 ```
 
-To get going with the Datenraffinerie, a daq and analysis configuration is needed. Configuraions for these components can be found in the `examples`
-and `tests/configuration` directories of the repository. See [configuration](#Configuration) for more details. Along with the analysis configuration
-a network configuration is also needed. An example for this configuration can be found in the `tests/configuration' directory. For the 
+To get going with the Datenraffinerie, network configuration and a daq/analysis configuration is needed. Examples for these Configurations can be found
+in the `examples` directory of the git repository. Further Configurations can be found in the.
+`tests/configuration` directories of the repository. See [configuration](#Configuration) for more details.
 
-## Definition of the Terms used in this Document
-- Target: The device/system that acquires the measurements and accepts the configuration. This can be either an LD/HD Hexaboard or a
-Single-roc-tester. In future the Train might also be supported
-- Procedure: A sequence of steps that are performed together and use a common configuration. Examples of procedures are daq-procedures that acquire
-measurements from a target; analysis-procedures take the data acquired by daq-procedures and try to derive meaningful insights from that.
-- Task: The smallest unit of a procedure. This term is taken from the library luigi used in this framework. A task produces a file at completion.
-- Acquisition: The procedure that acquires data from the target also known as daq-procedure
-- Analysis: An analysis takes data that was acquired during an acquisition and derives some sort of 'insight' from it. An 'insight' might be a plot or
-the decision to keep/discard the chip that the data was acquired on.
-- Distillery: Analyses are performed in 'Distilleries' which are the part of the datenraffinerie framework and provide the analysis code with the data
-and the output directory where the analysis is expected to place it's outputs.
+When using custom analysis code, the location of the module that provides this code has to be specified with the `-a` option. An example of custom
+analysis code can be found in `examples/example_analysis_collection`.
+
+As the Datenraffinerie was designed for the use of parallel processes, it is capable of running multiple procedures in parallel. The amount of
+parallel tasks can be specified by setting the number of `workers` with the `-w` option. The default for this option is 1, so without setting
+this value explicitly it will not run in parallel.
 
 ## Concepts
 The Datenraffinerie expresses the Creation of plots as a sequence of two types of procedures. There is a DAQ procedure and an Analysis procedure.
-A daq-procedure is expressed as a scan over a set of values of a configuration parameter of the target. If multiple target parameters are passed to an
-acquisition procedure, it computes the Cartesian product of the parameters and performs a measurement for every target configuration from that set.
-The daq-procedure is fully configurable, the daq-task structure is derived from a yaml configuration, more on that later.
+A daq-procedure acquires data from the target system. As most Measurements are scans of a multi dimensional phase space, the daq system was designed
+to make these kind of phase space scans as easy as possible. A daq procedure that is configured with a list of multiple parameter scans will combine
+them into a Cartesian product of the parameters and performs a measurement for every target configuration from that Cartesian product space.
+The daq-procedure is fully configurable, the daq-task structure is derived from a yaml configuration, see [configuratoin](#Configuration) for details.
 
-Analyses derive useful information from the data provided by the acquisitions. The module that contains the Analysis code is loaded at runtime by the
-datenraffinerie and does therefore not need to be aware of the context it is executed in. The context for the analysis code is also provided by `yaml`
-configuration files in a similar format to the daq-configuration.
+Analyses (also called Distilleries in the context of the Datenraffinerie) derive useful information from the data provided by the acquisitions.
+The module that contains the Analysis code is loaded at runtime by the Datenraffinerie and is desigend to run custom analysis code, see [writing a custom
+Distillery](#Writing a custom Distillery). If the custom distillery needs any sort of configuration it can be specified in the corresponding analysis
+configuration. The configuration is in a very similar format to the configuration of the daq system and provided as a yaml file.
 
 Data acquisition is performed by a target, that accepts some configuration and produces measurements where the it has configured itself and the HGCROCv3
 chips that are part of it according to the configuration received. The Datenraffinerie computes the entire configuration of target and daq system 
 for every measurement of the acquisition, guaranteeing that the system is in the desired state when taking data.
 To be able to do this the user needs to provide a 'power-on default configuration' that describes the state of every parameter of the target at power on and the
 configuration for the acquisition system.
-parameters and scan ranges need to be provided by the acquisition configuration.\*
 
-After computing the configuration for a single measurement from the aforementioned inputs the measurement is scheduled for execution on the target.
-After the measurements have been acquired the data and configuration are merged into a single `hdf5` file that should contain all information needed.
-The single hdf-5 file does not only contain data/configuration for a single measurement but for 
-HDF-5 files can be loaded into pandas DataFrames using `pd.read_hdf('/path/to/file')`.
-
----
-\*It may seem odd that the configuration for the entire chip is
-computed for every measurement instead of changing only the parameter that is being scanned over. This needs to be done as every task is run in a
-separate process and does not know when the luigi scheduler schedules it for execution. The order of measurements is not known and as such a task
-cannot rely on a the configuration being in a predefined state, without creating that state itself.
-
----
+After computing the configuration for a single measurement from the daq configuration the measurement is scheduled for execution on the target.
+After the measurements have been acquired the data and configuration are merged into a single `hdf5` file that should contain all information of the
+scan.
+The resulting data does not only contain the data received from all the individual measurements, but also the relevant configuration for every
+channel of every measurement. This gives the Distillery (anlysis) developer the freedom to slice and filter the data to their relevant needs. It also
+means that the data format for every analysis is identical. Furthermore the Data is provided to the analysis as a pandas `DataFrame` giving the
+analysis developer a modern and extensive set of tools to work with. For a close look at the data format see the [Data Format](#Data Format) section.
 
 ## Execution Model
-At the beginning of the Execution, the datenraffinerie is invoked by a cli command by the user. The user needs to provide some parameters to the
+The execution model of the Datenraffinerie relies on the same execution model of the [luigi](https://github.com/spotify/luigi) library that is used by
+the Datenraffinerie. As such the Datenraffinerie constructs a dependency graph of tasks before executing them. Task `A` that is depended upon by task `B`
+is run before task `B`. However during creation of the dependency graph task `B` is queried for it's dependencies before task `A` is, as any task is
+only run if it is depended upon by another.
+
+At the beginning of the Execution, the Datenraffinerie is invoked through a command line interface (CLI) by the user. The user needs to provide some parameters to the
 command to provide it with the location of the configuration to be used and the location at which to find the analysis code along with the name of the
 procedure that the user wishes to execute and the location where the data needs to be written to.
 
-The datenraffinerie then starts the ValveYard task. The job of the ValveYard is to parse the configuration provided by the user and schedule the
-appropriate tasks with the luigi scheduler. The ValveYard reads in all configuration and then looks for an entry in the configuration that matches
-with the name of the procedure that the user wishes to execute. Upon finding a matching entry it schedules either a `DistilleryAdapter` task (if the type of task is
-`analysis` or a Scan task (if the type is `daq`). It uses the configuration of the user to determine the correct parameters to pass to either of the
-tasks. At this point the initial call of the ValveYard returns, forcing the scheduler to schedule either the `Scan` or `DistilleryAdapter` task.
+To begin with the configuration files that where passed in by the user need to be parsed and the procedure that is to be executed found. This is done
+in the `ValveYard` class. After parsing the configuration, the `ValveYard` declares that it depends upon the Task that was indicated by the user
+during invocation.
 
-### Execution of a Scan and Measurement tasks
-To tackle the problem of multi-dimensional scans, the `Scan` task uses recursion to keep the amount of code needed to perform a general
-multi-dimensional scan small. The (simplified) input to a Scan task consists of a base configuration and a list of parameters and ranges to scan the
-parameters over.
-```python
-Scan(base_target_configuration, [[param1, [0,1,2,3,...]], [param2, [0,2,4,5,...]]])
+The `ValveYard` can declare two types of dependencies, either the dependency is of type `daq` or of type `analysis`. As the Analysis will always
+require some data it in turn declares a dependency upon the `ValveYard` task but this time the Analysis acts as the user, indicating a `daq` type task
+to be searched for and subsequently depended upon by the new instantiation of the `ValveYard` class.
+
+![Invocation of the valveyard](docs/valveyard-invocation.svg)
+
+### DAQ type procedures
+In contrast to the `analysis` type tasks discussed previously that rely on external code to run, and usually consist of a single task, the DAQ
+procedure is entirely implemented in the Datenraffinerie and relies on a recursive task called `Scan` to be able to generate the Cartesian product of
+the parameters specified by the user configuration. In the simplest case the `Scan` task does not recurs and directly starts a set of measurement tasks
+
+![non recursive scan](docs/daq-task-dependency-graph-1D.svg)
+
+If mutiple parameter ranges are passed to the `Scan` task during the creation of the dependency graph it will not directly declare measurements as
+it's dependency but instead declare a set of `Scan` tasks as it's dependency, one for every value of the 'dimension' it is supposed to scan over.
+This is probably best visualized as in the following picture:
+
+![recursive scan](docs/daq-task-dependency-graph-3D.svg)
+
+The bottom level of this tree is made up of the actual measurements. In the case of a simple scan without the need for a calibration, the Measurements
+are the final node in the dependency graph. As the computation of the dependency graph is now complete the tasks are now actually executed.
+During execution, the measurement calculates the final measurement configuration and send it to the
+`daq_coordinator` which is in charge of managing the access to the measurement system for more on that see [The `daq_coordinator`](#DAQ Coordination).
+
+If a calibration is needed the Measurement tasks declare a common dependency on an instance of the `ValveYard` class to find the `analysis` type
+procedure for calculating the calibration. *This is currently not implemented yet!*.
+
+## Configuration
+To get the Datenraffinerie to work properly, it needs to be configured. As mentioned earlier, there are examples of the configuration available in the
+`examples` and `tests/configuration` directory of the git repository. The configuration is a list of procedures that can be spread over multiple files
+for the purpose of structuring/segmenting different types of procedures, production vs. development for example. All files use the yaml syntax, for a
+detailed explanation of it's syntax see [here](https://yaml.org).
+The different files are all tied together into in the 'main' configuration file. The main configuration file in contrast to every other file does not
+represent a list on the top level but instead a dictionary. An example of a main configuration file is given below:
+
+```yaml
+libraries:
+  - "./daq_procedures.yaml"
+  - "./analysis_procedures.yaml"
 ```
-If the list of parameters to scan over is longer that one (which is the case in the previous example) it schedules a `Scan` task for each value of
-`param1` to execute. To each of these `Scan` tasks it passes a copy of it's `base_target_config` where the `param1` of that copy was set to one of the
-values that `param1` should be scanned over.
 
-If the list of parameters is exactly one the `Scan` task Schedules the collection of tasks that together perform a single `Measurement` for every
-value of the single parameter in the parameter list.
+As can be seen, the main configuration simply includes different files that contain the actual procedures available for use with the datenraffinerie.
+This file needs to be specified by the user during invocation of the Datenraffinerie using the CLI. The paths in the main configuration and in any
+other configuration file are assumed to be relative to the location of the file they are occurring in. Next we shall take a look at the configuration
+of the Analysis and DAQ procedure.
 
-When a measurement is executed it checks if it needs a calibration to be present. If it is present it applies the calibrated values and preforms the
-measurement (there is a bit more involved here but we shall get to that later). If a calibration is not present it is expected to be created by an
-analysis (inside a distillery) and passed to the daq task.
+### Configuration of the Analysis Procedure
+The Distillery configuration is the simpler of both configurations from the point of view of the datenraffinerie, They can become quite complex
+depending on the needs of the analysis run by the Distillery. An example of an Distillery configuration follows:
 
-### Execution of the Distillery task
+```yaml
+- name: my_analysis
+  type: analysis
+  daq: my_daq_procedure
+  parameters:
+    p1: 346045
+    p2: 45346
+    p3: 'string option'
+```
+
+As can be seen the Analysis procedure is an entry in a list. A file that is included in the main configuration is a list on the top level, the above
+example being one of possibly many entries in a file. Every entry needs the `name` field as it is the name by which the `Valve Yard` identifies the
+procedure to be executed. Also mandatory for every entry is the `type` field. It defines if it is an Analysis or a DAQ procedure and defines what kind
+of task the `ValveYard` declares as dependency. In the case of an Analysis, It is necessary to declare the daq procedure in charge of collecting the
+data. This is done with the name specified in the `daq` field. The name specified here needs to match with the name of the daq procedure.
+
+The parameters field is where the parameters for the analysis can be specified. It is assumed to be a dictionary and the entries in the 'parameters'
+dictionary are passed as a dictionary to the custom analysis code by the Distillery class. So given the above example the Analysis would be passed
+```python
+{
+    p1: 346045,
+    p2: 45346,
+    p3: 'string option
+}
+```
+
+For more details see [here](#Writing a custom Distillery)
+
+## Configuration of the DAQ Procedure
+The configuration of the DAQ Procedure is more complicated as it needs to define everything needed to calculate the entire system state for every
+measurement performed during the acquisition.
+```yaml
+- name: timewalk_scan
+  type: daq
+  target_settings:
+    power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ./init_timewalk_scan.yaml
+  daq_settings:
+    default: ./defaults/daq-system-config.yaml
+    server_override:
+      NEvents: 1000
+      l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
+      - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
+      - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
+      - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+      - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+  parameters:
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - 'ReferenceVoltage'
+      - [0, 1]
+      - 'Calib'
+      range:
+        start: 0
+        stop: 2048
+        step: 32
+```
+
+Just as with the analysis procedure the `name` and `type` fields are present, specifying the name of the procedure as specified by the user or other
+procedures and the type indicating if it is a daq or analysis procedure.
+
+The configuration is split into three sections the `target_settings` section that defines the default and initial settings for the target, the
+`daq_settings` section that describe the configuration of the daq server and client and the parameters section that describes the parameters defining
+the axes of the 'phase space' that is scanned over.
+
+It is assumed that only parameters of the target change from one measurement to the other and that the daq system part of the backend does not change
+during a daq procedure.
+
+### Target Settings
+The `target_settings` section has two parts, the first is the `power_on_default` section.
+
+The `power_on_default` field sets the path to a yaml file that describes the configuration of the target after either a reset or a power on.
+It is used to calculate the parameters that actually need to be sent to the backend and avoid unnecessary writes. There is generally one
+file per test system used.
+
+The `initial_config` specifies the set of parameters that differ from the power on configuration for the target. They do not need to provide the
+values of the parameter being scanned over but can contain an initial value for them (it will however be overwritten). This file normally differs
+from one daq procedure to the next.
+
+### DAQ Settings
+The `daq_settings` section specifies the settings of the DAQ system. It is assumed that the DAQ settings to not change between Measurments of the same
+procedure. There are is one field and two subsections in the `daq_settings` section. The `default` field is the path to the default settings of the
+daq system. These should not change often as they relate the defaults of the zmq-server and zmq-client C++ Programs running on the Hexacontroller.
+
+There are two sections, of which only one of them is shown in the above example. These are the `client_override` and `server_override` sections. They
+specify parameters that need to be set to non default values for the DAQ system to work with the scan that is to be performed. As it is assumed that
+these settings may vary from scan to scan the non-default settings are made explicit for every DAQ procedure.
+
+The last section is the `parameters` section. The parameters section describes the parameters that need to be adjusted from one measurement to the
+next. `parameters` is a list of dictionaries. Every entry is of this list has the same structure. There is a `key` field that describes what parameter
+of the targert needs to be changed from one measurement to the next and the range field that describes the different values the parameter needs to be
+set to.
+If multiple entries are specified, a measurement is performed for every element of the Cartesian product of both ranges.
+
+#### Key generation
+It is assumed that the Target configuration essentially mirrors the parameters and hierarchy of the slow control parameters of the HGCROC. Levels may
+be added on top to be able to describe systems that are made up of many constituent parts. To understand how the actual parameter is computed an
+example of the `key` as it appears in the daq-procedure configuration and the resulting dictionary key that is set to a value specified in the `range`
+field is given:
+```yaml
+key:
+  - ['roc_s0', 'roc_s1', 'roc_s2']
+  - 'ReferenceVoltage'
+  - [0, 1]
+  - 'Calib'
+```
+results in the following keys being set to a different value in every measurement task:
+```yaml
+roc_s0:
+  ReferenceVoltage:
+    0:
+      Calib: 32
+    1:
+      Calib: 32
+roc_s1:
+  ReferenceVoltage:
+    0:
+      Calib: 32
+    1:
+      Calib: 32
+roc_s2:
+  ReferenceVoltage:
+    0:
+      Calib: 32
+    1:
+      Calib: 32
+```
+In the above example the Measurement that is being performed has assigned the value specified by the key to `32`. In a different measurement task it
+would be set to a different value, for example `64`.
+
+## Data Format
+TODO
