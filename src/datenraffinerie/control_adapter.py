@@ -19,7 +19,7 @@ import zmq
 import yaml
 from .config_utilities import diff_dict, update_dict
 
-module_logger = logging.getLogger('hexactrl_shostnameipt.control_adapter')
+module_logger = logging.getLogger(__name__)
 
 class DAQError(Exception):
     def __init__(self, message):
@@ -37,7 +37,7 @@ class ControlAdapter:
     the client and server of the daq-system or target.
     """
 
-    def __init__(self, default_config: dict, hostname: str = None, port: str = None):
+    def __init__(self, hostname: str = None, port: str = None, default_config: dict = None):
         """
         Initialize the data structure on the control computer (the one
         coordinating everything) and connect to the system component.
@@ -47,9 +47,15 @@ class ControlAdapter:
         target program
         """
         self.logger = logging.getLogger(
-                'hexactrl_script.contol_adapter.ControlAdapter')
-        config, config_hostname, config_port = self._filter_out_network_config(
+                __name__+'.ControlAdapter')
+        if default_config is None:
+            self.configuration = {}
+            self.default_config = {}
+        else:
+            config, config_hostname, config_port = self._filter_out_network_config(
                 default_config)
+            self.configuration = config
+            self.default_config = config
         if hostname is None:
             if config_hostname is None:
                 raise DAQConfigError('No hostname given')
@@ -63,11 +69,10 @@ class ControlAdapter:
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
-        self.configuration = config
-        self.default_config = config
-        # this is used to determin if to send the full config
-        #-to the target if 'configure' is called without an argument
-        self.config_written = False
+
+    def load_default_config(self, default_config: dict):
+        self.default_config = default_config
+        self.reset()
 
     def reset(self):
         """
@@ -75,11 +80,16 @@ class ControlAdapter:
         state of the component
         """
         self.socket.close()
-        context = zmq.Context()
-        self.socket = context.socket(zmq.REQ)
+        self.configuration = self.default_config
+        self.socket = self.context.socket(zmq.REQ)
         self.socket.connect(f"tcp://{self.hostname}:{self.port}")
 
-    def configure(self, config=None, force=False, default_overlay=True):
+    def has_default(self):
+        if self.default_config != {}:
+            return True
+        return False
+
+    def configure(self, config=None, force=False, overlays_default=True):
         """
         send the configuration to the corresponding system component and wait
         for the configuration to be completed
@@ -88,38 +98,44 @@ class ControlAdapter:
         the force and diff flags
 
         Arguments:
-            default_overlay: Specifies that the config received is an overlay
+            overlays_default: Specifies that the config received is an overlay
             of the default_configuration. Using that information an appropriate
             diff is calculated and sent to the backend system
 
-            force: if this flag is set the cache is ignored. In this case
-            the cache is updated with the new values from the config passed
-            in (if there is any) and then the new configuration is sent to
-            the backend.
+            force: if this flag is set to True, the entire configuration
+            including the changes passed in as 'config' are applied. That
+            means that for an LD system about 6000 parameters are written
+            to the HGCROCs. The updated configruration is then stored as
+            cache.
             if this flag is false/unset then the diff between the config
-            passed in and the cache is sent. If no config is passed, then
+            passed in and the cache/current-system-state is sent.
+            If no config is passed, then
             the function checks if the values of the cache have been sent
-            to the endpoint yet. If the 'config_written' flag is set it exits
-            otherwise it configures the endpoint with the current content
-            of the cache
+            to the endpoint yet. If the 'config_written' flag is set the
+            configuration has been written and nothing is done, otherwise
+            all parameters that are in the cache that deviate from the
+            default configuration are written to the target
         """
         if config is not None:
             config, _, _ = self._filter_out_network_config(config)
-            if default_overlay is True:
+            if force is True:
+                write_config = update_dict(self.default_config, config)
+            elif overlays_default is True:
                 config = update_dict(self.default_config, config)
                 write_config = diff_dict(self.configuration, config)
             else:
                 write_config = diff_dict(self.configuration, config)
                 if force is True:
-                    write_config = self.configuration
+                    write_config = update_dict(self.configuration, config)
         else:
             if force is True:
                 write_config = self.configuration
-            elif self.config_written is False:
-                write_config = diff_dict(self.default_config,
-                                         self.configuration)
             else:
                 write_config = None
+
+        # if the config is empty we don't have to write anything
+        if write_config == {}:
+            write_config = None
         # if there is no difference between the configs simply return
         if write_config is None:
             return
@@ -142,7 +158,6 @@ class ControlAdapter:
         self.configuration = update_dict(self.configuration,
                                          write_config,
                                          in_place=True)
-        self.config_written = True
 
     def _send_and_log(self, msg: str):
         self.logger.debug(f"Sending string '{msg}' to {self.hostname}:{self.port}")
@@ -192,7 +207,7 @@ class TargetAdapter(ControlAdapter):
     Hexboards) currrently uses the zmq_i2c server
     """
 
-    def __init__(self, initial_config: dict):
+    def __init__(self, hostname: str, port: int, default_config: dict = None):
         """
         Initializes the target Board and loads an initial config onto it
 
@@ -201,17 +216,9 @@ class TargetAdapter(ControlAdapter):
             of the system, if it is passed during initialisation it is
             written to the target system
         """
-        try:
-            hostname = initial_config['hostname']
-            port = initial_config['port']
-        except KeyError as err:
-            raise DAQConfigError('A hostname and port are not '
-                                 ' present in any configuration'
-                                 ' received') from err
-        super().__init__(initial_config, hostname=hostname, port=port)
+        super().__init__(hostname, port, default_config)
         self.logger = logging.getLogger(
-                'hexactrl_script.contol_adapter.TargetAdapter')
-        self.configure()
+                __name__+'.TargetAdapter')
 
     def read_config(self, parameter: dict):
         """
@@ -280,7 +287,8 @@ class DAQAdapter(ControlAdapter):
     """
     variant_key_map = {'server': 'daq', 'client': 'global'}
 
-    def __init__(self, config: dict, variant: str):
+    def __init__(self, variant: str, hostname: str,
+                 port: int, config: dict = None):
         """
         The DAQ adapter needs to modify the configuration format of the
         Datenraffinerie to make it compatible with the current zmq-server
@@ -292,14 +300,14 @@ class DAQAdapter(ControlAdapter):
                 make the neccesary changes to the config
         """
         self.variant = variant
-        super().__init__(config)
+        if config is not None:
+            config = {self.variant_key_map[self.variant]:
+                             config}
+        super().__init__(hostname, port, config)
         self.logger = logging.getLogger(
-                f'hexactrl_script.contol_adapter.DAQAdapter.{self.variant}')
-        self.configuration = {self.variant_key_map[self.variant]:
-                              self.configuration}
-        self.configure()
+                __name__+f'.DAQAdapter.{self.variant}')
 
-    def configure(self, config: dict = None):
+    def configure(self, config: dict = None, overlays_default=False):
         """
         workaround for the way the zmq-client/zmq-server handles the
         configuration together with necessary checks for the
@@ -307,9 +315,17 @@ class DAQAdapter(ControlAdapter):
         if config is not None:
             config, _, _ = self._filter_out_network_config(config)
             super().configure({self.variant_key_map[self.variant]: config},
-                              force=True)
+                              force=True, overlays_default=overlays_default)
         else:
-            super().configure(force=True)
+            super().configure(force=True, overlays_default=overlays_default)
+
+    def reset(self):
+        self.configuration = self.default_config
+        self.configure()
+
+    def load_default_config(self, default_config):
+        super().load_default_config({self.variant_key_map[self.variant]:
+                                   default_config})
 
     def get_config(self):
         return self.configuration[self.variant_key_map[self.variant]]
@@ -354,40 +370,65 @@ class DAQAdapter(ControlAdapter):
 
 class DAQSystem:
     """
-    A class that abstracts encapsulates the interactions
-    with the DAQ-system (the hexacontroller, hexaboard and zmq-[server|client])
+    A class that encapsulates the interactions
+    with the DAQ-system (the zmq-[server|client])
 
     The class implements a small two-state state machine that only allows data-taking
     via the 'take_data' function after the 'start_run' function has been called.
     The data taking is stopped via the 'stop_run' function that 
     """
 
-    def __init__(self, daq_config):
+    def __init__(self, server_hostname: str, server_port: int,
+                 client_hostname: str, client_port: int, daq_config = None):
         """
         initialise the daq system by initializing it's components (the client and
         server)
         """
         # set up the server part of the daq system (zmq-server)
+        self.logger = logging.getLogger(__name__+'.DAQSystem')
         self.daq_data_base_path = None
         self.daq_data_folder = None
-        if 'server' not in daq_config.keys():
-            raise DAQError("There mus be a 'server' key in the initial"
-                           " configuration")
-        if 'client' not in daq_config.keys():
-            raise DAQError("There mus be a 'client' key in the initial"
-                           " configuration")
-        server_config, client_config = self.split_config_into_client_and_server(
-                daq_config)
-        self.server = DAQAdapter(server_config, 'server')
+        if daq_config is not None:
+            server_config, client_config = self.get_server_and_client_config(daq_config)
+        else:
+            server_config = None
+            client_config = None
+        self.server = DAQAdapter('server', server_hostname,
+                                 server_port, server_config)
         # set up the client part of the daq system (zmq-client)
         # the wrapping with the global needs to be done so that the client
         # accepts the configuration
-        self.client = DAQAdapter(client_config, 'client')
-        self._setup_data_taking_context()
-        self.client.configure()
+        self.client = DAQAdapter('client', client_hostname,
+                                 client_port, client_config)
+        if daq_config is not None:
+            self._setup_data_taking_context()
+            self.client.configure()
+            self.server.configure()
 
     def __del__(self):
         self.tear_down_data_taking_context()
+
+    def has_default(self):
+        return self.client.has_default() and self.server.has_default()
+
+    def load_default_config(self, default_config: dict):
+        server_config, client_config = self.get_server_and_client_config(default_config)
+        self.client.load_default_config(client_config)
+        self.server.load_default_config(server_config)
+        self._setup_data_taking_context()
+        self.client.configure()
+
+    @staticmethod
+    def get_server_and_client_config(config: dict):
+        if 'server' not in config.keys():
+            raise DAQError("There mus be a 'server' key in the initial"
+                           " configuration")
+        if 'client' not in config.keys():
+            raise DAQError("There mus be a 'client' key in the initial"
+                           " configuration")
+        server_config, client_config = DAQSystem.split_config_into_client_and_server(
+                config)
+        return server_config, client_config
 
     @staticmethod
     def split_config_into_client_and_server(daq_config: dict):
@@ -418,8 +459,8 @@ class DAQSystem:
         if daq_config is not None:
             server_config, client_config = self.split_config_into_client_and_server(
                     daq_config)
-        self.client.configure(client_config)
-        self.server.configure(server_config)
+        self.client.configure(client_config, overlays_default=True)
+        self.server.configure(server_config, overlays_default=True)
 
     def _setup_data_taking_context(self):
         """
@@ -444,7 +485,7 @@ class DAQSystem:
         if not os.path.isdir(self.daq_data_folder):
             os.mkdir(self.daq_data_folder)
 
-    def take_data(self, output_data_path):
+    def take_data(self, output_data_path=None):
         """
         function that encapsulates the data taking currently done via the
         zmq-client program. The zmq-client currently has a particular way of
@@ -458,7 +499,6 @@ class DAQSystem:
         the location given by the 'output_data_path' argument of the function
         after the daq for the run has concluded
         """
-        self.client.configure()
         self.client.start()
         self.server.start()
         while not self.server.is_done() or\

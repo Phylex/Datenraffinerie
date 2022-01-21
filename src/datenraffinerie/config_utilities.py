@@ -268,6 +268,7 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
     try:
         daq_system_config = load_configuration(
                 default_daq_settings_path.resolve())
+        daq_system_default_config = daq_system_config
     except FileNotFoundError as err:
         raise ConfigFormatError(f"The path specified for the default config"
                                 f"of the daq_settings in {daq_label} does"
@@ -357,7 +358,8 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
             'type': 'daq',
             'target_power_on_default_config': target_power_on_config,
             'target_init_config': target_initial_config,
-            'daq_system_config': daq_system_config}
+            'daq_system_config': daq_system_config,
+            'daq_system_default_config': daq_system_default_config}
 
 
 def parse_analysis_config(analysis_config: dict) -> tuple:

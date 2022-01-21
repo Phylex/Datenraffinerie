@@ -9,11 +9,12 @@ import os
 import operator
 import pandas as pd
 import luigi
+from luigi.format import Nop
 import yaml
+import zmq
 from . import config_utilities as cfu
 from . import analysis_utilities as anu
 from .control_adapter import DAQSystem, TargetAdapter
-
 
 class ScanConfiguration(luigi.Task):
     """ builds the configuration for a single measurement from the
@@ -101,15 +102,14 @@ class Measurement(luigi.Task):
     label = luigi.Parameter(significant=True)
     identifier = luigi.IntParameter(significant=True)
 
-    root_config_path = luigi.Parameter(significant=False)
+    root_config_path = luigi.Parameter(significant=True)
 
     # calibration if one is required
     calibration = luigi.OptionalParameter(default=None,
                                           significant=False)
     analysis_module_path = luigi.OptionalParameter(default=None,
                                                    significant=False)
-
-    resources = {'hexacontroller': 1}
+    network_config = luigi.DictParameter(significant=True)
 
     def requires(self):
         return Configuration(self.target_config,
@@ -128,7 +128,7 @@ class Measurement(luigi.Task):
         data_path = Path(self.output_dir) / (self.label +
                                              str(self.identifier) +
                                              '-data.raw')
-        return (luigi.LocalTarget(data_path), self.input())
+        return (luigi.LocalTarget(data_path, format=Nop), self.input())
 
     def run(self):
         """
@@ -139,12 +139,20 @@ class Measurement(luigi.Task):
         # load the possibly calibrated configuration from the configuration
         # task
         with self.input().open('r') as config_file:
-            target_config = yaml.safe_load(config_file.read())
-        daq_system = DAQSystem(cfu.unfreeze(self.daq_system_config))
-        target = TargetAdapter(cfu.unfreeze(target_config))
-        target.configure()
-        data_file = self.output()[0]
-        daq_system.take_data(data_file.path)
+            config_string = config_file.read()
+        target_config = yaml.safe_load(config_string)
+        daq_system_config = cfu.unfreeze(self.daq_system_config)
+        complete_config = {'daq': daq_system_config,
+                           'target': target_config}
+        context = zmq.Context()
+        socket = context.socket(zmq.REQ)
+        socket.connect(
+                f"tcp://{self.network_config['daq_coordinator']['hostname']}:" +
+                f"{self.network_config['daq_coordinator']['port']}")
+        socket.send_string('measure;'+yaml.safe_dump(complete_config))
+        data = socket.recv()
+        with self.output()[0].open('w') as data_file:
+            data_file.write(data)
 
 
 class Format(luigi.Task):
@@ -173,6 +181,7 @@ class Format(luigi.Task):
     # calibration if one is required
     calibration = luigi.OptionalParameter(significant=False)
     analysis_module_path = luigi.OptionalParameter(significant=False)
+    network_config = luigi.DictParameter(significant=True)
 
     def requires(self):
         """
@@ -184,8 +193,10 @@ class Format(luigi.Task):
                             self.output_dir,
                             self.label,
                             self.identifier,
+                            self.root_config_path,
                             self.calibration,
-                            self.analysis_module_path),
+                            self.analysis_module_path,
+                            self.network_config),
                 ScanConfiguration(self.output_dir,
                                   self.target_default_config))
 
@@ -267,6 +278,8 @@ class Scan(luigi.Task):
                                           default=None)
     analysis_module_path = luigi.OptionalParameter(significant=False,
                                                    default=None)
+    network_config = luigi.DictParameter(significant=False)
+    defaults_configured = luigi.BoolParameter(significant=True)
     supported_formats = ['hdf5']
 
     def requires(self):
@@ -309,7 +322,8 @@ class Scan(luigi.Task):
                                            self.daq_system_config,
                                            self.root_config_path,
                                            self.calibration,
-                                           self.analysis_module_path))
+                                           self.analysis_module_path,
+                                           self.network_config))
         # The scan has reached the one dimensional case. Spawn a measurement
         # for every value that takes part in the scan
         else:
@@ -327,7 +341,8 @@ class Scan(luigi.Task):
                                              self.identifier + i,
                                              self.root_config_path,
                                              self.calibration,
-                                             self.analysis_module_path))
+                                             self.analysis_module_path,
+                                             self.network_config))
         return required_tasks
 
     def run(self):
