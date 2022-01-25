@@ -9,6 +9,7 @@ import os
 import operator
 import pandas as pd
 import luigi
+from luigi.parameter import ParameterVisibility
 import yaml
 import zmq
 from . import config_utilities as cfu
@@ -89,7 +90,8 @@ class Measurement(luigi.Task):
                                  self.calibration,
                                  self.target_default_config,
                                  self.root_config_path,
-                                 self.output_dir)
+                                 self.output_dir,
+                                 self.analysis_module_path)
 
     def output(self):
         """
@@ -173,10 +175,10 @@ class Scan(luigi.Task):
 
     # parameters describing to the type of measurement being taken
     # and the relevant information for the measurement/scan
-    label = luigi.Parameter(significant=False)
-    output_dir = luigi.Parameter(significant=False)
+    label = luigi.Parameter(significant=True)
+    output_dir = luigi.Parameter(significant=True)
     output_format = luigi.Parameter(significant=False)
-    scan_parameters = luigi.ListParameter(significant=True)
+    scan_parameters = luigi.ListParameter(significant=False)
 
     # configuration of the target and daq system that is used to
     # perform the scan (This may be extended with an 'environment')
@@ -191,7 +193,6 @@ class Scan(luigi.Task):
     analysis_module_path = luigi.OptionalParameter(significant=False,
                                                    default=None)
     network_config = luigi.DictParameter(significant=False)
-    defaults_configured = luigi.BoolParameter(significant=True)
     supported_formats = ['hdf5']
 
     def requires(self):
