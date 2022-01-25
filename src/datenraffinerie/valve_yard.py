@@ -13,7 +13,7 @@ import luigi
 import zmq
 import yaml
 from .scan import Scan
-from .distillery import DistilleryAdapter
+from .distillery import Distillery
 from . import config_utilities as cfu
 from . import control_adapter as ctrl
 
@@ -49,7 +49,8 @@ class ValveYard(luigi.WrapperTask):
                                       " the config files")
         procedure = procedures[procedure_index]
         if procedure['type'] == 'analysis':
-            return DistilleryAdapter(name=self.procedure_label,
+            return Distillery(name=self.procedure_label,
+                              python_module=procedure['python_module'],
                               daq=procedure['daq'],
                               output_dir=str(
                                   (output_dir/self.procedure_label).resolve()),

@@ -7,11 +7,12 @@ import pandas as pd
 from .config_utilities import unfreeze
 from .errors import OutputError
 
-class DistilleryAdapter(luigi.Task):
+class Distillery(luigi.Task):
     """ Task that encapsulates analysis tasks and makes them executable
     inside the Datenraffinerie
     """
     name = luigi.Parameter(significant=True)
+    python_module = luigi.Parameter(significant=True)
     daq = luigi.Parameter(significant=True)
     output_dir = luigi.Parameter(significant=True)
     parameters = luigi.DictParameter(significant=True)
@@ -38,12 +39,12 @@ class DistilleryAdapter(luigi.Task):
             and the value associated to 'plots' is a list of relative
             paths. All paths should be strings.
         """
-        distillery = self.import_distillery(self.analysis_module_path,
-                                            self.name)
+        analysis = self.import_analysis(self.analysis_module_path,
+                                        self.python_module)
         analysis_parameters = unfreeze(self.parameters)
-        distillery = distillery(analysis_parameters)
+        analysis = analysis(analysis_parameters)
         output = {}
-        for key, paths in distillery.output().items():
+        for key, paths in analysis.output().items():
             if key == 'plots':
                 try:
                     if len(paths) == 0:
@@ -67,17 +68,17 @@ class DistilleryAdapter(luigi.Task):
 
         """
         # import the class definition
-        distillery = self.import_distillery(self.analysis_module_path,
-                                            self.name)
+        analysis = self.import_analysis(self.analysis_module_path,
+                                            self.python_module)
         # instantiate an analysis object from the imported analysis class
-        distillery = distillery(unfreeze(self.parameters))
+        analysis = analysis(unfreeze(self.parameters))
 
         # open and read the data
         data = pd.read_hdf(self.input().path)
-        distillery.run(data, self.output_dir)
+        analysis.run(data, self.output_dir)
 
     @staticmethod
-    def import_distillery(distillery_path: str, name: str):
+    def import_analysis(distillery_path: str, name: str):
         """ Import the distillery for the analysis.
 
         :distillery_path: The path in which to find the distilleries

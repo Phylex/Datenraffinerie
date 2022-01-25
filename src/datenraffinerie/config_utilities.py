@@ -375,7 +375,16 @@ def parse_analysis_config(analysis_config: dict) -> tuple:
         daq: daq task required by the analysis
         analysis_label: name of the analysis
     """
-    analysis_label = analysis_config['name']
+    try:
+        analysis_label = analysis_config['name']
+    except KeyError as err:
+        raise ConfigFormatError("The analysis configuration needs"
+                                " a name field") from err
+    try:
+        analysis_object_name = analysis_config['python_module_name']
+    except KeyError as err:
+        raise ConfigFormatError("The analysis configuration needs"
+                                " a python_module_name field") from err
     # parse the daq that is required for the analysis
     if 'daq' not in analysis_config.keys():
         raise ConfigFormatError("an analysis must specify a daq task")
@@ -389,6 +398,7 @@ def parse_analysis_config(analysis_config: dict) -> tuple:
         analysis_parameters = analysis_config['parameters']
     return {'parameters': analysis_parameters,
             'daq': daq,
+            'python_module': analysis_object_name,
             'name': analysis_label,
             'type': 'analysis'}
 
@@ -520,7 +530,7 @@ def test_diff_dict():
 
 
 def test_parse_scan_config():
-    test_fpath = Path('./examples/daq_procedures.yaml')
+    test_fpath = Path('../../examples/daq_procedures.yaml')
     scan_configs = []
     test_config = load_configuration(test_fpath)
     expected_config_keys = ['parameters', 'name', 'type',
@@ -541,7 +551,7 @@ def test_parse_scan_config():
 
 
 def test_analysis_config():
-    test_fpath = Path('./examples/analysis_procedures.yaml')
+    test_fpath = Path('../../examples/analysis_procedures.yaml')
     config = load_configuration(test_fpath)
     parsed_config = parse_analysis_config(config[0])
     assert parsed_config['daq'] == 'pedestal_scan'
@@ -555,9 +565,9 @@ def test_analysis_config():
 
 
 def test_parse_config_entry():
-    scan_test_config = Path('./examples/daq_procedures.yaml')
+    scan_test_config = Path('../../examples/daq_procedures.yaml')
     daq_system_test_config = Path(
-            './tests/configuration/defaults/daq-system-config.yaml')
+            '../../tests/configuration/defaults/daq-system-config.yaml')
     daq_reference_config = load_configuration(daq_system_test_config)
     config = load_configuration(scan_test_config)
     names = ['injection_scan', 'timewalk_scan', 'pedestal_scan']

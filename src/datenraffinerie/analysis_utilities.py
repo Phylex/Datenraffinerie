@@ -191,7 +191,8 @@ def roc_channel_to_globals(chip_id, channel_id, channel_type, complete_config):
     """
     id_map = {0: 'roc_s0', 1: 'roc_s1', 2: 'roc_s2'}
     channel_type_map = {0: 'ch', 1: 'calib', 100: 'cm'}
-    roc_global_keys = ['DigitalHalf', 'GlobalAnalog', 'MasterTdc', 'ReferenceVoltage']
+    half_wise_keys = ['DigitalHalf', 'GlobalAnalog', 'MasterTdc', 'ReferenceVoltage']
+    global_keys = ['Top']
     channel_type = channel_type_map[channel_type]
     if channel_type == 'ch':
         chip_half = 0 if channel_id < 36 else 1
@@ -201,8 +202,11 @@ def roc_channel_to_globals(chip_id, channel_id, channel_type, complete_config):
         chip_half = channel_id
     roc_config = complete_config[id_map[chip_id]]
     result = {}
-    for gl_key in roc_global_keys:
-        for key, val in roc_config[gl_key][chip_half].items():
+    for hw_key in half_wise_keys:
+        for key, val in roc_config[hw_key][chip_half].items():
+            result[key] = val
+    for gl_key in global_keys:
+        for key, val in roc_config[gl_key][0].items():
             result[key] = val
     return result
 
@@ -230,7 +234,7 @@ def merge_in_config_params(run_data: pd.DataFrame, run_config: dict):
 
 
 def test_extract_data():
-    test_root_path = Path('./tests/data/run.root')
+    test_root_path = Path('../../tests/data/run.root')
     frame = extract_data(test_root_path.resolve())
     expected_columns = ['chip', 'channel', 'channeltype',
                         'adc_median', 'adc_iqr', 'tot_median',
@@ -247,11 +251,11 @@ def test_add_channel_wise_data():
     """ test that all the channel wise parameters appear as a
     column in the dataframe
     """
-    import config_utilities as cfu
-    test_data_path = Path('./tests/data/run.root')
+    from . import config_utilities as cfu
+    test_data_path = Path('../../tests/data/run.root')
     frame = extract_data(test_data_path.resolve())
-    configuration = cfu.load_configuration('tests/data/default.yaml')
-    overlay = cfu.load_configuration('tests/data/run.yaml')
+    configuration = cfu.load_configuration('../../tests/data/default.yaml')
+    overlay = cfu.load_configuration('../../tests/data/run.yaml')
     configuration = cfu.update_dict(configuration, overlay)
     frame = add_channel_wise_data(frame, configuration)
     expected_columns = ['Adc_pedestal',
@@ -293,11 +297,11 @@ def test_add_half_wise_data():
     :returns: Nothing
 
     """
-    import config_utilities as cfu
-    test_data_path = Path('./tests/data/run.root')
+    from . import config_utilities as cfu
+    test_data_path = Path('../../tests/data/run.root')
     frame = extract_data(test_data_path.resolve())
-    default = cfu.load_configuration('tests/data/default.yaml')
-    overlay = cfu.load_configuration('tests/data/run.yaml')
+    default = cfu.load_configuration('../../tests/data/default.yaml')
+    overlay = cfu.load_configuration('../../tests/data/run.yaml')
     config = cfu.update_dict(default, overlay)
     frame = add_half_wise_data(frame, config)
     expected_columns = [
@@ -431,6 +435,49 @@ def test_add_half_wise_data():
             'probe_dc',
             'probe_dc1',
             'probe_dc2',
+            'BIAS_I_PLL_D',
+            'DIV_PLL',
+            'EN',
+            'EN_HIGH_CAPA',
+            'EN_LOCK_CONTROL',
+            'EN_PLL',
+            'EN_PhaseShift',
+            'EN_RCG',
+            'EN_REF_BG',
+            'EN_probe_pll',
+            'ENpE',
+            'ERROR_LIMIT_SC',
+            'EdgeSel_T1',
+            'FOLLOWER_PLL_EN',
+            'INIT_D',
+            'INIT_DAC_EN',
+            'Pll_Locked_sc',
+            'PreL1AOffset',
+            'RunL',
+            'RunR',
+            'S',
+            'TestMode',
+            'VOUT_INIT_EN',
+            'VOUT_INIT_EXT_D',
+            'VOUT_INIT_EXT_EN',
+            'b_in',
+            'b_out',
+            'err_countL',
+            'err_countR',
+            'fc_error_count',
+            'in_inv_cmd_rx',
+            'lock_count',
+            'n_counter_rst',
+            'phase_ck',
+            'phase_strobe',
+            'rcg_gain',
+            'sel_40M_ext',
+            'sel_error',
+            'sel_lock',
+            'sel_strobe_ext',
+            'srout',
+            'statusL',
+            'statusR',
            ]
     for col in expected_columns:
         print(frame[col])
