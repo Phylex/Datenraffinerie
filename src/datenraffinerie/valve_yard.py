@@ -92,7 +92,6 @@ class ValveYard(luigi.WrapperTask):
                             Path(self.root_config_file).resolve()),
                         calibration=procedure['calibration'],
                         analysis_module_path=self.analysis_module_path,
-                        network_config=self.network_config,
-                        defaults_configured=False)
+                        network_config=self.network_config)
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")

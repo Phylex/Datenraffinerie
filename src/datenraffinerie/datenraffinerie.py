@@ -28,7 +28,6 @@ def cli(netcfg, config, procedure, workers, output, analysis_path):
         sys.exit(1)
     daq_coordination_process = multiprocessing.Process(target=coordinate_daq_access, args=(netcfg, ))
     daq_coordination_process.start()
-    print(daq_coordination_process)
     try:
         run_result = luigi.build([ValveYard(
             click.format_filename(config),
@@ -50,6 +49,6 @@ def cli(netcfg, config, procedure, workers, output, analysis_path):
         print("An error occured that was not properly caught")
         print(err)
     finally:
-        sys.exit(1)
         daq_coordination_process.kill()
         daq_coordination_process.join()
+        sys.exit(1)
