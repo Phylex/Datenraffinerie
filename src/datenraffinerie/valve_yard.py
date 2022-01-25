@@ -50,7 +50,7 @@ class ValveYard(luigi.WrapperTask):
         procedure = procedures[procedure_index]
         if procedure['type'] == 'analysis':
             return Distillery(name=self.procedure_label,
-                              python_module=procedure['python_module']
+                              python_module=procedure['python_module'],
                               daq=procedure['daq'],
                               output_dir=str(
                                   (output_dir/self.procedure_label).resolve()),
