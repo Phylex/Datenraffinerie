@@ -1,6 +1,7 @@
 - name: example_analysis
   type: analysis
   daq: example_scan
+  python_module_name: example_analysis_class
   parameters:
     p1: 346045
     p2: 45346
