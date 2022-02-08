@@ -301,16 +301,21 @@ class Scan(luigi.Task):
             values = self.scan_parameters[0][1]
             parameter = list(self.scan_parameters[0][0])
             output_dir = Path(self.output_dir)
+
+            raw_files = []
             measurement_files = []
+            # gather the data
             for i, value in enumerate(values):
                 # compute the name of the data files
                 data_file_base_name = self.label + f'_{self.identifier + i}'
                 raw_file_path = output_dir / (data_file_base_name + '.raw')
-                unpacked_file_path = output_dir /\
-                    (data_file_base_name + '.root')
                 converted_file_path = output_dir /\
                     (data_file_base_name + '.hdf5')
-                measurement_files.append(converted_file_path)
+                # skip the files that have allready been completely converted
+                if converted_file_path.exists():
+                    measurement_files.append(converted_file_path)
+                    continue
+                raw_files.append((i, raw_file_path))
 
                 # calculate the configuration to send to the backend
                 patch = cfu.generate_patch(parameter, value)
@@ -327,15 +332,32 @@ class Scan(luigi.Task):
                 with open(raw_file_path, 'wb') as raw_data_file:
                     raw_data_file.write(data)
 
+            # close the connection to the daq coordinator
+            # as the scan is now complete
+            socket.close()
+            context.term()
+
+            # convert the data
+            for i, raw_file in raw_files:
+                data_file_base_name = self.label + f'_{self.identifier + i}'
+                unpacked_file_path = output_dir /\
+                    (data_file_base_name + '.root')
+                converted_file_path = output_dir /\
+                    (data_file_base_name + '.hdf5')
                 # 'unpack' the data from the raw data gathered into a root file that
                 # can then be merged with the configuration into a large table
                 unpack_command = 'unpack'
-                input_file = ' -i ' + str(raw_file_path.as_posix())
+                input_file = ' -i ' + str(raw_file.as_posix())
                 output_command = ' -o ' + str(unpacked_file_path.as_posix())
                 output_type = ' -t unpacked'
                 full_unpack_command = unpack_command + input_file +\
                     output_command + output_type
                 os.system(full_unpack_command)
+
+                if not unpacked_file_path.exists():
+                    raise ValueError(
+                        f'The Data in run {self.identifier} {i}'
+                        ' was unable to be unpacked')
 
                 # load the data from the unpacked root file and merge in the
                 # data from the configuration for that run with the data
@@ -347,11 +369,7 @@ class Scan(luigi.Task):
                 measurement_data = anu.add_half_wise_data(measurement_data,
                                                           full_target_config)
                 measurement_data.to_hdf(converted_file_path, 'data')
-
-            # close the connection to the daq coordinator
-            # as the scan is now complete
-            socket.close()
-            context.term()
+                measurement_files.append(converted_file_path)
 
         # iron out the differences in input data files between the 'loop' and
         # 'non loop' variants
