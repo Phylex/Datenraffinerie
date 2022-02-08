@@ -102,7 +102,7 @@ class Measurement(luigi.Task):
         unpacking steps
         """
         formatted_data_path = Path(self.output_dir) / \
-            (self.label + str(self.identifier) + '-data.' + self.output_format)
+            f'{self.label}_{self.identifier}.{self.output_format}'
         return luigi.LocalTarget(formatted_data_path.resolve())
 
     def run(self):
@@ -131,7 +131,7 @@ class Measurement(luigi.Task):
         data = socket.recv()
         socket.close()
         context.term()
-        raw_data_file_path = self.output().path + '.raw'
+        raw_data_file_path = os.path.splitext(self.output().path)[0] + '.raw'
 
         # save the data in a file so that the unpacker can work with it
         with open(raw_data_file_path, 'wb') as raw_data_file:
@@ -141,7 +141,7 @@ class Measurement(luigi.Task):
         # can then be merged with the configuration into a large table
         unpack_command = 'unpack'
         input_file = ' -i ' + str(raw_data_file_path)
-        data_file_path = self.output().path + '.root'
+        data_file_path = os.path.splitext(self.output().path)[0] + '.root'
         output_command = ' -o ' + data_file_path
         output_type = ' -t unpacked'
         full_unpack_command = unpack_command + input_file + output_command\
@@ -307,7 +307,7 @@ class Scan(luigi.Task):
             # gather the data
             for i, value in enumerate(values):
                 # compute the name of the data files
-                data_file_base_name = self.label + f'_{self.identifier + i}'
+                data_file_base_name = f'{self.label}_{self.identifier + i}'
                 raw_file_path = output_dir / (data_file_base_name + '.raw')
                 converted_file_path = output_dir /\
                     (data_file_base_name + '.hdf5')
@@ -362,8 +362,8 @@ class Scan(luigi.Task):
                 # load the data from the unpacked root file and merge in the
                 # data from the configuration for that run with the data
                 measurement_data = anu.extract_data(unpacked_file_path)
-                os.remove(unpacked_file_path)
-                os.remove(raw_file_path)
+                os.remove(unpacked_file_path.as_posix())
+                os.remove(raw_file.as_posix())
                 measurement_data = anu.add_channel_wise_data(measurement_data,
                                                              full_target_config)
                 measurement_data = anu.add_half_wise_data(measurement_data,
