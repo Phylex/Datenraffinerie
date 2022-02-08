@@ -24,6 +24,7 @@ class ValveYard(luigi.WrapperTask):
     output_dir = luigi.Parameter(significant=True)
     analysis_module_path = luigi.Parameter(significant=True)
     network_config = luigi.DictParameter(significant=True)
+    loop = luigi.BoolParameter(significant=True)
 
     def output(self):
         return self.input()
@@ -58,29 +59,24 @@ class ValveYard(luigi.WrapperTask):
                               root_config_path=str(
                                   Path(self.root_config_file).resolve()),
                               analysis_module_path=self.analysis_module_path,
-                              network_config=self.network_config)
+                              network_config=self.network_config,
+                              loop=self.loop)
         if procedure['type'] == 'daq':
             # the default values for the DAQ system and the target need to
             # be loaded on to the backend
-            print('creating socket')
             context = zmq.Context()
             socket = context.socket(zmq.REQ)
-            print('connecting')
             socket.connect(
                     f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
                     f"{self.network_config['daq_coordinator']['port']}")
-            print('connected')
             complete_default_config = {
                     'daq': procedure['daq_system_default_config'],
                     'target': procedure['target_power_on_default_config']}
-            print('sending message')
             socket.send_string('load defaults;' +
                                yaml.safe_dump(complete_default_config))
-            print('waiting for response')
             resp = socket.recv()
             if resp != b'defaults loaded':
                 raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
-            print(f'response received: {resp}')
             return Scan(identifier=0,
                         label=self.procedure_label,
                         output_dir=str(output_dir.resolve()),
@@ -93,6 +89,7 @@ class ValveYard(luigi.WrapperTask):
                             Path(self.root_config_file).resolve()),
                         calibration=procedure['calibration'],
                         analysis_module_path=self.analysis_module_path,
-                        network_config=self.network_config)
+                        network_config=self.network_config,
+                        loop=self.loop)
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")
