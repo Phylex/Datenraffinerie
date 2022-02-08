@@ -11,13 +11,13 @@ from .daq_coordination import coordinate_daq_access
 
 @click.command()
 @click.argument('netcfg', type=click.File('r'),
-                help='Path to the network configuration file')
+                metavar='[network configuration file]')
 @click.argument('config', type=click.Path(exists=True),
-                help='path to the main configuration file')
+                metavar='[main configuration file]')
 @click.argument('procedure', type=str,
-                help='Name of the Procedure to be run by the datenraffinerie')
+                metavar='[Procedure to be run by the datenraffinerie]')
 @click.argument('output', type=click.Path(),
-                help='The directory that the data is placed in')
+                metavar='[data output directory]')
 @click.option('-a', '--analysis_path', 'analysis_path', type=click.Path(exists=True),
               help='specify the path to the python module containing the analyses')
 @click.option('-w', '--workers', 'workers', type=int, default=1,
@@ -44,7 +44,7 @@ def cli(netcfg, config, procedure, workers, output, analysis_path, loop):
             output,
             analysis_path,
             netcfg,
-            loop)],
+            loop='true' if loop else 'false')],
             local_scheduler=True,
             workers=workers,
         )

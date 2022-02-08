@@ -29,7 +29,8 @@ class Distillery(luigi.Task):
         :returns: The acquisition procedure needed to produce the data
         """
         return ValveYard(self.root_config_path, self.daq, self.output_dir,
-                         self.analysis_module_path, self.network_config, self.loop)
+                         self.analysis_module_path, self.network_config,
+                         self.loop)
 
     def output(self):
         """ Define the files that are produced by the analysis

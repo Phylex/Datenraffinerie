@@ -24,7 +24,7 @@ class ValveYard(luigi.WrapperTask):
     output_dir = luigi.Parameter(significant=True)
     analysis_module_path = luigi.Parameter(significant=True)
     network_config = luigi.DictParameter(significant=True)
-    loop = luigi.BoolParameter(significant=False)
+    loop = luigi.BoolParameter(significant=True)
 
     def output(self):
         return self.input()
@@ -59,7 +59,8 @@ class ValveYard(luigi.WrapperTask):
                               root_config_path=str(
                                   Path(self.root_config_file).resolve()),
                               analysis_module_path=self.analysis_module_path,
-                              network_config=self.network_config)
+                              network_config=self.network_config,
+                              loop=self.loop)
         if procedure['type'] == 'daq':
             # the default values for the DAQ system and the target need to
             # be loaded on to the backend

@@ -27,7 +27,7 @@ class ScanConfiguration(luigi.Task):
     root_config_path = luigi.Parameter(significant=True)
     output_dir = luigi.Parameter(significant=True)
     analysis_module_path = luigi.Parameter(significant=True)
-    loop = luigi.BoolParameter(significant=False)
+    loop = luigi.OptionalParameter(significant=False, default=False)
 
     def requires(self):
         from .valve_yard import ValveYard
@@ -93,8 +93,7 @@ class Measurement(luigi.Task):
                                  self.target_default_config,
                                  self.root_config_path,
                                  self.output_dir,
-                                 self.analysis_module_path,
-                                 self.loop)
+                                 self.analysis_module_path)
 
     def output(self):
         """
