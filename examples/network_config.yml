@@ -1,0 +1,12 @@
+daq_coordinator:
+  hostname: 0.0.0.0
+  port: 5000
+target:
+  hostname: hc640256.cern.ch
+  port: 5555
+client:
+  hostname: localhost
+  port: 6001
+server:
+  hostname: hc640256
+  port: 6000

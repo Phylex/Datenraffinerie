@@ -9,10 +9,11 @@ import os
 import operator
 import pandas as pd
 import luigi
+from luigi.parameter import ParameterVisibility
 import yaml
+import zmq
 from . import config_utilities as cfu
 from . import analysis_utilities as anu
-from .control_adapter import DAQSystem, TargetAdapter
 
 
 class ScanConfiguration(luigi.Task):
@@ -21,34 +22,12 @@ class ScanConfiguration(luigi.Task):
     measurement
     """
     output_path = luigi.Parameter(significant=True)
-    target_power_on_config = luigi.DictParameter(significant=False)
-
-    def output(self):
-        output_config_path = Path(self.output_path).resolve()
-        output_config_path = output_config_path / 'target_reset_config.yaml'
-        return luigi.LocalTarget(output_config_path)
-
-    def run(self):
-        run_config = cfu.unfreeze(self.target_power_on_config)
-        with self.output().open('w') as target_pwr_on_config_file:
-            yaml.safe_dump(run_config, target_pwr_on_config_file)
-
-
-class Configuration(luigi.Task):
-    """
-    Write the configuration file for every run this way the
-    configuration can be created without needing to run the
-    whole daq process
-    """
-    target_config = luigi.DictParameter(significant=False)
-    label = luigi.Parameter(significant=True)
-    output_dir = luigi.Parameter(significant=True)
-    identifier = luigi.IntParameter(significant=True)
-    calibration = luigi.OptionalParameter(default=None,
-                                          significant=False)
+    calibration = luigi.Parameter(significant=True)
+    target_power_on_config = luigi.DictParameter(significant=True)
     root_config_path = luigi.Parameter(significant=True)
-    analysis_module_path = luigi.OptionalParameter(significant=False,
-                                                   default=None)
+    output_dir = luigi.Parameter(significant=True)
+    analysis_module_path = luigi.Parameter(significant=True)
+    loop = luigi.OptionalParameter(significant=False, default=False)
 
     def requires(self):
         from .valve_yard import ValveYard
@@ -59,95 +38,28 @@ class Configuration(luigi.Task):
             return ValveYard(self.root_config_path,
                              self.calibration,
                              str(Path(self.output_dir).resolve()),
-                             str(Path(self.analysis_module_path).resolve()))
+                             str(Path(self.analysis_module_path).resolve()),
+                             self.loop)
 
     def output(self):
-        output_path = Path(self.output_dir) / (self.label +
-                                               str(self.identifier) +
-                                               '-config.yaml')
-        return luigi.LocalTarget(output_path)
+        output_config_path = Path(self.output_path).resolve()
+        output_config_path = output_config_path /\
+            'target_config_with_calibration.yaml'
+        return luigi.LocalTarget(output_config_path)
 
     def run(self):
-        target_config = cfu.unfreeze(self.target_config)
+        calibration_overlay = None
         if self.calibration is not None:
-            try:
-                calib_file = self.input()['calibration'].open('r')
-            except KeyError as err:
-                raise FileNotFoundError(f'the scan {self.label} expects a calibration'
-                                        f' but no `calibration` key  was found in the'
-                                        f' output of the analysis specified by the '
-                                        f'calibration procedure') from err
-            calibration = yaml.safe_load(calib_file)
-            out_config = cfu.update_dict(target_config, calibration)
-        else:
-            out_config = target_config
-        with self.output().open('w') as conf_out_file:
-            yaml.dump(out_config, conf_out_file)
+            with self.input()['calibration'].open('r') as calibration_file:
+                calibration_overlay = yaml.safe_load(calibration_file.read())
+        run_config = cfu.unfreeze(self.target_power_on_config)
+        if calibration_overlay is not None:
+            run_config = cfu.update_dict(run_config, calibration_overlay)
+        with self.output().open('w') as target_pwr_on_config_file:
+            yaml.safe_dump(run_config, target_pwr_on_config_file)
 
 
 class Measurement(luigi.Task):
-    """
-    The task that performs a single measurement for the scan task
-    """
-    # configuration and connection to the target
-    # (aka hexaboard/SingleROC tester)
-    target_config = luigi.DictParameter(significant=False)
-
-    # configuration of the (daq) system
-    daq_system_config = luigi.DictParameter(significant=False)
-
-    # Directory that the data should be stored in
-    output_dir = luigi.Parameter(significant=True)
-    label = luigi.Parameter(significant=True)
-    identifier = luigi.IntParameter(significant=True)
-
-    root_config_path = luigi.Parameter(significant=False)
-
-    # calibration if one is required
-    calibration = luigi.OptionalParameter(default=None,
-                                          significant=False)
-    analysis_module_path = luigi.OptionalParameter(default=None,
-                                                   significant=False)
-
-    resources = {'hexacontroller': 1}
-
-    def requires(self):
-        return Configuration(self.target_config,
-                             self.label,
-                             self.output_dir,
-                             self.identifier,
-                             self.calibration,
-                             self.root_config_path,
-                             self.analysis_module_path)
-
-    def output(self):
-        """
-        Specify the output of this task to be the measured data along with the
-        configuration of the target during the measurement
-        """
-        data_path = Path(self.output_dir) / (self.label +
-                                             str(self.identifier) +
-                                             '-data.raw')
-        return (luigi.LocalTarget(data_path), self.input())
-
-    def run(self):
-        """
-        Perform the measurement after configuring the different parts
-        of the system
-        """
-
-        # load the possibly calibrated configuration from the configuration
-        # task
-        with self.input().open('r') as config_file:
-            target_config = yaml.safe_load(config_file.read())
-        daq_system = DAQSystem(cfu.unfreeze(self.daq_system_config))
-        target = TargetAdapter(cfu.unfreeze(target_config))
-        target.configure()
-        data_file = self.output()[0]
-        daq_system.take_data(data_file.path)
-
-
-class Format(luigi.Task):
     """
     Task that unpacks the raw data into the desired data format
     also merges the yaml chip configuration with the reformatted
@@ -173,21 +85,15 @@ class Format(luigi.Task):
     # calibration if one is required
     calibration = luigi.OptionalParameter(significant=False)
     analysis_module_path = luigi.OptionalParameter(significant=False)
+    network_config = luigi.DictParameter(significant=True)
 
     def requires(self):
-        """
-        to be able to unpack the data we need the data and the
-        configuration file. These are returned by the
-        """
-        return (Measurement(self.target_config,
-                            self.daq_system_config,
-                            self.output_dir,
-                            self.label,
-                            self.identifier,
-                            self.calibration,
-                            self.analysis_module_path),
-                ScanConfiguration(self.output_dir,
-                                  self.target_default_config))
+        return ScanConfiguration(self.output_dir,
+                                 self.calibration,
+                                 self.target_default_config,
+                                 self.root_config_path,
+                                 self.output_dir,
+                                 self.analysis_module_path)
 
     def output(self):
         """
@@ -196,27 +102,47 @@ class Format(luigi.Task):
         unpacking steps
         """
         formatted_data_path = Path(self.output_dir) / \
-            (self.label + str(self.identifier) + '-data.' + self.output_format)
+            f'{self.label}_{self.identifier}.{self.output_format}'
         return luigi.LocalTarget(formatted_data_path.resolve())
 
     def run(self):
-        # get the target configuration of this particular run
-        # from the target power on config and the run patch
-        data_file_path = Path(self.input()[0][0].path).resolve()
-        with self.input()[1].open('r') as pwr_on_default_config_file:
-            power_on_default_config = cfu.unfreeze(yaml.safe_load(
-                pwr_on_default_config_file.read()))
-        with self.input()[0][1].open('r') as run_config_file:
-            run_config = cfu.unfreeze(yaml.safe_load(run_config_file.read()))
-        complete_config = cfu.patch_configuration(power_on_default_config,
-                                                  run_config)
+        # load the configurations
+        target_config = cfu.unfreeze(self.target_config)
+        daq_system_config = cfu.unfreeze(self.daq_system_config)
+        power_on_default = cfu.unfreeze(self.target_default_config)
+        with self.input().open('r') as calibrated_default_config_file:
+            calibrated_default_config = cfu.unfreeze(yaml.safe_load(
+                calibrated_default_config_file.read()))
+
+        # calculate the configuration to send to the backend
+        full_target_config = cfu.update_dict(calibrated_default_config,
+                                             target_config)
+        target_config = cfu.diff_dict(power_on_default, full_target_config)
+        complete_config = {'daq': daq_system_config,
+                           'target': target_config}
+
+        # send config to the backend and wait for the response
+        context = zmq.Context()
+        socket = context.socket(zmq.REQ)
+        socket.connect(
+                f"tcp://{self.network_config['daq_coordinator']['hostname']}:" +
+                f"{self.network_config['daq_coordinator']['port']}")
+        socket.send_string('measure;'+yaml.safe_dump(complete_config))
+        data = socket.recv()
+        socket.close()
+        context.term()
+        raw_data_file_path = os.path.splitext(self.output().path)[0] + '.raw'
+
+        # save the data in a file so that the unpacker can work with it
+        with open(raw_data_file_path, 'wb') as raw_data_file:
+            raw_data_file.write(data)
 
         # 'unpack' the data from the raw data gathered into a root file that
         # can then be merged with the configuration into a large table
         unpack_command = 'unpack'
-        input_file = ' -i ' + str(data_file_path)
-        data_file = self.output().path + '.root'
-        output_command = ' -o ' + data_file
+        input_file = ' -i ' + str(raw_data_file_path)
+        data_file_path = os.path.splitext(self.output().path)[0] + '.root'
+        output_command = ' -o ' + data_file_path
         output_type = ' -t unpacked'
         full_unpack_command = unpack_command + input_file + output_command\
             + output_type
@@ -224,12 +150,13 @@ class Format(luigi.Task):
 
         # load the data from the unpacked root file and merge in the
         # data from the configuration for that run with the data
-        measurement_data = anu.extract_data(data_file)
-        os.remove(data_file)
+        measurement_data = anu.extract_data(data_file_path)
+        os.remove(data_file_path)
+        os.remove(raw_data_file_path)
         measurement_data = anu.add_channel_wise_data(measurement_data,
-                                                     complete_config)
+                                                     full_target_config)
         measurement_data = anu.add_half_wise_data(measurement_data,
-                                                  complete_config)
+                                                  full_target_config)
         with self.output().temporary_path() as tmp_out_path:
             measurement_data.to_hdf(tmp_out_path, 'data')
 
@@ -250,10 +177,10 @@ class Scan(luigi.Task):
 
     # parameters describing to the type of measurement being taken
     # and the relevant information for the measurement/scan
-    label = luigi.Parameter(significant=False)
-    output_dir = luigi.Parameter(significant=False)
+    label = luigi.Parameter(significant=True)
+    output_dir = luigi.Parameter(significant=True)
     output_format = luigi.Parameter(significant=False)
-    scan_parameters = luigi.ListParameter(significant=True)
+    scan_parameters = luigi.ListParameter(significant=False)
 
     # configuration of the target and daq system that is used to
     # perform the scan (This may be extended with an 'environment')
@@ -267,6 +194,8 @@ class Scan(luigi.Task):
                                           default=None)
     analysis_module_path = luigi.OptionalParameter(significant=False,
                                                    default=None)
+    network_config = luigi.DictParameter(significant=False)
+    loop = luigi.BoolParameter(significant=False)
     supported_formats = ['hdf5']
 
     def requires(self):
@@ -309,36 +238,150 @@ class Scan(luigi.Task):
                                            self.daq_system_config,
                                            self.root_config_path,
                                            self.calibration,
-                                           self.analysis_module_path))
+                                           self.analysis_module_path,
+                                           self.network_config,
+                                           self.loop))
         # The scan has reached the one dimensional case. Spawn a measurement
         # for every value that takes part in the scan
         else:
-            for i, value in enumerate(values):
-                patch = cfu.generate_patch(parameter, value)
-                measurement_config = cfu.patch_configuration(
-                        target_config,
-                        patch)
-                required_tasks.append(Format(measurement_config,
-                                             self.target_default_config,
-                                             self.daq_system_config,
-                                             self.output_dir,
-                                             self.output_format,
-                                             self.label,
-                                             self.identifier + i,
-                                             self.root_config_path,
-                                             self.calibration,
-                                             self.analysis_module_path))
+            if self.loop:
+                return ScanConfiguration(self.output_dir,
+                                         self.calibration,
+                                         self.target_default_config,
+                                         self.root_config_path,
+                                         self.output_dir,
+                                         self.analysis_module_path)
+
+            else:
+                for i, value in enumerate(values):
+                    patch = cfu.generate_patch(parameter, value)
+                    measurement_config = cfu.patch_configuration(
+                            target_config,
+                            patch)
+                    required_tasks.append(Measurement(measurement_config,
+                                                      self.target_default_config,
+                                                      self.daq_system_config,
+                                                      self.output_dir,
+                                                      self.output_format,
+                                                      self.label,
+                                                      self.identifier + i,
+                                                      self.root_config_path,
+                                                      self.calibration,
+                                                      self.analysis_module_path,
+                                                      self.network_config))
         return required_tasks
 
     def run(self):
         """
         concatenate the files of a measurement together into a single file
-        and write the merged data
+        and write the merged data, or if the 'loop' parameter is set, it performs
+        the low
         """
+        if self.loop and len(self.scan_parameters) == 1:
+            # open the socket to the daq coordinator
+            context = zmq.Context()
+            socket = context.socket(zmq.REQ)
+            socket.connect(
+                f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
+                f"{self.network_config['daq_coordinator']['port']}")
+
+            # prepare the default configurations to compare against
+            daq_system_config = cfu.unfreeze(self.daq_system_config)
+            power_on_default = cfu.unfreeze(self.target_default_config)
+
+            # load the configurations
+            target_config = cfu.unfreeze(self.target_config)
+            with self.input().open('r') as calibrated_default_config_file:
+                calibrated_default_config = yaml.safe_load(
+                    calibrated_default_config_file.read())
+            target_config = cfu.update_dict(calibrated_default_config,
+                                            target_config)
+
+            # perform the scan
+            values = self.scan_parameters[0][1]
+            parameter = list(self.scan_parameters[0][0])
+            output_dir = Path(self.output_dir)
+
+            raw_files = []
+            measurement_files = []
+            # gather the data
+            for i, value in enumerate(values):
+                # compute the name of the data files
+                data_file_base_name = f'{self.label}_{self.identifier + i}'
+                raw_file_path = output_dir / (data_file_base_name + '.raw')
+                converted_file_path = output_dir /\
+                    (data_file_base_name + '.hdf5')
+                # skip the files that have allready been completely converted
+                if converted_file_path.exists():
+                    measurement_files.append(converted_file_path)
+                    continue
+                raw_files.append((i, raw_file_path))
+
+                # calculate the configuration to send to the backend
+                patch = cfu.generate_patch(parameter, value)
+                full_target_config = cfu.update_dict(target_config,
+                                                     patch)
+                tx_config = cfu.diff_dict(power_on_default, full_target_config)
+                complete_config = {'daq': daq_system_config,
+                                   'target': tx_config}
+                socket.send_string('measure;'+yaml.safe_dump(complete_config))
+                # wait for the data to return
+                data = socket.recv()
+
+                # save the data in a file so that the unpacker can work with it
+                with open(raw_file_path, 'wb') as raw_data_file:
+                    raw_data_file.write(data)
+
+            # close the connection to the daq coordinator
+            # as the scan is now complete
+            socket.close()
+            context.term()
+
+            # convert the data
+            for i, raw_file in raw_files:
+                data_file_base_name = self.label + f'_{self.identifier + i}'
+                unpacked_file_path = output_dir /\
+                    (data_file_base_name + '.root')
+                converted_file_path = output_dir /\
+                    (data_file_base_name + '.hdf5')
+                # 'unpack' the data from the raw data gathered into a root file that
+                # can then be merged with the configuration into a large table
+                unpack_command = 'unpack'
+                input_file = ' -i ' + str(raw_file.as_posix())
+                output_command = ' -o ' + str(unpacked_file_path.as_posix())
+                output_type = ' -t unpacked'
+                full_unpack_command = unpack_command + input_file +\
+                    output_command + output_type
+                os.system(full_unpack_command)
+
+                if not unpacked_file_path.exists():
+                    raise ValueError(
+                        f'The Data in run {self.identifier} {i}'
+                        ' was unable to be unpacked')
+
+                # load the data from the unpacked root file and merge in the
+                # data from the configuration for that run with the data
+                measurement_data = anu.extract_data(unpacked_file_path)
+                os.remove(unpacked_file_path.as_posix())
+                os.remove(raw_file.as_posix())
+                measurement_data = anu.add_channel_wise_data(measurement_data,
+                                                             full_target_config)
+                measurement_data = anu.add_half_wise_data(measurement_data,
+                                                          full_target_config)
+                measurement_data.to_hdf(converted_file_path, 'data')
+                measurement_files.append(converted_file_path)
+
+        # iron out the differences in input data files between the 'loop' and
+        # 'non loop' variants
+        if self.loop and len(self.scan_parameters) == 1:
+            in_files = measurement_files
+        else:
+            in_files = [data_file.path for data_file in self.input()]
+
+        # merge the data together
         data_seg = []
-        for data_file in self.input():
-            print(data_file.path)
-            data_seg.append(pd.read_hdf(data_file.path))
+        for data_file in in_files:
+            data_seg.append(pd.read_hdf(data_file))
         merged_data = pd.concat(data_seg, ignore_index=True, axis=0)
         with self.output().temporary_path() as outfile:
             merged_data.to_hdf(outfile, 'data')
@@ -348,7 +391,7 @@ class Scan(luigi.Task):
         generate the output file for the scan task
         """
         if self.output_format in self.supported_formats:
-            out_file = str(self.identifier) + 'merged.' + self.output_format
+            out_file = str(self.identifier) + '_merged.' + self.output_format
             output_path = Path(self.output_dir) / out_file
             return luigi.LocalTarget(output_path)
         raise KeyError("The output format for the scans needs to"

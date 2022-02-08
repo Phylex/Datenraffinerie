@@ -87,10 +87,11 @@ def update_dict(original: dict, update: dict, offset: bool = False,
     ConfigPatchError: If lists are updated the length of the lists needs to match
                otherwise a error is raised
     """
+
     if in_place is True:
         result = original
     else:
-        result = dict(deepcopy(original))
+        result = deepcopy(original)
     for update_key in update.keys():
         if update_key not in result.keys():
             if in_place is True:
@@ -161,6 +162,8 @@ def generate_patch(keys: list, value):
     # this is needed to work with luigi as it turns stuffinto
     # tuples
     keys = list(keys)
+    if len(keys) == 0:
+        return {}
     keys.reverse()
     current_root = value
     for key in keys:
@@ -268,6 +271,7 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
     try:
         daq_system_config = load_configuration(
                 default_daq_settings_path.resolve())
+        daq_system_default_config = daq_system_config
     except FileNotFoundError as err:
         raise ConfigFormatError(f"The path specified for the default config"
                                 f"of the daq_settings in {daq_label} does"
@@ -329,6 +333,8 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
         raise ConfigFormatError("There needs to be a 'parameters' list"
                                 f" in the scan entry {daq_label}")
     for scan_dimension in scan_config['parameters']:
+        if scan_dimension['key'] is None:
+            continue
         step = 1
         start = None
         stop = None
@@ -351,13 +357,16 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
                                     " dimensions")
         scan_range = list(range(start, stop, step))
         scan_parameters.append((scan_dimension['key'], scan_range))
+    if len(scan_parameters) == 0:
+        scan_parameters = [({}, [0])]
     return {'parameters': scan_parameters,
             'calibration': calibration,
             'name': daq_label,
             'type': 'daq',
             'target_power_on_default_config': target_power_on_config,
             'target_init_config': target_initial_config,
-            'daq_system_config': daq_system_config}
+            'daq_system_config': daq_system_config,
+            'daq_system_default_config': daq_system_default_config}
 
 
 def parse_analysis_config(analysis_config: dict) -> tuple:
@@ -373,7 +382,16 @@ def parse_analysis_config(analysis_config: dict) -> tuple:
         daq: daq task required by the analysis
         analysis_label: name of the analysis
     """
-    analysis_label = analysis_config['name']
+    try:
+        analysis_label = analysis_config['name']
+    except KeyError as err:
+        raise ConfigFormatError("The analysis configuration needs"
+                                " a name field") from err
+    try:
+        analysis_object_name = analysis_config['python_module_name']
+    except KeyError as err:
+        raise ConfigFormatError("The analysis configuration needs"
+                                " a python_module_name field") from err
     # parse the daq that is required for the analysis
     if 'daq' not in analysis_config.keys():
         raise ConfigFormatError("an analysis must specify a daq task")
@@ -387,6 +405,7 @@ def parse_analysis_config(analysis_config: dict) -> tuple:
         analysis_parameters = analysis_config['parameters']
     return {'parameters': analysis_parameters,
             'daq': daq,
+            'python_module': analysis_object_name,
             'name': analysis_label,
             'type': 'analysis'}
 
@@ -461,7 +480,7 @@ def parse_config_file(config_path: str):
 
 #### TESTS ####
 def test_load_config():
-    test_fpath = Path('./tests/configuration/scan_procedures.yaml')
+    test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
     config = load_configuration(test_fpath)
     assert isinstance(config, list)
     assert isinstance(config[0], dict)
@@ -471,7 +490,7 @@ def test_update_dict():
     """
     test the update_dict function
     """
-    test_fpath = Path('./examples/daq_procedures.yaml')
+    test_fpath = Path('../../examples/daq_procedures.yaml')
     config = load_configuration(test_fpath)
     original = config[0]
     assert 'calibration' in original
@@ -518,13 +537,14 @@ def test_diff_dict():
 
 
 def test_parse_scan_config():
-    test_fpath = Path('./examples/daq_procedures.yaml')
+    test_fpath = Path('../../examples/daq_procedures.yaml')
     scan_configs = []
     test_config = load_configuration(test_fpath)
     expected_config_keys = ['parameters', 'name', 'type',
                             'target_power_on_default_config',
                             'target_init_config',
                             'daq_system_config',
+                            'daq_system_default_config',
                             'calibration']
     for scan in test_config:
         scan_configs.append(parse_scan_config(scan, test_fpath))
@@ -539,12 +559,12 @@ def test_parse_scan_config():
 
 
 def test_analysis_config():
-    test_fpath = Path('./examples/analysis_procedures.yaml')
+    test_fpath = Path('../../examples/analysis_procedures.yaml')
     config = load_configuration(test_fpath)
     parsed_config = parse_analysis_config(config[0])
-    assert parsed_config['daq'] == 'pedestal_scan'
+    assert parsed_config['daq'] == 'example_scan'
     assert isinstance(parsed_config['parameters'], dict)
-    assert parsed_config['name'] == 'pedestal_calibration'
+    assert parsed_config['name'] == 'example_analysis'
     assert parsed_config['type'] == 'analysis'
     ana_params = parsed_config['parameters']
     assert ana_params['p1'] == 346045
@@ -553,12 +573,12 @@ def test_analysis_config():
 
 
 def test_parse_config_entry():
-    scan_test_config = Path('./examples/daq_procedures.yaml')
+    scan_test_config = Path('../../examples/daq_procedures.yaml')
     daq_system_test_config = Path(
-            './tests/configuration/defaults/daq-system-config.yaml')
+            '../../tests/configuration/defaults/daq-system-config.yaml')
     daq_reference_config = load_configuration(daq_system_test_config)
     config = load_configuration(scan_test_config)
-    names = ['injection_scan', 'timewalk_scan', 'pedestal_scan']
+    names = ['injection_scan', 'timewalk_scan', 'example_scan']
     lengths = [1, 2, 1]
     expected_diffs = [{'server': {'NEvents': 4000}, 'client': {'hw_type': 'HD'}},
                       {'server': {'port': 7777, 'IdelayStep': 3},

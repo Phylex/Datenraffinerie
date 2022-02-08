@@ -1,12 +1,8 @@
 client:
-  hostname: localhost
-  port: 6001
   data_push_port: 8888
   hw_type: LD
   serverIP: hc640256
 server:
-  hostname: hc640256
-  port: 6000
   IdelayStep: 8
   NChips: 3
   NEvents: 5000
