@@ -264,7 +264,7 @@ These are the `client_override` and `server_override` sections. These sections s
 in order for it to work with the scan that is to be performed. As it is assumed that
 these settings may vary from scan to scan the non-default settings are made explicit for every DAQ procedure.
 
-#### Parameters
+### Parameters
 The parameters section describes the parameters that need to be adjusted from one measurement/run to the
 next. `parameters` is a list of dictionaries. Every entry is of this list has the same structure. There is a `key` field that describes what parameter
 of the targert needs to be changed from one measurement to the next and the range field that describes the different values the parameter needs to be
