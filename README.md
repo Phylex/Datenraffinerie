@@ -265,15 +265,16 @@ these settings may vary from scan to scan the non-default settings are made expl
 
 ### Parameters
 The parameters section describes the parameters that need to be adjusted from one measurement/run to the
-next. `parameters` is a list of dictionaries. Every entry is of this list has the same structure. There is a `key` field that describes what parameter
+next. `parameters` is a list of dictionaries. Every entry of this list has the same structure. There is a `key` field that describes what parameter
 of the targert needs to be changed from one measurement to the next and the range field that describes the different values the parameter needs to be
-set to.
+set to. Please see [key generation](#Key generation) for more details.
 If multiple entries are specified, a measurement is performed for every element of the Cartesian product of both ranges.
 
 #### Key generation
-It is assumed that the Target configuration essentially mirrors the parameters and hierarchy of the slow control parameters of the HGCROC. Levels may
-be added on top to be able to describe systems that are made up of many constituent parts. To understand how the actual parameter is computed an
-example of the `key` as it appears in the daq-procedure configuration and the resulting dictionary key that is set to a value specified in the `range`
+It is assumed that the Target configuration essentially mirrors the parameters and hierarchy of the slow control parameters of the HGCROC. If a system
+consists of multiple ROCs the configuration of each roc becomes a subdicitonary with the key being the name of the HGCROC.
+To understand how the actual parameter is computed an example of the `key` as it appears in the daq-procedure configuration and the resulting dictionary
+that is set to a value specified in the `range`
 field is given:
 ```yaml
 key:
@@ -281,15 +282,19 @@ key:
   - 'ReferenceVoltage'
   - [0, 1]
   - 'Calib'
+range
+  start: 0
+  stop: 33
+  step: 32
 ```
-results in the following keys being set to a different value in every measurement task:
+results in the following keys being generated. Once with the value 0 as show here and once for the value 32.
 ```yaml
 roc_s0:
   ReferenceVoltage:
     0:
-      Calib: 32
+      Calib: 0
     1:
-      Calib: 32
+      Calib: 0
 roc_s1:
   ReferenceVoltage:
     0:
