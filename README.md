@@ -173,11 +173,14 @@ depending on the needs of the analysis run by the Distillery. An example of an D
     p3: 'string option'
 ```
 
-As can be seen the Analysis procedure is an entry in a list. A file that is included in the main configuration is a list on the top level, the above
-example being one of possibly many entries in a file. Every entry needs the `name` field as it is the name by which the `Valve Yard` identifies the
-procedure to be executed. Also mandatory for every entry is the `type` field. It defines if it is an Analysis or a DAQ procedure and defines what kind
-of task the `ValveYard` declares as dependency. In the case of an Analysis, It is necessary to declare the daq procedure in charge of collecting the
-data. This is done with the name specified in the `daq` field. The name specified here needs to match with the name of the daq procedure.
+As can be seen in the example, the Analysis procedure is an entry in a list. A file that is included in the main configuration must be a yaml representation of a list.
+The above example may be one of possibly many entries in a file. Every entry needs the `name` field as it is the name by which the `Valve Yard` identifies the
+procedure to be executed. The value of the `name` field is also the value that the user specifies on the command line to tell the Datenraffinerie what
+procedure to execute.
+
+Also mandatory for every entry is the `type` field. It defines if it is an Analysis or a DAQ procedure.
+In the case of an Analysis, It is necessary to declare the daq procedure to collect the neede information to be able to perform the analysis.
+This is done with the name specified in the `daq` field. The name specified here needs to match with the `name` field of the daq procedure.
 
 As the code for the Analysis is loaded by the Distillery at runtime, the Distillery needs to know the name of the module to be
 imported. That name is specified in the `python_module_name` field. The name needs to match the name given to the analysis class in the `__init__.py` file
@@ -199,7 +202,7 @@ dictionary are passed as a dictionary to the custom analysis code by the Distill
 
 For more details see [here](#Writing a custom Distillery)
 
-## Configuration of the DAQ Procedure
+### Configuration of the DAQ Procedure
 The configuration of the DAQ Procedure is more complicated as it needs to define everything needed to calculate the entire system state for every
 measurement performed during the acquisition.
 ```yaml
@@ -229,8 +232,8 @@ measurement performed during the acquisition.
         step: 32
 ```
 
-Just as with the analysis procedure the `name` and `type` fields are present, specifying the name of the procedure as specified by the user or other
-procedures and the type indicating if it is a daq or analysis procedure.
+Just as with the analysis procedure the `name` and `type` fields are present, specifying the name of the procedure as specified by the user and
+it's type, indicating if it is a daq or analysis procedure.
 
 The configuration is split into three sections the `target_settings` section that defines the default and initial settings for the target, the
 `daq_settings` section that describe the configuration of the daq server and client and the parameters section that describes the parameters defining
@@ -247,19 +250,22 @@ It is used to calculate the parameters that actually need to be sent to the back
 file per test system used.
 
 The `initial_config` specifies the set of parameters that differ from the power on configuration for the target. They do not need to provide the
-values of the parameter being scanned over but can contain an initial value for them (it will however be overwritten). This file normally differs
-from one daq procedure to the next.
+values of the parameter being scanned over but can contain an initial value for them (it will however be overwritten). This file sets the parameters
+that are specific to each daq procedure.
 
 ### DAQ Settings
-The `daq_settings` section specifies the settings of the DAQ system. It is assumed that the DAQ settings to not change between Measurments of the same
-procedure. There are is one field and two subsections in the `daq_settings` section. The `default` field is the path to the default settings of the
-daq system. These should not change often as they relate the defaults of the zmq-server and zmq-client C++ Programs running on the Hexacontroller.
+The `daq_settings` section specifies the settings of the DAQ system. It is assumed that the DAQ settings do not change between Measurments of the same
+procedure. There is one field and there are two subsections in the `daq_settings` section. The `default` field is the path to the default settings of the
+daq system. The default settings only need to change if the the zmq-server and zmq-client C++ Programs running on the Hexacontroller are updated and
+end up using use a different configuration interface.
 
-There are two sections, of which only one of them is shown in the above example. These are the `client_override` and `server_override` sections. They
-specify parameters that need to be set to non default values for the DAQ system to work with the scan that is to be performed. As it is assumed that
+The two sections, of which only one of them is shown in the above example specify overrides to the `daq_settings`.
+These are the `client_override` and `server_override` sections. These sections specify parameters that need to be set to non default values of the DAQ system
+in order for it to work with the scan that is to be performed. As it is assumed that
 these settings may vary from scan to scan the non-default settings are made explicit for every DAQ procedure.
 
-The last section is the `parameters` section. The parameters section describes the parameters that need to be adjusted from one measurement to the
+#### Parameters
+The parameters section describes the parameters that need to be adjusted from one measurement/run to the
 next. `parameters` is a list of dictionaries. Every entry is of this list has the same structure. There is a `key` field that describes what parameter
 of the targert needs to be changed from one measurement to the next and the range field that describes the different values the parameter needs to be
 set to.
@@ -368,3 +374,6 @@ connected. 5 measurements are taken. If an `adc_val` is below threshold, the Chi
 
 There are roughly 200 columns in the `DataFrame` so they will not be listed here. A list of the columns can be obtained with the
 `pd.DataFrame.columns` member.
+
+## Writing a custom Distillery
+TODO
