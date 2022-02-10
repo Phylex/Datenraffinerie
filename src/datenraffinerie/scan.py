@@ -12,6 +12,7 @@ import luigi
 from luigi.parameter import ParameterVisibility
 import yaml
 import zmq
+from uproot.exceptions import KeyInFileError
 from . import config_utilities as cfu
 from . import analysis_utilities as anu
 
@@ -66,9 +67,8 @@ class Calibration(luigi.Task):
                              self.loop)
 
     def output(self):
-        if self.calibration is not None:
-            local_calib_path = Path(self.output_dir) / 'calibration.yaml'
-            return luigi.LocalTarget(local_calib_path)
+        local_calib_path = Path(self.output_dir) / 'calibration.yaml'
+        return luigi.LocalTarget(local_calib_path)
 
     def run(self):
         # figure out if there is a calibration that we need and if so create a
@@ -220,7 +220,14 @@ class DataField(luigi.Task):
     network_config = luigi.DictParameter(significant=False)
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=False)
+
     supported_formats = ['hdf5']
+
+    @property
+    def priority(self):
+        if self.loop and len(self.scan_parameters) == 1:
+            return 10
+        return 0
 
     def requires(self):
         """
@@ -251,7 +258,7 @@ class DataField(luigi.Task):
                 subscan_target_config = cfu.update_dict(
                         target_config,
                         patch)
-                if len(scan_parameters[1:]) == 1 and self.loop:
+                if len(self.scan_parameters[1:]) == 1 and self.loop:
                     required_tasks.append(Fracker(self.identifier + 1 + task_id_offset * i,
                                                   self.label,
                                                   self.output_dir,
@@ -337,7 +344,8 @@ class DataField(luigi.Task):
                 if fracked_file_path.exists():
                     continue
                 raw_file_path = Path(self.output_dir) / raw_file_name
-                raw_files.append(luigi.LocalTarget(raw_file_path))
+                raw_files.append(luigi.LocalTarget(raw_file_path,
+                                                   format=luigi.format.Nop))
             return raw_files
 
         # this task is not required by the fracker so we do the usual merge job
@@ -374,8 +382,8 @@ class DataField(luigi.Task):
             # load the calibration
             if self.calibration is not None:
                 with self.input().open('r') as calibration_file:
-                    calbration = cfu.unfreeze(yaml.safe_load(
-                        calibration_file.read()))
+                    calibration = yaml.safe_load(
+                        calibration_file.read())
                 # calculate the configuration to send to the backend
                 target_config = cfu.update_dict(target_config,
                                                 calibration)
@@ -392,10 +400,11 @@ class DataField(luigi.Task):
             # load the configurations
             target_config = cfu.unfreeze(self.target_config)
             with self.input().open('r') as calibrated_default_config_file:
-                calibrated_default_config = yaml.safe_load(
+                calibration = yaml.safe_load(
                     calibrated_default_config_file.read())
-            target_config = cfu.update_dict(calibrated_default_config,
-                                            target_config)
+            if calibration is not None:
+                target_config = cfu.update_dict(target_config,
+                                                calibration)
 
             # perform the scan
             values = self.scan_parameters[0][1]
@@ -416,7 +425,7 @@ class DataField(luigi.Task):
                 data = socket.recv()
 
                 # save the data in a file so that the unpacker can work with it
-                with raw_file as raw_data_file:
+                with raw_file.open('w') as raw_data_file:
                     raw_data_file.write(data)
 
             # close the connection to the daq coordinator
@@ -500,14 +509,9 @@ class Fracker(luigi.Task):
                        f"{self.supported_formats}")
 
     def run(self):
-        data_fragments = []
-        expected_unpacked_files = []
-        target_config = cfu.unfreeze(self.target_config)
-
         # load the configurations
         target_config = cfu.unfreeze(self.target_config)
         power_on_default = cfu.unfreeze(self.target_default_config)
-
         # load the calibration
         if self.calibration is not None:
             with self.input().open('r') as calibration_file:
@@ -520,45 +524,52 @@ class Fracker(luigi.Task):
         target_config = cfu.update_dict(power_on_default,
                                         target_config)
 
-        # get the parameters to build the patch from
-        values = self.scan_parameters[0][1]
-        parameter = list(self.scan_parameters[0][0])
-
-        for raw_file in self.input():
+        for i, raw_file in enumerate(self.input()[1:]):
             data_file_base_name = os.path.splitext(raw_file.path)[0]
-            unpacked_file_path = Path(self.output_dir) /\
-                (data_file_base_name + '.root')
-            expected_unpacked_files.append(unpacked_file_path)
+            unpacked_file_path = data_file_base_name + '.root'
 
             unpack_raw_data_into_root(raw_file.path,
                                       unpacked_file_path,
                                       raw_data=self.raw)
-            if not unpacked_file_path.exists():
-                os.remove(raw_file.path)
-                continue
 
-            # calculate the patch that needs to be applied
-            index = (os.path.splitext(raw_file.path)[0]).split('_')[-1]
-            patch = cfu.generate_patch(parameter, values[index])
+        # get the parameters to build the patch from
+        values = self.scan_parameters[0][1]
+        parameter = list(self.scan_parameters[0][0])
 
-            # calculate the configuration to send to the backend
-            current_target_config = cfu.update_dict(target_config, patch)
+        expected_files = []
+        data_fragments = []
+        for i, raw_file in enumerate(self.input()[1:]):
+            data_file_base_name = os.path.splitext(raw_file.path)[0]
+            unpacked_file_path = Path(data_file_base_name + '.root')
+            formatted_data_path = Path(data_file_base_name + '.hdf5')
+            expected_files.append(formatted_data_path)
 
             # load the data from the unpacked root file and merge in the
             # data from the configuration for that run with the data
-            measurement_data = anu.extract_data(unpacked_file_path)
-            os.remove(unpacked_file_path.as_posix())
+            try:
+                measurement_data = anu.extract_data(unpacked_file_path)
+            except KeyInFileError:
+                os.remove(raw_file.path)
+                os.remove(unpacked_file_path.as_posix())
+                continue
             os.remove(raw_file.path)
+            os.remove(unpacked_file_path.as_posix())
+            # calculate the patch that needs to be applied
+            patch = cfu.generate_patch(parameter, values[i])
+
+            # calculate the configuration to send to the backend
+            current_target_config = cfu.update_dict(target_config, patch)
             measurement_data = anu.add_channel_wise_data(measurement_data,
                                                          current_target_config)
             measurement_data = anu.add_half_wise_data(measurement_data,
                                                       current_target_config)
+            measurement_data.to_hdf(formatted_data_path, 'data')
             data_fragments.append(measurement_data)
 
-        for unpacked_file_path in expected_unpacked_files:
+        for unpacked_file_path in expected_files:
             if not unpacked_file_path.exists():
                 raise ValueError('An unpacker failed, the datenraffinerie needs to be rerun')
 
         merged_data = pd.concat(data_fragments, ignore_index=True, axis=0)
-        with self.output().temporary_path() as outfile:
-            merged_data.to_hdf(outfile, 'data')
+        outfile = self.output().path
+        merged_data.to_hdf(outfile, 'data')
