@@ -12,7 +12,7 @@ from pathlib import Path
 import luigi
 import zmq
 import yaml
-from .scan import Scan
+from .scan import DataField
 from .distillery import Distillery
 from . import config_utilities as cfu
 from . import control_adapter as ctrl
@@ -77,7 +77,7 @@ class ValveYard(luigi.WrapperTask):
             resp = socket.recv()
             if resp != b'defaults loaded':
                 raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
-            return Scan(identifier=0,
+            return DataField(identifier=0,
                         label=self.procedure_label,
                         output_dir=str(output_dir.resolve()),
                         output_format='hdf5',
