@@ -27,11 +27,11 @@ from source. To set up a python environment run:
 ```
 $ python3.9 -m venv venv
 ```
-this creates a virtual environment in the `./venv` directory. The virtual environment can be activated by running
+this creates a [virtual environment](https://docs.python.org/3/library/venv.html). in the `./venv` directory. The virtual environment can be activated by running
 ```
 $ source ./venv/bin/activate
 ```
-in a bash shell. For other options on virtual environments see [here](https://docs.python.org/3/library/venv.html).
+in a bash shell.
 To deactivate the virtual environment, run:
 ```
 $ deactivate
@@ -41,8 +41,7 @@ In the virtual environment simply install the datenraffinerie via pip with the c
 ```
 pip install datenraffinerie
 ```
-This will install the latest version released on the python package index. The package available can be checked
-[here](https://pypi.org/project/datenraffinerie/).
+This will install the latest version released on the [python package index](https://pypi.org/project/datenraffinerie/).
 
 
 ### from Source
@@ -80,8 +79,8 @@ them into a Cartesian product of the parameters and performs a measurement for e
 The daq-procedure is fully configurable, the daq-task structure is derived from a yaml configuration, see [configuratoin](#Configuration) for details.
 
 Analyses (also called Distilleries in the context of the Datenraffinerie) derive useful information from the data provided by the acquisitions.
-The module that contains the Analysis code is loaded at runtime by the Datenraffinerie and is desigend to run custom analysis code, see [writing a custom
-Distillery](#Writing a custom Distillery). If the custom distillery needs any sort of configuration it can be specified in the corresponding analysis
+The module that contains the Analysis code is loaded at runtime by the Datenraffinerie and is desigend to run custom analysis code, see [writing a custom Distillery](#Writing a custom Distillery).
+If the custom distillery needs any sort of configuration it can be specified in the corresponding analysis
 configuration. The configuration is in a very similar format to the configuration of the daq system and provided as a yaml file.
 
 Data acquisition is performed by a target, that accepts some configuration and produces measurements where the it has configured itself and the HGCROCv3
