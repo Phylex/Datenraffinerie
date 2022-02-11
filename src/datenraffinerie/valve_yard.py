@@ -12,7 +12,7 @@ from pathlib import Path
 import luigi
 import zmq
 import yaml
-from .scan import DataField
+from .scan import DataField, Fracker
 from .distillery import Distillery
 from . import config_utilities as cfu
 from . import control_adapter as ctrl
@@ -62,6 +62,7 @@ class ValveYard(luigi.WrapperTask):
                               network_config=self.network_config,
                               loop=self.loop)
         if procedure['type'] == 'daq':
+            print(f"raw value: {procedure['raw']}")
             # the default values for the DAQ system and the target need to
             # be loaded on to the backend
             context = zmq.Context()
@@ -77,19 +78,37 @@ class ValveYard(luigi.WrapperTask):
             resp = socket.recv()
             if resp != b'defaults loaded':
                 raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
+            if len(procedure['parameters']) == 1:
+                return Fracker(identifier=0,
+                               label=self.procedure_label,
+                               output_dir=str(output_dir.resolve()),
+                               output_format='hdf5',
+                               scan_parameters=procedure['parameters'],
+                               target_config=procedure['target_init_config'],
+                               target_default_config=procedure['target_power_on_default_config'],
+                               daq_system_config=procedure['daq_system_config'],
+                               root_config_path=str(
+                                   Path(self.root_config_file).resolve()),
+                               calibration=procedure['calibration'],
+                               analysis_module_path=self.analysis_module_path,
+                               network_config=self.network_config,
+                               loop=self.loop,
+                               raw=procedure['raw']) # indicate if to produce event by event data data
             return DataField(identifier=0,
-                        label=self.procedure_label,
-                        output_dir=str(output_dir.resolve()),
-                        output_format='hdf5',
-                        scan_parameters=procedure['parameters'],
-                        target_config=procedure['target_init_config'],
-                        target_default_config=procedure['target_power_on_default_config'],
-                        daq_system_config=procedure['daq_system_config'],
-                        root_config_path=str(
-                            Path(self.root_config_file).resolve()),
-                        calibration=procedure['calibration'],
-                        analysis_module_path=self.analysis_module_path,
-                        network_config=self.network_config,
-                        loop=self.loop)
+                             label=self.procedure_label,
+                             output_dir=str(output_dir.resolve()),
+                             output_format='hdf5',
+                             scan_parameters=procedure['parameters'],
+                             target_config=procedure['target_init_config'],
+                             target_default_config=procedure['target_power_on_default_config'],
+                             daq_system_config=procedure['daq_system_config'],
+                             root_config_path=str(
+                                 Path(self.root_config_file).resolve()),
+                             calibration=procedure['calibration'],
+                             analysis_module_path=self.analysis_module_path,
+                             network_config=self.network_config,
+                             loop=self.loop,
+                             raw=procedure['raw']) # indicate if to produce event by event data data
+
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")

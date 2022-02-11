@@ -39,6 +39,7 @@ def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False)
     output_command = ' -o ' + str(out_file_path)
     full_unpack_command = unpack_command + input_file + output_command\
         + output_type
+    print(full_unpack_command)
     os.system(full_unpack_command)
     # if raw_data:
     #     os.remove(unpacker_opt_file_path)
@@ -110,7 +111,7 @@ class DrillingRig(luigi.Task):
     analysis_module_path = luigi.OptionalParameter(significant=False)
     network_config = luigi.DictParameter(significant=True)
     loop = luigi.BoolParameter(significant=False)
-    raw = luigi.BoolParameter(significant=False)
+    raw = luigi.BoolParameter(significant=True)
 
     def requires(self):
         return Calibration(self.root_config_path,
@@ -146,6 +147,8 @@ class DrillingRig(luigi.Task):
 
         target_config = cfu.diff_dict(power_on_default,
                                       target_config)
+        full_target_config = cfu.update_dict(power_on_default,
+                                             target_config)
         complete_config = {'daq': daq_system_config,
                            'target': target_config}
 
@@ -350,7 +353,7 @@ class DataField(luigi.Task):
 
         # this task is not required by the fracker so we do the usual merge job
         if self.output_format in self.supported_formats:
-            out_file = str(self.identifier) + '_merged.' + self.output_format
+            out_file = f'{self.label}_{self.identifier}_merged.{self.output_format}'
             raw_file_path = Path(self.output_dir) / out_file
             return luigi.LocalTarget(raw_file_path)
         raise KeyError("The output format for the scans needs to"
@@ -552,8 +555,13 @@ class Fracker(luigi.Task):
                 os.remove(raw_file.path)
                 os.remove(unpacked_file_path.as_posix())
                 continue
+            except FileNotFoundError:
+                os.remove(raw_file.path)
+                continue
+
             os.remove(raw_file.path)
             os.remove(unpacked_file_path.as_posix())
+
             # calculate the patch that needs to be applied
             patch = cfu.generate_patch(parameter, values[i])
 
@@ -566,8 +574,8 @@ class Fracker(luigi.Task):
             measurement_data.to_hdf(formatted_data_path, 'data')
             data_fragments.append(measurement_data)
 
-        for unpacked_file_path in expected_files:
-            if not unpacked_file_path.exists():
+        for formatted_file_path in expected_files:
+            if not formatted_file_path.exists():
                 raise ValueError('An unpacker failed, the datenraffinerie needs to be rerun')
 
         merged_data = pd.concat(data_fragments, ignore_index=True, axis=0)
