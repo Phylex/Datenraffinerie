@@ -90,6 +90,7 @@ class ValveYard(luigi.WrapperTask):
                         calibration=procedure['calibration'],
                         analysis_module_path=self.analysis_module_path,
                         network_config=self.network_config,
-                        loop=self.loop)
+                        loop=self.loop,
+                        raw=procedure['raw']) # indicate if to produce event by event data data
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")

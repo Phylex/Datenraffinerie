@@ -250,6 +250,13 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
     except KeyError:
         calibration = None
 
+    try:
+        raw_data = scan_config['raw_data']
+        if not isinstance(raw_data, bool):
+            raise ConfigFormatError("The raw_data field needs to contain a"
+                                    " boolean")
+    except KeyError:
+        raw_data = False
     # parse the daq-system configuration
     # build the path for the default config
     try:
@@ -363,6 +370,7 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
             'calibration': calibration,
             'name': daq_label,
             'type': 'daq',
+            'raw': raw_data,
             'target_power_on_default_config': target_power_on_config,
             'target_init_config': target_initial_config,
             'daq_system_config': daq_system_config,
