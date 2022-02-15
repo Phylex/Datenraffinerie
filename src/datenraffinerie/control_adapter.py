@@ -343,7 +343,7 @@ class DAQAdapter(ControlAdapter):
         check if the current aquisition is ongoing or not
         """
         rep = self._send_and_log('run_done')
-        if "notdone" in rep:
+        if "notdone" in rep.lower():
             return False
         return True
 
@@ -501,8 +501,7 @@ class DAQSystem:
         """
         self.client.start()
         self.server.start()
-        while not self.server.is_done() or\
-                len(os.listdir(self.daq_data_folder)) == 0:
+        while not self.server.is_done() or len(os.listdir(self.daq_data_folder)) == 0:
             sleep(0.01)
         data_files = os.listdir(self.daq_data_folder)
         if len(data_files) > 1:

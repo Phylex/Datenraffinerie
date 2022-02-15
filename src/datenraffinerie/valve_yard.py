@@ -78,7 +78,7 @@ class ValveYard(luigi.WrapperTask):
             resp = socket.recv()
             if resp != b'defaults loaded':
                 raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
-            if len(procedure['parameters']) == 1:
+            if len(procedure['parameters']) == 1 and self.loop:
                 return Fracker(identifier=0,
                                label=self.procedure_label,
                                output_dir=str(output_dir.resolve()),
