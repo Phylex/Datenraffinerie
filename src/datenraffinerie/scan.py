@@ -19,30 +19,17 @@ from . import analysis_utilities as anu
 def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False):
     # 'unpack' the data from the raw data gathered into a root file that
     # can then be merged with the configuration into a large table
-    _this_dir_ = Path('.')
     if raw_data:
-        # The commented sections are what I undestood Arnaud (the developer of unpack)
-        # had the unpacker require to produce root files containing every event.
-        # he has changed his statements so that only the commented code should be
-        # enough
-        # unpacker_opt_file_path = _this_dir_ / 'meta_opt.yaml'
-        # unpacker_options = {}
-        # unpacker_options['metaData'] = {'keepRawData': 1}
-        # with open(unpacker_opt_file_path, 'w') as unpacker_opt_file:
-        #     yaml.dump(unpacker_options, unpacker_opt_file)
-        output_type = ''
-        # metainfo_option = f'-M {unpacker_opt_file_path.absolute()}'
+        output_type = ' > /dev/null'
     else:
         output_type = ' -t unpacked'
     unpack_command = 'unpack'
     input_file = ' -i ' + str(in_file_path)
     output_command = ' -o ' + str(out_file_path)
     full_unpack_command = unpack_command + input_file + output_command\
-        + output_type
+        + output_type # + metainfo_option
     print(full_unpack_command)
     os.system(full_unpack_command)
-    # if raw_data:
-    #     os.remove(unpacker_opt_file_path)
 
 class Calibration(luigi.Task):
     """
@@ -176,13 +163,15 @@ class DrillingRig(luigi.Task):
 
         # load the data from the unpacked root file and merge in the
         # data from the configuration for that run with the data
-        measurement_data = anu.extract_data(data_file_path)
+        measurement_data = anu.extract_data(data_file_path, self.raw)
         os.remove(data_file_path)
         os.remove(raw_data_file_path)
         measurement_data = anu.add_channel_wise_data(measurement_data,
-                                                     full_target_config)
+                                                     full_target_config,
+                                                     self.raw)
         measurement_data = anu.add_half_wise_data(measurement_data,
-                                                  full_target_config)
+                                                  full_target_config,
+                                                  self.raw)
         with self.output().temporary_path() as tmp_out_path:
             measurement_data.to_hdf(tmp_out_path, 'data')
 
@@ -317,6 +306,7 @@ class DataField(luigi.Task):
                                                   self.calibration,
                                                   self.analysis_module_path,
                                                   self.network_config,
+                                                  self.loop,
                                                   self.raw))
         return required_tasks
 
@@ -550,7 +540,7 @@ class Fracker(luigi.Task):
             # load the data from the unpacked root file and merge in the
             # data from the configuration for that run with the data
             try:
-                measurement_data = anu.extract_data(unpacked_file_path)
+                measurement_data = anu.extract_data(unpacked_file_path, self.raw)
             except KeyInFileError:
                 os.remove(raw_file.path)
                 os.remove(unpacked_file_path.as_posix())

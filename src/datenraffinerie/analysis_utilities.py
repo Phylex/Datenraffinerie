@@ -98,12 +98,27 @@ def extract_data(rootfile, raw_data=False):
                     list(range(len(ttree[cname].array()))))
             return pd.DataFrame(run_data)
         else:
-            raise NotImplementedError(
-                "The extraction of individual events"
-                " has not been implemented")
+            run_data = {}
+            ttree = rfile['unpacker_data/hgcroc']
+            for cname in ttree.keys():
+                run_data[cname] = pd.Series(
+                    np.array(ttree[cname].array()),
+                    list(range(len(ttree[cname].array()))))
+            return pd.DataFrame(run_data)
 
+def compute_channel_type_from_event_data(chip, channel, half):
+    if channel <= 35:
+        out_channel = channel * (half + 1)
+        out_type = 0
+    if channel == 36:
+        out_channel = half
+        out_type = 1
+    if channel > 36:
+        out_channel = channel - 37 + (half * 2)
+        out_type = 100
+    return chip, out_channel, out_type
 
-def add_channel_wise_data(measurement_data: pd.DataFrame, complete_config: dict) -> pd.DataFrame:
+def add_channel_wise_data(measurement_data: pd.DataFrame, complete_config: dict, event_data: bool) -> pd.DataFrame:
     """Add channel wise data adds the data from the configuration
     to every channel that is specific to that channel
 
@@ -114,18 +129,24 @@ def add_channel_wise_data(measurement_data: pd.DataFrame, complete_config: dict)
               parameter that is channel specific the channels are determined by the
               names and types present in the measurement data.
     """
-    channel_keys = roc_channel_to_dict(0, 0, 0, complete_config)
+    channel_keys = roc_channel_to_dict(complete_config, 0, 0, 0)
     for key in channel_keys:
-        measurement_data[key] = measurement_data.apply(
-                lambda x: roc_channel_to_dict(
-                    x['chip'],
-                    x['channel'],
-                    x['channeltype'],
-                    complete_config)[key], axis=1)
+        if event_data:
+            measurement_data[key] = measurement_data.apply(
+                    lambda x: roc_channel_to_dict(
+                        complete_config,
+                        *compute_channel_type_from_event_data(x['chip'], x['channel'], x['half']))[key],
+                    axis=1)
+        else:
+            measurement_data[key] = measurement_data.apply(
+                    lambda x: roc_channel_to_dict(
+                        complete_config,
+                        x['chip'], x['channel'], x['channeltype'])[key],
+                    axis=1)
     return measurement_data
 
 
-def add_half_wise_data(measurement_data: pd.DataFrame, complete_config: dict) -> pd.DataFrame:
+def add_half_wise_data(measurement_data: pd.DataFrame, complete_config: dict, event_data: bool) -> pd.DataFrame:
     """add the config information of the chip half that corresponds to the particular
     channel
 
@@ -137,14 +158,21 @@ def add_half_wise_data(measurement_data: pd.DataFrame, complete_config: dict) ->
               parameters
 
     """
-    channel_keys = roc_channel_to_globals(0, 0, 1, complete_config)
+    channel_keys = roc_channel_to_globals(complete_config, 0, 0, 1)
     for key in channel_keys:
-        measurement_data[key] = measurement_data.apply(
-                lambda x: roc_channel_to_globals(
-                    x['chip'],
-                    x['channel'],
-                    x['channeltype'],
-                    complete_config)[key], axis=1)
+        if event_data:
+            measurement_data[key] = measurement_data.apply(
+                    lambda x: roc_channel_to_globals(
+                        complete_config,
+                        *compute_channel_type_from_event_data(x['chip'], x['channel'], x['half']))[key],
+                    axis=1)
+        else:
+            measurement_data[key] = measurement_data.apply(
+                    lambda x: roc_channel_to_globals(
+                        x['chip'],
+                        x['channel'],
+                        x['channeltype'],
+                        complete_config)[key], axis=1)
     return measurement_data
 
 
@@ -162,7 +190,8 @@ def add_global_data(measurement_data: pd.DataFrame, global_config: dict) -> pd.D
     """
     return measurement_data
 
-def roc_channel_to_dict(chip_id, channel_id, channel_type, complete_config):
+
+def roc_channel_to_dict(complete_config, chip_id, channel_id, channel_type):
     """Map a channel identifier to the correct part of the config
 
     :chip_id: chip_id from the measurement in range 0,1,2 for LD hexaboard
@@ -178,7 +207,7 @@ def roc_channel_to_dict(chip_id, channel_id, channel_type, complete_config):
         [channel_type_map[int(channel_type)]][int(channel_id)]
 
 
-def roc_channel_to_globals(chip_id, channel_id, channel_type, complete_config):
+def roc_channel_to_globals(complete_config, chip_id, channel_id, channel_type):
     """get the chip-half wise configuration from the 
 
     :chip_id: TODO
