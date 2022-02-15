@@ -163,17 +163,10 @@ class DrillingRig(luigi.Task):
 
         # load the data from the unpacked root file and merge in the
         # data from the configuration for that run with the data
-        measurement_data = anu.extract_data(data_file_path, self.raw)
-        os.remove(data_file_path)
+        output_path = self.output().temporary_path()
         os.remove(raw_data_file_path)
-        measurement_data = anu.add_channel_wise_data(measurement_data,
-                                                     full_target_config,
-                                                     self.raw)
-        measurement_data = anu.add_half_wise_data(measurement_data,
-                                                  full_target_config,
-                                                  self.raw)
-        with self.output().temporary_path() as tmp_out_path:
-            measurement_data.to_hdf(tmp_out_path, 'data')
+        anu.reformat_data(data_file_path, output_path, full_target_config, self.raw)
+        os.remove(data_file_path)
 
 
 class DataField(luigi.Task):
@@ -540,7 +533,10 @@ class Fracker(luigi.Task):
             # load the data from the unpacked root file and merge in the
             # data from the configuration for that run with the data
             try:
-                measurement_data = anu.extract_data(unpacked_file_path, self.raw)
+                # calculate the patch that needs to be applied
+                patch = cfu.generate_patch(parameter, values[i])
+                current_target_config = cfu.update_dict(target_config, patch)
+                anu.reformat_data(unpacked_file_path, formatted_data_path, self.raw)
             except KeyInFileError:
                 os.remove(raw_file.path)
                 os.remove(unpacked_file_path.as_posix())
@@ -552,24 +548,8 @@ class Fracker(luigi.Task):
             os.remove(raw_file.path)
             os.remove(unpacked_file_path.as_posix())
 
-            # calculate the patch that needs to be applied
-            patch = cfu.generate_patch(parameter, values[i])
-
-            # calculate the configuration to send to the backend
-            current_target_config = cfu.update_dict(target_config, patch)
-            measurement_data = anu.add_channel_wise_data(measurement_data,
-                                                         current_target_config,
-                                                         self.raw)
-            measurement_data = anu.add_half_wise_data(measurement_data,
-                                                      current_target_config,
-                                                      self.raw)
-            measurement_data.to_hdf(formatted_data_path, 'data')
-            data_fragments.append(measurement_data)
 
         for formatted_file_path in expected_files:
             if not formatted_file_path.exists():
                 raise ValueError('An unpacker failed, the datenraffinerie needs to be rerun')
-
-        merged_data = pd.concat(data_fragments, ignore_index=True, axis=0)
-        outfile = self.output().path
-        merged_data.to_hdf(outfile, 'data')
+        anu.merge_files(expected_files, self.output().path)

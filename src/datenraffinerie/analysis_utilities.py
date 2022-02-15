@@ -105,7 +105,7 @@ def extract_data(rootfile: str, raw_data=False):
         return pd.DataFrame(run_data)
 
 
-def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool):
+def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool, chunk_length=10000):
     hd_file = h5py.File(hdf_file, 'w')
     hd_file.create_group('data')
     data = hd_file['data']
@@ -120,10 +120,12 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
         ttree = rfile[tree_name]
         keys = list(ttree.keys())
         data.create_dataset('block0_items', data=keys, dtype='|S50')
-        data.create_dataset('axis0', data=keys, dtype='|S50')
         current_branch = ttree[keys[0]].array()
-        dset = data.create_dataset('block0_values', shape=(len(keys), len(current_branch)), dtype='f32')
-        data.create_dataset('axis1', data=np.array(range(len(current_branch))), dtype='i32')
+        dset = data.create_dataset('block0_values',
+                                   shape=(len(keys), len(current_branch)),
+                                   chunks=(len(keys), chunk_length),
+                                   dtype='f4')
+        data.create_dataset('axis1', data=np.array(range(len(current_branch))), dtype='i4')
         dset[0, :] = current_branch
         for i, key in keys[1:]:
             current_branch = ttree[key].array()
@@ -133,11 +135,20 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
         chan_config = roc_channel_to_dict(complete_config, 0, 0, 1)
         global_config = roc_channel_to_globals(complete_config, 0, 0, 1)
         config = chan_config.update(global_config)
+        # add the keys form the config to the axis0
+        for key in config.keys():
+            keys.append(key)
+        data.create_dataset('axis0', data=keys, dtype='|S50')
         data.create_dataset('block1_items', data=config.keys(), dtype='|S50')
         # create the 2D array with the every row being the chip channel and (half|channeltype)
-        chan_id_branches = np.array([ttree[branch_name].array() for branch_name in chan_id_branch_names]).transpose()
+        chan_id_branches = np.array([ttree[branch_name].array()
+                                    for branch_name in chan_id_branch_names]).transpose()
         # now that the dimensions are known create the dataset in the hdf5 file
-        conf_dset = data.create_dataset('block1_values', shape=(len(config.keys()), len(chan_id_branches)), dtype='i32')
+        conf_dset = data.create_dataset('block1_values',
+                                        shape=(len(config.keys()),
+                                               len(chan_id_branches)),
+                                        chunks=(len(config.keys()), chunk_length),
+                                        dtype='i4')
         # merge in the configuration
         for i, row in enumerate(chan_id_branches):
             if raw_data:
@@ -149,6 +160,46 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
             config = chan_config.update(global_config)
             conf_dset[:, i] = np.array([val for key, val in config.items()], dtype=np.int32)
     hd_file.close()
+
+
+def merge_files(in_files: str, out_file: str, group_name='data'):
+    out_f = h5py.File(out_file, 'w')
+    in_files = [h5py.File(in_f, 'r') for in_f in in_files]
+    o_data = out_f.create_group(group_name)
+    axis0 = list(in_files[0][group_name]['axis0'])
+    total_length = sum([len(in_f[group_name]['axis1']) for in_f in in_files])
+    o_data.create_dataset('axis0', data=axis0, dtype='|S50')
+    o_data.create_dataset('axis1', data=range(total_length), dtype='i4')
+    dataset_names = [('block0_items', 'block0_values'),
+                     ('block1_items', 'block0_values')]
+    dataset_type = ['f4', 'i4']
+    datasets = []
+    ds_keys = []
+    for names, typ in zip(dataset_names, dataset_type):
+        keys = list(in_files[0][group_name][names[0]])
+        o_data.create_dataset(names[0], data=keys, dtype='|S50')
+        ds_keys.append(keys)
+        datasets.append(o_data.create_dataset(names[1],
+                                              shape=(len(keys), total_length),
+                                              chunks=(len(keys), 10000),
+                                              dtype=typ))
+    counters = [0 for _ in ds_keys]
+    for in_f in in_files:
+        in_axis0 = list(in_f[group_name]['axis0'])
+        if in_axis0 != axis0:
+            raise ValueError('The axis of the files dont match')
+        for counter, keys, (key_name, val_name)\
+                in zip(counters, ds_keys, dataset_names):
+            in_keys = list(in_f[group_name][key_name])
+            if in_keys != keys:
+                raise ValueError(
+                        f'The {dataset_names[0]} items are misalligned')
+            for chunk in in_f[group_name][val_name].iter_chunks():
+                for row in chunk:
+                    o_data[val_name][counter] = row
+                    counter += 1
+        in_f.close()
+    out_f.close()
 
 
 def compute_channel_type_from_event_data(chip, channel, half):
