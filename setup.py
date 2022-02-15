@@ -18,6 +18,7 @@ setup(
         'zmq',
         'pytest',
         'awkward',
-        'tables'
+        'tables',
+        'h5py',
     ]
 )

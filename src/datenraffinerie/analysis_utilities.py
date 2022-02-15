@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import pytest
 import uproot
+import h5py
 import os
 import yaml
 from pathlib import Path
@@ -56,6 +57,7 @@ def create_measurement_dataframe(data_directory: str,
             pd.concat([r[1] for r in runs], axis=0),  # the calib channels
             pd.concat([r[2] for r in runs], axis=0))  # the common mode chans
 
+
 def split_channels(run_data, plot_channels):
     """
     split the dataset into three different sets, one for the
@@ -83,28 +85,71 @@ def extract_metadata(run_config_file):
         return meta_Data['run_params']
 
 
-def extract_data(rootfile, raw_data=False):
+def extract_data(rootfile: str, raw_data=False):
     """
     Extract the Data from the rootfile and put it
     into a Pandas dataframe
     """
+    if raw_data is False:
+        tree_name = 'runsummary/summary;1'
+    else:
+        tree_name = 'unpacker_data/hgcroc'
+
     with uproot.open(rootfile) as rfile:
-        if raw_data is False:
-            run_data = {}
-            ttree = rfile['runsummary/summary;1']
-            for cname in ttree.keys():
-                run_data[cname] = pd.Series(
-                    np.array(ttree[cname].array()),
-                    list(range(len(ttree[cname].array()))))
-            return pd.DataFrame(run_data)
-        else:
-            run_data = {}
-            ttree = rfile['unpacker_data/hgcroc']
-            for cname in ttree.keys():
-                run_data[cname] = pd.Series(
-                    np.array(ttree[cname].array()),
-                    list(range(len(ttree[cname].array()))))
-            return pd.DataFrame(run_data)
+        run_data = {}
+        ttree = rfile[tree_name]
+        for cname in ttree.keys():
+            run_data[cname] = pd.Series(
+                np.array(ttree[cname].array()),
+                list(range(len(ttree[cname].array()))))
+        return pd.DataFrame(run_data)
+
+
+def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool):
+    hd_file = h5py.File(hdf_file, 'w')
+    hd_file.create_group('data')
+    data = hd_file['data']
+    if raw_data:
+        tree_name = 'unpacker_data/hgcroc'
+        chan_id_branch_names = ['chip', 'channel', 'half']
+    else:
+        tree_name = 'runsummary/summary;1'
+        chan_id_branch_names = ['chip', 'channel', 'channeltype']
+    with uproot.open(rootfile) as rfile:
+        # extract the data from the root file
+        ttree = rfile[tree_name]
+        keys = list(ttree.keys())
+        data.create_dataset('block0_items', data=keys, dtype='|S50')
+        data.create_dataset('axis0', data=keys, dtype='|S50')
+        current_branch = ttree[keys[0]].array()
+        dset = data.create_dataset('block0_values', shape=(len(keys), len(current_branch)), dtype='f32')
+        data.create_dataset('axis1', data=np.array(range(len(current_branch))), dtype='i32')
+        dset[0, :] = current_branch
+        for i, key in keys[1:]:
+            current_branch = ttree[key].array()
+            dset[i, :] = current_branch
+
+        # now merge in the configuration
+        chan_config = roc_channel_to_dict(complete_config, 0, 0, 1)
+        global_config = roc_channel_to_globals(complete_config, 0, 0, 1)
+        config = chan_config.update(global_config)
+        data.create_dataset('block1_items', data=config.keys(), dtype='|S50')
+        # create the 2D array with the every row being the chip channel and (half|channeltype)
+        chan_id_branches = np.array([ttree[branch_name].array() for branch_name in chan_id_branch_names]).transpose()
+        # now that the dimensions are known create the dataset in the hdf5 file
+        conf_dset = data.create_dataset('block1_values', shape=(len(config.keys()), len(chan_id_branches)), dtype='i32')
+        # merge in the configuration
+        for i, row in enumerate(chan_id_branches):
+            if raw_data:
+                chip, chan, chan_type = compute_channel_type_from_event_data(row[0], row[1], row[2])
+            else:
+                chip, chan, chan_type = (row[0], row[1], row[2])
+            chan_config = roc_channel_to_dict(complete_config, chip, chan, chan_type)
+            global_config = roc_channel_to_globals(complete_config, chip, chan, chan_type)
+            config = chan_config.update(global_config)
+            conf_dset[:, i] = np.array([val for key, val in config.items()], dtype=np.int32)
+    hd_file.close()
+
 
 def compute_channel_type_from_event_data(chip, channel, half):
     if channel <= 35:
@@ -117,78 +162,6 @@ def compute_channel_type_from_event_data(chip, channel, half):
         out_channel = channel - 37 + (half * 2)
         out_type = 100
     return chip, out_channel, out_type
-
-def add_channel_wise_data(measurement_data: pd.DataFrame, complete_config: dict, event_data: bool) -> pd.DataFrame:
-    """Add channel wise data adds the data from the configuration
-    to every channel that is specific to that channel
-
-    :measurement_data: data that was gathered from the chip
-    :complete_config: the complete configuration (so the default config with the
-                      patch appled that is the measurement configuration
-    :returns: a pandas dataframe where a column has been added for each configuration
-              parameter that is channel specific the channels are determined by the
-              names and types present in the measurement data.
-    """
-    channel_keys = roc_channel_to_dict(complete_config, 0, 0, 0)
-    for key in channel_keys:
-        if event_data:
-            measurement_data[key] = measurement_data.apply(
-                    lambda x: roc_channel_to_dict(
-                        complete_config,
-                        *compute_channel_type_from_event_data(x['chip'], x['channel'], x['half']))[key],
-                    axis=1)
-        else:
-            measurement_data[key] = measurement_data.apply(
-                    lambda x: roc_channel_to_dict(
-                        complete_config,
-                        x['chip'], x['channel'], x['channeltype'])[key],
-                    axis=1)
-    return measurement_data
-
-
-def add_half_wise_data(measurement_data: pd.DataFrame, complete_config: dict, event_data: bool) -> pd.DataFrame:
-    """add the config information of the chip half that corresponds to the particular
-    channel
-
-    :measurement_data: data measured from the rocs
-    :complete_config: configuration of the rocs at the time of measurement.
-        the half wise parameters of the rocs from this config will be added to every
-        channel of the corresponding half in the `measurement_data`
-    :returns: the dataframe measurement_data with added columns for the half wise
-              parameters
-
-    """
-    channel_keys = roc_channel_to_globals(complete_config, 0, 0, 1)
-    for key in channel_keys:
-        if event_data:
-            measurement_data[key] = measurement_data.apply(
-                    lambda x: roc_channel_to_globals(
-                        complete_config,
-                        *compute_channel_type_from_event_data(x['chip'], x['channel'], x['half']))[key],
-                    axis=1)
-        else:
-            measurement_data[key] = measurement_data.apply(
-                    lambda x: roc_channel_to_globals(
-                        x['chip'],
-                        x['channel'],
-                        x['channeltype'],
-                        complete_config)[key], axis=1)
-    return measurement_data
-
-
-def add_global_data(measurement_data: pd.DataFrame, global_config: dict) -> pd.DataFrame:
-    """add global Data to the dataframe. Currently there is no global data
-    so there is nothing to add
-
-    :measurement_data: the dataframe that the global parameters should be added to
-    :global_config: the configuration containing the global parameter that should
-        be added to the measurement dataframe (it will be added to every channel of every
-        chip)
-    :returns: Data with the the global parameters added to every channel currently nothing
-        is done
-
-    """
-    return measurement_data
 
 
 def roc_channel_to_dict(complete_config, chip_id, channel_id, channel_type):
