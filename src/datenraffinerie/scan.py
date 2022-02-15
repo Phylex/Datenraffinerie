@@ -558,9 +558,11 @@ class Fracker(luigi.Task):
             # calculate the configuration to send to the backend
             current_target_config = cfu.update_dict(target_config, patch)
             measurement_data = anu.add_channel_wise_data(measurement_data,
-                                                         current_target_config)
+                                                         current_target_config,
+                                                         self.raw)
             measurement_data = anu.add_half_wise_data(measurement_data,
-                                                      current_target_config)
+                                                      current_target_config,
+                                                      self.raw)
             measurement_data.to_hdf(formatted_data_path, 'data')
             data_fragments.append(measurement_data)
 
