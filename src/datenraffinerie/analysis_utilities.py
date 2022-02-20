@@ -6,11 +6,12 @@ import pandas as pd
 import numpy as np
 import pytest
 import uproot
-import h5py
+import tables
 import os
 import yaml
 from pathlib import Path
 import subprocess
+from numba import jit
 
 
 class AnalysisError(Exception):
@@ -106,9 +107,25 @@ def extract_data(rootfile: str, raw_data=False):
 
 
 def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool, chunk_length=10000):
-    hd_file = h5py.File(hdf_file, 'w')
-    hd_file.create_group('data')
-    data = hd_file['data']
+    """ take in the unpacked root data and reformat into an hdf5 file.
+    Also add in the configuration from the run.
+    """
+    hd_file = tables.open_file(hdf_file, 'w')
+    data = hd_file.create_group('/', 'data')
+    # create the attributes that are needed for pandas to
+    # be able to read the hdf5 file as a dataframe
+    data._v_attrs['axis0_variety'] = 'regular'
+    data._v_attrs['axis1_variety'] = 'regular'
+    data._v_attrs['block0_items_variety'] = 'regular'
+    data._v_attrs['block1_items_variety'] = 'regular'
+    data._v_attrs['encoding'] = 'UTF-8'
+    data._v_attrs['errors'] = 'strict'
+    data._v_attrs['ndim'] = 2
+    data._v_attrs['nblocks'] = 2
+    data._v_attrs['pandas_type'] = 'frame'
+    data._v_attrs['pandas_version'] = '0.15.2'
+
+    # get the data from the 
     if raw_data:
         tree_name = 'unpacker_data/hgcroc'
         chan_id_branch_names = ['chip', 'channel', 'half']
@@ -119,50 +136,89 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
         # extract the data from the root file
         ttree = rfile[tree_name]
         keys = list(ttree.keys())
-        data.create_dataset('block0_items', data=keys, dtype='|S50')
-        current_branch = ttree[keys[0]].array()
-        dset = data.create_dataset('block0_values',
-                                   shape=(len(keys), len(current_branch)),
-                                   chunks=(len(keys), chunk_length),
-                                   dtype='f4')
-        data.create_dataset('axis1', data=np.array(range(len(current_branch))), dtype='i4')
-        dset[0, :] = current_branch
-        for i, key in keys[1:]:
-            current_branch = ttree[key].array()
-            dset[i, :] = current_branch
+        root_data = np.array([ttree[key].array() for key in keys]).transpose()
+        total_length = len(root_data)
 
-        # now merge in the configuration
+        # create the hdf5 data structure for pandas
+        b0_items = hd_file.create_array('/data', 'block0_items', np.array(keys))
+        b0_items._v_attrs['kind'] = 'string'
+        b0_items._v_attrs['name'] = 'N.'
+        b0_items._v_attrs['transposed'] = 1
+
+        axis1 = hd_file.create_earray('/data', 'axis1', tables.IntAtom(),
+                                      shape=(0,),
+                                      expectedrows=total_length)
+        axis1.append(np.array(range(total_length)))
+        axis1._v_attrs['kind'] = 'integer'
+        axis1._v_attrs['name'] = 'N.'
+        axis1._v_attrs['transposed'] = 1
+
+        # fill the data from the root file into the hdf5
+        b0_values = hd_file.create_earray('/data', 'block0_values',
+                                          atom=tables.Float32Atom(len(keys)),
+                                          shape=(0,),
+                                          expectedrows=total_length)
+        b0_values.append(root_data)
+        b0_values._v_attrs['transposed'] = 1
+        hd_file.flush()
+
+        # determin the size of the block that holds the configuration
         chan_config = roc_channel_to_dict(complete_config, 0, 0, 1)
         global_config = roc_channel_to_globals(complete_config, 0, 0, 1)
-        config = chan_config.update(global_config)
-        # add the keys form the config to the axis0
-        for key in config.keys():
+        chan_config.update(global_config)
+        config_atom = tables.Int32Atom(shape=len(chan_config.values()))
+
+        # create the rest of the needed data structures for the pandas dataframe
+        for key in chan_config.keys():
             keys.append(key)
-        data.create_dataset('axis0', data=keys, dtype='|S50')
-        data.create_dataset('block1_items', data=config.keys(), dtype='|S50')
-        # create the 2D array with the every row being the chip channel and (half|channeltype)
+        axis0 = hd_file.create_array('/data', 'axis0', np.array(keys))
+        axis0._v_attrs['kind'] = 'string'
+        axis0._v_attrs['name'] = 'N.'
+        axis0._v_attrs['transposed'] = 1
+        b1_items = hd_file.create_array('/data', 'block1_items',
+                                        np.array([str(k) for k in chan_config.keys()]))
+        b1_items._v_attrs['kind'] = 'string'
+        b1_items._v_attrs['name'] = 'N.'
+        b1_items._v_attrs['transposed'] = 1
+
+        # create the 2D array with every row being the chip channel and  (half|channeltype)
         chan_id_branches = np.array([ttree[branch_name].array()
-                                    for branch_name in chan_id_branch_names]).transpose()
-        # now that the dimensions are known create the dataset in the hdf5 file
-        conf_dset = data.create_dataset('block1_values',
-                                        shape=(len(config.keys()),
-                                               len(chan_id_branches)),
-                                        chunks=(len(config.keys()), chunk_length),
-                                        dtype='i4')
+                                     for branch_name in chan_id_branch_names],
+                                    dtype=np.int32).transpose()
+        conf_dset = hd_file.create_earray('/data',
+                                          'block1_values',
+                                          atom=config_atom,
+                                          shape=(0,),
+                                          expectedrows=len(chan_id_branches))
+        conf_dset._v_attrs['transposed'] = 1
         # merge in the configuration
-        for i, row in enumerate(chan_id_branches):
-            if raw_data:
-                chip, chan, chan_type = compute_channel_type_from_event_data(row[0], row[1], row[2])
-            else:
-                chip, chan, chan_type = (row[0], row[1], row[2])
-            chan_config = roc_channel_to_dict(complete_config, chip, chan, chan_type)
-            global_config = roc_channel_to_globals(complete_config, chip, chan, chan_type)
-            config = chan_config.update(global_config)
-            conf_dset[:, i] = np.array([val for key, val in config.items()], dtype=np.int32)
-    hd_file.close()
+        add_config_to_dataset(chan_id_branches, conf_dset, complete_config, raw_data)
+
+
+@jit()
+def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, raw_data: bool):
+    """ generate a single row of the configuration to load into the
+    merge into the hdf5 file
+    """
+    for row in chip_chan_indices:
+        chip, chan, half_or_type = row[0], row[1], row[2]
+        if raw_data:
+            chip, chan, chan_type = compute_channel_type_from_event_data(chip,
+                                                                         chan,
+                                                                         half_or_type)
+        else:
+            chip, chan, chan_type = (chip, chan, half_or_type)
+        chan_config = roc_channel_to_dict(complete_config, chip, chan, chan_type)
+        global_config = roc_channel_to_globals(complete_config,
+                                               chip, chan, chan_type)
+        chan_config.update(global_config)
+    dataset.append(np.array([np.array(list(chan_config.values()))]))
 
 
 def merge_files(in_files: str, out_file: str, group_name='data'):
+    """ take multiple hdf5 files from the individual runs and merge them together into a single
+    file
+    """
     out_f = h5py.File(out_file, 'w')
     in_files = [h5py.File(in_f, 'r') for in_f in in_files]
     o_data = out_f.create_group(group_name)
@@ -181,7 +237,7 @@ def merge_files(in_files: str, out_file: str, group_name='data'):
         ds_keys.append(keys)
         datasets.append(o_data.create_dataset(names[1],
                                               shape=(len(keys), total_length),
-                                              chunks=(len(keys), 10000),
+                                              chunks=(len(keys), 10000 if total_length > 10000 else total_length),
                                               dtype=typ))
     counters = [0 for _ in ds_keys]
     for in_f in in_files:
