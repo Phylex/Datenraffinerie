@@ -428,13 +428,7 @@ class DataField(luigi.Task):
         else:
             in_files = [data_file.path for data_file in self.input()]
             # merge the data together
-            data_segments = []
-            for data_file in in_files:
-                data_segments.append(pd.read_hdf(data_file))
-            merged_data = pd.concat(data_segments, ignore_index=True, axis=0)
-            with self.output().temporary_path() as outfile:
-                merged_data.to_hdf(outfile, 'data')
-
+            anu.merge_files(in_files, self.output().path, self.raw)
 
 class Fracker(luigi.Task):
     """
