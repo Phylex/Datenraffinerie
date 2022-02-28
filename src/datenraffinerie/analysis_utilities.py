@@ -10,6 +10,7 @@ import tables
 import os
 import yaml
 from pathlib import Path
+import shutil
 import subprocess
 from numba import jit
 
@@ -17,73 +18,6 @@ from numba import jit
 class AnalysisError(Exception):
     def __init__(self, message):
         self.message = message
-
-
-def create_measurement_dataframe(data_directory: str,
-                                 channels_of_interest: list):
-    """
-    get the data from the *.root and the metadata from the *.yaml
-    files and merge them together into a dataframe.
-
-    This function parses and combines all the data from the root and
-    yaml files into a single pandas dataframe. While performing the
-    merging, only the channels selected in the *.yaml['chip_params']
-    dictionary entry are selected to be merged together. All other
-    channels are ignored. The selection of channels happens for each run
-    so the channels of different runs may be different. All files are
-    merged into a single pandas dataframe.
-    """
-    runs = []
-    data_directory = Path(data_directory)
-    rootfiles = [rf for rf in data_directory.iterdir()
-            if os.path.splitext(rf)[1] == '.root']
-    for rootfile in rootfiles:
-        run_config_file = Path(os.path.splitext(rootfile)[0]+'.yaml')
-        if run_config_file.is_file():
-            run_config = extract_metadata(run_config_file)
-            if run_config['keepRawData'] == 1:
-                raise NotImplementedError("raw data mode not implemented")
-            else:
-                run_data = extract_data(rootfile)
-            runs.append((run_data, run_config))
-        else:
-            raise AnalysisError(
-                f"There was no {run_config_file} for {rootfile}")
-    for i, run in enumerate(runs):
-        runs[i] = merge_in_config_params(run[0], run[1])
-    for i, run in enumerate(runs):
-        runs[i] = split_channels(run, channels_of_interest)
-
-    return (pd.concat([r[0] for r in runs], axis=0),  # the channels
-            pd.concat([r[1] for r in runs], axis=0),  # the calib channels
-            pd.concat([r[2] for r in runs], axis=0))  # the common mode chans
-
-
-def split_channels(run_data, plot_channels):
-    """
-    split the dataset into three different sets, one for the
-    normal channels, one for the calibration channels and one for the
-    common mode channels.
-    Also create the chip-'half' identifier in the data
-
-    From the channels filter out the channels of interest
-    """
-    channel_data = pd.concat([run_data[run_data['channel'] == chan]
-                             for chan in plot_channels])
-    channel_data = channel_data[channel_data['channeltype'] == 0]
-    channel_data.assign(half=(channel_data.channel//36)+1)
-    calibration_channel_data = run_data[run_data['channeltype'] == 100]
-    common_mode_data = run_data[run_data['channeltype'] == 1]
-    return (channel_data, calibration_channel_data, common_mode_data)
-
-
-def extract_metadata(run_config_file):
-    """
-    Interpret the metadata from the yaml file
-    """
-    with open(run_config_file, 'r') as file:
-        meta_Data = yaml.safe_load(file.read())
-        return meta_Data['run_params']
 
 
 def extract_data(rootfile: str, raw_data=False):
@@ -110,7 +44,9 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
     """ take in the unpacked root data and reformat into an hdf5 file.
     Also add in the configuration from the run.
     """
-    hd_file = tables.open_file(hdf_file, 'w')
+    # create a compression filter
+    compression_filter = tables.Filters(complib='zlib', complevel=5)
+    hd_file = tables.open_file(hdf_file, mode='w', filters=compression_filter)
     data = hd_file.create_group('/', 'data')
     # create the attributes that are needed for pandas to
     # be able to read the hdf5 file as a dataframe
@@ -124,6 +60,7 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
     data._v_attrs['nblocks'] = 2
     data._v_attrs['pandas_type'] = 'frame'
     data._v_attrs['pandas_version'] = '0.15.2'
+
 
     # get the data from the 
     if raw_data:
@@ -189,18 +126,66 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
                                           'block1_values',
                                           atom=config_atom,
                                           shape=(0,),
-                                          expectedrows=len(chan_id_branches))
+                                          expectedrows=total_length)
         conf_dset._v_attrs['transposed'] = 1
         # merge in the configuration
-        add_config_to_dataset(chan_id_branches, conf_dset, complete_config, raw_data)
+        add_config_to_dataset(chan_id_branches, conf_dset, complete_config, 10000, raw_data)
+    hd_file.close()
 
 
 @jit()
-def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, raw_data: bool):
-    """ generate a single row of the configuration to load into the
-    merge into the hdf5 file
+def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chunklength: int, raw_data: bool):
     """
-    for row in chip_chan_indices:
+    Add the configuration to the dataset
+
+    extract the configuration for the chip/channel/type from the complete configuration
+    for every row in the data and add it to the 'block1_values' EArray of the hdf5 file
+
+    This function expects that the EArray has been created and all the neccesary metadata written
+    it will simply add extract the data and append it to the EArray
+
+    Parameters
+    ----------
+    chip_chan_indices : numpy.ndarray
+        a 2D array where every row corresponds to [chip, channel, half_or_type]
+    dataset : tables.EArray
+        the EArray that the data needs to be added to
+    complete_config : dict
+        the complete configuration of the chip at the time of the measurement
+    chunklength : int
+        the number of rows in a chunk of the hdf file this
+    """
+    chan_config = roc_channel_to_dict(complete_config, 0, 0, 1)
+    global_config = roc_channel_to_globals(complete_config,
+                                           0, 0, 1)
+    chan_config.update(global_config)
+    chunks = int(len(chip_chan_indices) / chunklength)
+    for i in range(chunks):
+        chunk_array = np.zeros(shape=(chunklength, len(chan_config.items())))
+        for j in range(chunklength):
+            row = chip_chan_indices[i*chunklength+j]
+            chip, chan, half_or_type = row[0], row[1], row[2]
+            if raw_data:
+                chip, chan, chan_type = compute_channel_type_from_event_data(chip,
+                                                                             chan,
+                                                                             half_or_type)
+            else:
+                chan_type = half_or_type
+            chan_config = roc_channel_to_dict(complete_config,
+                                              chip,
+                                              chan,
+                                              chan_type)
+            global_config = roc_channel_to_globals(complete_config,
+                                                   chip, chan, chan_type)
+            chan_config.update(global_config)
+            chunk_array[j] = np.array(list(chan_config.values()))
+        dataset.append(chunk_array)
+    # add to the configuration to the last of the items that dont fully
+    # fill up a chunk
+    remaining_items = chip_chan_indices[chunks*chunklength:]
+    chunk_array = np.zeros(shape=(len(remaining_items),
+                                  len(chan_config.items())))
+    for j, row in enumerate(remaining_items):
         chip, chan, half_or_type = row[0], row[1], row[2]
         if raw_data:
             chip, chan, chan_type = compute_channel_type_from_event_data(chip,
@@ -212,53 +197,56 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, raw
         global_config = roc_channel_to_globals(complete_config,
                                                chip, chan, chan_type)
         chan_config.update(global_config)
-    dataset.append(np.array([np.array(list(chan_config.values()))]))
+        chunk_array[j] = np.array(list(chan_config.values()))
+    dataset.append(chunk_array)
 
 
-def merge_files(in_files: str, out_file: str, group_name='data'):
-    """ take multiple hdf5 files from the individual runs and merge them together into a single
-    file
+def merge_files(in_files: list, out_file: str, group_name: str='data'):
     """
-    out_f = h5py.File(out_file, 'w')
-    in_files = [h5py.File(in_f, 'r') for in_f in in_files]
-    o_data = out_f.create_group(group_name)
-    axis0 = list(in_files[0][group_name]['axis0'])
-    total_length = sum([len(in_f[group_name]['axis1']) for in_f in in_files])
-    o_data.create_dataset('axis0', data=axis0, dtype='|S50')
-    o_data.create_dataset('axis1', data=range(total_length), dtype='i4')
-    dataset_names = [('block0_items', 'block0_values'),
-                     ('block1_items', 'block0_values')]
-    dataset_type = ['f4', 'i4']
-    datasets = []
-    ds_keys = []
-    for names, typ in zip(dataset_names, dataset_type):
-        keys = list(in_files[0][group_name][names[0]])
-        o_data.create_dataset(names[0], data=keys, dtype='|S50')
-        ds_keys.append(keys)
-        datasets.append(o_data.create_dataset(names[1],
-                                              shape=(len(keys), total_length),
-                                              chunks=(len(keys), 10000 if total_length > 10000 else total_length),
-                                              dtype=typ))
-    counters = [0 for _ in ds_keys]
+    Merge the files of the different runs into a single file containing all
+    the data
+    """
+    start_file = in_files[0]
+    in_files = [tables.open_file(in_f, 'r') for in_f in in_files[1:]]
+    # compression_filter = tables.Filters(complib='zlib', complevel=5)
+    # copy the first of the input files to become the merged output
+    shutil.copy(start_file, out_file)
+    hd_file = tables.open_file(out_file, mode='r+')
+    block0_items = hd_file.root.data.block0_items
+    blk0 = hd_file.root.data.block0_values
+    block1_items = hd_file.root.data.block1_items
+    blk1 = hd_file.root.data.block1_values
+    chunksize = 10000
     for in_f in in_files:
-        in_axis0 = list(in_f[group_name]['axis0'])
-        if in_axis0 != axis0:
-            raise ValueError('The axis of the files dont match')
-        for counter, keys, (key_name, val_name)\
-                in zip(counters, ds_keys, dataset_names):
-            in_keys = list(in_f[group_name][key_name])
-            if in_keys != keys:
-                raise ValueError(
-                        f'The {dataset_names[0]} items are misalligned')
-            for chunk in in_f[group_name][val_name].iter_chunks():
-                for row in chunk:
-                    o_data[val_name][counter] = row
-                    counter += 1
+        in_blk0 = in_f.root.data.block0_items
+        in_blk1 = in_f.root.data.block1_items
+        for elem, in_elem in zip(block0_items, in_blk0):
+            if elem != in_elem:
+                raise AnalysisError('the block0_items of the files to be merged must match')
+        for elem, in_elem in zip(block1_items, in_blk1):
+            if elem != in_elem:
+                raise AnalysisError('the block1_items of the files to be merged must match')
+        in_blk0 = in_f.root.data.block0_values
+        in_blk1 = in_f.root.data.block1_values
+        # append the data for block0
+        chunks = len(in_blk0) // chunksize
+        for chunk in range(chunks):
+            start = chunk * chunksize
+            stop = start + chunksize
+            blk0.append(in_blk0.read(start, stop))
+        blk0.append(in_blk0.read(chunks*chunksize, len(in_blk0)))
+        # append the data for block1
+        chunks = len(in_blk1) // chunksize
+        for chunk in range(chunks):
+            start = chunk * chunksize
+            stop = start + chunksize
+            blk1.append(in_blk1.read(start, stop))
+        blk1.append(in_blk1.read(chunks*chunksize, len(in_blk1)))
         in_f.close()
-    out_f.close()
 
 
-def compute_channel_type_from_event_data(chip, channel, half):
+@jit(nopython=True)
+def compute_channel_type_from_event_data(chip: int, channel: int, half: int):
     if channel <= 35:
         out_channel = channel * (half + 1)
         out_type = 0
@@ -271,7 +259,8 @@ def compute_channel_type_from_event_data(chip, channel, half):
     return chip, out_channel, out_type
 
 
-def roc_channel_to_dict(complete_config, chip_id, channel_id, channel_type):
+@jit(nopython=False, forceobj=True)
+def roc_channel_to_dict(complete_config: dict, chip_id: int, channel_id: int, channel_type: int) -> dict:
     """Map a channel identifier to the correct part of the config
 
     :chip_id: chip_id from the measurement in range 0,1,2 for LD hexaboard
@@ -287,7 +276,7 @@ def roc_channel_to_dict(complete_config, chip_id, channel_id, channel_type):
         [channel_type_map[int(channel_type)]][int(channel_id)]
 
 
-def roc_channel_to_globals(complete_config, chip_id, channel_id, channel_type):
+def roc_channel_to_globals(complete_config: dict, chip_id: int, channel_id: int, channel_type: int) -> dict:
     """get the chip-half wise configuration from the 
 
     :chip_id: TODO
@@ -320,28 +309,6 @@ def roc_channel_to_globals(complete_config, chip_id, channel_id, channel_type):
     return result
 
 
-def merge_in_config_params(run_data: pd.DataFrame, run_config: dict):
-    """
-    merge the run_data with the chip parameters for that run
-
-    Note: for the injected_channels chip parameter a column is added
-          that is true when the channel was injected into and false
-          otherwise.
-    """
-    run_params = run_config
-    for param in run_params.keys():
-        if param == 'injection_channels':
-            injected_channels = run_params['injection_channels']
-            run_data['injected'] = [y in injected_channels
-                                    for y in run_data['channel']]
-        elif param not in run_data.columns:
-            run_param = pd.Series(run_params[param],
-                                  index=run_data.index,
-                                  name=param)
-            run_data = pd.concat([run_data, run_param], axis=1)
-    return run_data
-
-
 def test_extract_data():
     test_root_path = Path('../../tests/data/run.root')
     frame = extract_data(test_root_path.resolve())
@@ -356,49 +323,223 @@ def test_extract_data():
         _ = frame[col]
 
 
-def test_add_channel_wise_data():
+def test_reformat_data():
     """ test that all the channel wise parameters appear as a
     column in the dataframe
     """
     from . import config_utilities as cfu
-    test_data_path = Path('../../tests/data/run.root')
-    frame = extract_data(test_data_path.resolve())
+    test_data_path = Path('../../tests/data/event_run.root')
+    test_hdf_path = Path('../../tests/data/event_run.hdf5')
     configuration = cfu.load_configuration('../../tests/data/default.yaml')
     overlay = cfu.load_configuration('../../tests/data/run.yaml')
-    configuration = cfu.update_dict(configuration, overlay)
-    frame = add_channel_wise_data(frame, configuration)
-    expected_columns = ['Adc_pedestal',
-                        'Channel_off',
-                        'DAC_CAL_CTDC_TOA',
-                        'DAC_CAL_CTDC_TOT',
-                        'DAC_CAL_FTDC_TOA',
-                        'DAC_CAL_FTDC_TOT',
-                        'DIS_TDC',
-                        'ExtData',
-                        'HZ_inv',
-                        'HZ_noinv',
-                        'HighRange',
-                        'IN_FTDC_ENCODER_TOA',
-                        'IN_FTDC_ENCODER_TOT',
-                        'Inputdac',
-                        'LowRange',
-                        'mask_AlignBuffer',
-                        'mask_adc',
-                        'mask_toa',
-                        'mask_tot',
-                        'probe_inv',
-                        'probe_noinv',
-                        'probe_pa',
-                        'probe_toa',
-                        'probe_tot',
-                        'sel_trig_toa',
-                        'sel_trig_tot',
-                        'trim_inv',
-                        'trim_toa',
-                        'trim_tot'
-                       ]
-    for col in expected_columns:
-        print(col, frame[col])
+    configuration.update(overlay)
+    reformat_data(test_data_path, test_hdf_path, configuration, True)
+    expected_columns = [
+        'Adc_pedestal',
+        'Channel_off',
+        'DAC_CAL_CTDC_TOA',
+        'DAC_CAL_CTDC_TOT',
+        'DAC_CAL_FTDC_TOA',
+        'DAC_CAL_FTDC_TOT',
+        'DIS_TDC',
+        'ExtData',
+        'HZ_inv',
+        'HZ_noinv',
+        'HighRange',
+        'IN_FTDC_ENCODER_TOA',
+        'IN_FTDC_ENCODER_TOT',
+        'Inputdac',
+        'LowRange',
+        'mask_AlignBuffer',
+        'mask_adc',
+        'mask_toa',
+        'mask_tot',
+        'probe_inv',
+        'probe_noinv',
+        'probe_pa',
+        'probe_toa',
+        'probe_tot',
+        'sel_trig_toa',
+        'sel_trig_tot',
+        'trim_inv',
+        'trim_toa',
+        'trim_tot',
+        'Adc_TH',
+        'Bx_offset',
+        'CalibrationSC',
+        'ClrAdcTot_trig',
+        'IdleFrame',
+        'L1Offset',
+        'MultFactor',
+        'SC_testRAM',
+        'SelTC4',
+        'Tot_P0',
+        'Tot_P1',
+        'Tot_P2',
+        'Tot_P3',
+        'Tot_P_Add',
+        'Tot_TH0',
+        'Tot_TH1',
+        'Tot_TH2',
+        'Tot_TH3',
+        'sc_testRAM',
+        'Cf',
+        'Cf_comp',
+        'Clr_ADC',
+        'Clr_ShaperTail',
+        'Delay40',
+        'Delay65',
+        'Delay87',
+        'Delay9',
+        'En_hyst_tot',
+        'Ibi_inv',
+        'Ibi_inv_buf',
+        'Ibi_noinv',
+        'Ibi_noinv_buf',
+        'Ibi_sk',
+        'Ibo_inv',
+        'Ibo_inv_buf',
+        'Ibo_noinv',
+        'Ibo_noinv_buf',
+        'Ibo_sk',
+        'ON_pa',
+        'ON_ref_adc',
+        'ON_rtr',
+        'ON_toa',
+        'ON_tot',
+        'Rc',
+        'Rf',
+        'S_inv',
+        'S_inv_buf',
+        'S_noinv',
+        'S_noinv_buf',
+        'S_sk',
+        'SelExtADC',
+        'SelRisingEdge',
+        'dac_pol',
+        'gain_tot',
+        'neg',
+        'pol_trig_toa',
+        'range_indac',
+        'range_inv',
+        'range_tot',
+        'ref_adc',
+        'trim_vbi_pa',
+        'trim_vbo_pa',
+        'BIAS_CAL_DAC_CTDC_P_D',
+        'BIAS_CAL_DAC_CTDC_P_EN',
+        'BIAS_FOLLOWER_CAL_P_CTDC_EN',
+        'BIAS_FOLLOWER_CAL_P_D',
+        'BIAS_FOLLOWER_CAL_P_FTDC_D',
+        'BIAS_FOLLOWER_CAL_P_FTDC_EN',
+        'BIAS_I_CTDC_D',
+        'BIAS_I_FTDC_D',
+        'CALIB_CHANNEL_DLL',
+        'CTDC_CALIB_FREQUENCY',
+        'CTRL_IN_REF_CTDC_P_D',
+        'CTRL_IN_REF_CTDC_P_EN',
+        'CTRL_IN_REF_FTDC_P_D',
+        'CTRL_IN_REF_FTDC_P_EN',
+        'CTRL_IN_SIG_CTDC_P_D',
+        'CTRL_IN_SIG_CTDC_P_EN',
+        'CTRL_IN_SIG_FTDC_P_D',
+        'CTRL_IN_SIG_FTDC_P_EN',
+        'EN_MASTER_CTDC_DLL',
+        'EN_MASTER_CTDC_VOUT_INIT',
+        'EN_MASTER_FTDC_DLL',
+        'EN_MASTER_FTDC_VOUT_INIT',
+        'EN_REF_BG',
+        'FOLLOWER_CTDC_EN',
+        'FOLLOWER_FTDC_EN',
+        'FTDC_CALIB_FREQUENCY',
+        'GLOBAL_DISABLE_TOT_LIMIT',
+        'GLOBAL_EN_BUFFER_CTDC',
+        'GLOBAL_EN_BUFFER_FTDC',
+        'GLOBAL_EN_TOT_PRIORITY',
+        'GLOBAL_EN_TUNE_GAIN_DAC',
+        'GLOBAL_FORCE_EN_CLK',
+        'GLOBAL_FORCE_EN_OUTPUT_DATA',
+        'GLOBAL_FORCE_EN_TOT',
+        'GLOBAL_INIT_DAC_B_CTDC',
+        'GLOBAL_LATENCY_TIME',
+        'GLOBAL_MODE_FTDC_TOA',
+        'GLOBAL_MODE_NO_TOT_SUB',
+        'GLOBAL_MODE_TOA_DIRECT_OUTPUT',
+        'GLOBAL_SEU_TIME_OUT',
+        'GLOBAL_TA_SELECT_GAIN_TOA',
+        'GLOBAL_TA_SELECT_GAIN_TOT',
+        'INV_FRONT_40MHZ',
+        'START_COUNTER',
+        'VD_CTDC_N_D',
+        'VD_CTDC_N_DAC_EN',
+        'VD_CTDC_N_FORCE_MAX',
+        'VD_CTDC_P_D',
+        'VD_CTDC_P_DAC_EN',
+        'VD_FTDC_N_D',
+        'VD_FTDC_N_DAC_EN',
+        'VD_FTDC_N_FORCE_MAX',
+        'VD_FTDC_P_D',
+        'VD_FTDC_P_DAC_EN',
+        'sel_clk_rcg',
+        'Calib',
+        'ExtCtest',
+        'IntCtest',
+        'Inv_vref',
+        'Noinv_vref',
+        'ON_dac',
+        'Refi',
+        'Toa_vref',
+        'Tot_vref',
+        'Vbg_1v',
+        'probe_dc',
+        'probe_dc1',
+        'probe_dc2',
+        'BIAS_I_PLL_D',
+        'DIV_PLL',
+        'EN',
+        'EN_HIGH_CAPA',
+        'EN_LOCK_CONTROL',
+        'EN_PLL',
+        'EN_PhaseShift',
+        'EN_RCG',
+        'EN_REF_BG',
+        'EN_probe_pll',
+        'ENpE',
+        'ERROR_LIMIT_SC',
+        'EdgeSel_T1',
+        'FOLLOWER_PLL_EN',
+        'INIT_D',
+        'INIT_DAC_EN',
+        'Pll_Locked_sc',
+        'PreL1AOffset',
+        'RunL',
+        'RunR',
+        'S',
+        'TestMode',
+        'VOUT_INIT_EN',
+        'VOUT_INIT_EXT_D',
+        'VOUT_INIT_EXT_EN',
+        'b_in',
+        'b_out',
+        'err_countL',
+        'err_countR',
+        'fc_error_count',
+        'in_inv_cmd_rx',
+        'lock_count',
+        'n_counter_rst',
+        'phase_ck',
+        'phase_strobe',
+        'rcg_gain',
+        'sel_40M_ext',
+        'sel_error',
+        'sel_lock',
+        'sel_strobe_ext',
+        'srout',
+        'statusL',
+        'statusR']
+    df = pd.read_hdf(test_hdf_path)
+    for c in df.columns:
+        assert c in expected_columns
 
 
 def test_add_half_wise_data():
@@ -414,179 +555,6 @@ def test_add_half_wise_data():
     config = cfu.update_dict(default, overlay)
     frame = add_half_wise_data(frame, config)
     expected_columns = [
-            'Adc_TH',
-            'Bx_offset',
-            'CalibrationSC',
-            'ClrAdcTot_trig',
-            'IdleFrame',
-            'L1Offset',
-            'MultFactor',
-            'SC_testRAM',
-            'SelTC4',
-            'Tot_P0',
-            'Tot_P1',
-            'Tot_P2',
-            'Tot_P3',
-            'Tot_P_Add',
-            'Tot_TH0',
-            'Tot_TH1',
-            'Tot_TH2',
-            'Tot_TH3',
-            'sc_testRAM',
-            'Cf',
-            'Cf_comp',
-            'Clr_ADC',
-            'Clr_ShaperTail',
-            'Delay40',
-            'Delay65',
-            'Delay87',
-            'Delay9',
-            'En_hyst_tot',
-            'Ibi_inv',
-            'Ibi_inv_buf',
-            'Ibi_noinv',
-            'Ibi_noinv_buf',
-            'Ibi_sk',
-            'Ibo_inv',
-            'Ibo_inv_buf',
-            'Ibo_noinv',
-            'Ibo_noinv_buf',
-            'Ibo_sk',
-            'ON_pa',
-            'ON_ref_adc',
-            'ON_rtr',
-            'ON_toa',
-            'ON_tot',
-            'Rc',
-            'Rf',
-            'S_inv',
-            'S_inv_buf',
-            'S_noinv',
-            'S_noinv_buf',
-            'S_sk',
-            'SelExtADC',
-            'SelRisingEdge',
-            'dac_pol',
-            'gain_tot',
-            'neg',
-            'pol_trig_toa',
-            'range_indac',
-            'range_inv',
-            'range_tot',
-            'ref_adc',
-            'trim_vbi_pa',
-            'trim_vbo_pa',
-            'BIAS_CAL_DAC_CTDC_P_D',
-            'BIAS_CAL_DAC_CTDC_P_EN',
-            'BIAS_FOLLOWER_CAL_P_CTDC_EN',
-            'BIAS_FOLLOWER_CAL_P_D',
-            'BIAS_FOLLOWER_CAL_P_FTDC_D',
-            'BIAS_FOLLOWER_CAL_P_FTDC_EN',
-            'BIAS_I_CTDC_D',
-            'BIAS_I_FTDC_D',
-            'CALIB_CHANNEL_DLL',
-            'CTDC_CALIB_FREQUENCY',
-            'CTRL_IN_REF_CTDC_P_D',
-            'CTRL_IN_REF_CTDC_P_EN',
-            'CTRL_IN_REF_FTDC_P_D',
-            'CTRL_IN_REF_FTDC_P_EN',
-            'CTRL_IN_SIG_CTDC_P_D',
-            'CTRL_IN_SIG_CTDC_P_EN',
-            'CTRL_IN_SIG_FTDC_P_D',
-            'CTRL_IN_SIG_FTDC_P_EN',
-            'EN_MASTER_CTDC_DLL',
-            'EN_MASTER_CTDC_VOUT_INIT',
-            'EN_MASTER_FTDC_DLL',
-            'EN_MASTER_FTDC_VOUT_INIT',
-            'EN_REF_BG',
-            'FOLLOWER_CTDC_EN',
-            'FOLLOWER_FTDC_EN',
-            'FTDC_CALIB_FREQUENCY',
-            'GLOBAL_DISABLE_TOT_LIMIT',
-            'GLOBAL_EN_BUFFER_CTDC',
-            'GLOBAL_EN_BUFFER_FTDC',
-            'GLOBAL_EN_TOT_PRIORITY',
-            'GLOBAL_EN_TUNE_GAIN_DAC',
-            'GLOBAL_FORCE_EN_CLK',
-            'GLOBAL_FORCE_EN_OUTPUT_DATA',
-            'GLOBAL_FORCE_EN_TOT',
-            'GLOBAL_INIT_DAC_B_CTDC',
-            'GLOBAL_LATENCY_TIME',
-            'GLOBAL_MODE_FTDC_TOA',
-            'GLOBAL_MODE_NO_TOT_SUB',
-            'GLOBAL_MODE_TOA_DIRECT_OUTPUT',
-            'GLOBAL_SEU_TIME_OUT',
-            'GLOBAL_TA_SELECT_GAIN_TOA',
-            'GLOBAL_TA_SELECT_GAIN_TOT',
-            'INV_FRONT_40MHZ',
-            'START_COUNTER',
-            'VD_CTDC_N_D',
-            'VD_CTDC_N_DAC_EN',
-            'VD_CTDC_N_FORCE_MAX',
-            'VD_CTDC_P_D',
-            'VD_CTDC_P_DAC_EN',
-            'VD_FTDC_N_D',
-            'VD_FTDC_N_DAC_EN',
-            'VD_FTDC_N_FORCE_MAX',
-            'VD_FTDC_P_D',
-            'VD_FTDC_P_DAC_EN',
-            'sel_clk_rcg',
-            'Calib',
-            'ExtCtest',
-            'IntCtest',
-            'Inv_vref',
-            'Noinv_vref',
-            'ON_dac',
-            'Refi',
-            'Toa_vref',
-            'Tot_vref',
-            'Vbg_1v',
-            'probe_dc',
-            'probe_dc1',
-            'probe_dc2',
-            'BIAS_I_PLL_D',
-            'DIV_PLL',
-            'EN',
-            'EN_HIGH_CAPA',
-            'EN_LOCK_CONTROL',
-            'EN_PLL',
-            'EN_PhaseShift',
-            'EN_RCG',
-            'EN_REF_BG',
-            'EN_probe_pll',
-            'ENpE',
-            'ERROR_LIMIT_SC',
-            'EdgeSel_T1',
-            'FOLLOWER_PLL_EN',
-            'INIT_D',
-            'INIT_DAC_EN',
-            'Pll_Locked_sc',
-            'PreL1AOffset',
-            'RunL',
-            'RunR',
-            'S',
-            'TestMode',
-            'VOUT_INIT_EN',
-            'VOUT_INIT_EXT_D',
-            'VOUT_INIT_EXT_EN',
-            'b_in',
-            'b_out',
-            'err_countL',
-            'err_countR',
-            'fc_error_count',
-            'in_inv_cmd_rx',
-            'lock_count',
-            'n_counter_rst',
-            'phase_ck',
-            'phase_strobe',
-            'rcg_gain',
-            'sel_40M_ext',
-            'sel_error',
-            'sel_lock',
-            'sel_strobe_ext',
-            'srout',
-            'statusL',
-            'statusR',
            ]
     for col in expected_columns:
         print(frame[col])

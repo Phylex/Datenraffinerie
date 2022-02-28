@@ -17,8 +17,10 @@ from . import config_utilities as cfu
 from . import analysis_utilities as anu
 
 def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False):
-    # 'unpack' the data from the raw data gathered into a root file that
-    # can then be merged with the configuration into a large table
+    """
+    'unpack' the data from the raw data gathered into a root file that
+    can then be merged with the configuration into a large table
+    """
     if raw_data:
         output_type = ' > /dev/null'
     else:
@@ -27,14 +29,15 @@ def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False)
     input_file = ' -i ' + str(in_file_path)
     output_command = ' -o ' + str(out_file_path)
     full_unpack_command = unpack_command + input_file + output_command\
-        + output_type # + metainfo_option
+        + output_type
     print(full_unpack_command)
     os.system(full_unpack_command)
+
 
 class Calibration(luigi.Task):
     """
     fetches the Calibration for a daq procedure this is normally
-    done by the 
+    done by the
     """
     root_config_path = luigi.Parameter()
     calibration = luigi.Parameter()
@@ -523,7 +526,6 @@ class Fracker(luigi.Task):
         parameter = list(self.scan_parameters[0][0])
 
         expected_files = []
-        data_fragments = []
         for i, raw_file in enumerate(self.input()[1:]):
             data_file_base_name = os.path.splitext(raw_file.path)[0]
             unpacked_file_path = Path(data_file_base_name + '.root')
@@ -536,7 +538,10 @@ class Fracker(luigi.Task):
                 # calculate the patch that needs to be applied
                 patch = cfu.generate_patch(parameter, values[i])
                 current_target_config = cfu.update_dict(target_config, patch)
-                anu.reformat_data(unpacked_file_path, formatted_data_path, self.raw)
+                anu.reformat_data(unpacked_file_path,
+                                  formatted_data_path,
+                                  current_target_config,
+                                  self.raw)
             except KeyInFileError:
                 os.remove(raw_file.path)
                 os.remove(unpacked_file_path.as_posix())
@@ -547,7 +552,6 @@ class Fracker(luigi.Task):
 
             os.remove(raw_file.path)
             os.remove(unpacked_file_path.as_posix())
-
 
         for formatted_file_path in expected_files:
             if not formatted_file_path.exists():
