@@ -20,5 +20,6 @@ setup(
         'awkward',
         'tables',
         'h5py',
+        'numba',
     ]
 )
