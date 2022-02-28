@@ -76,7 +76,10 @@ class Distillery(luigi.Task):
         analysis = analysis(unfreeze(self.parameters))
 
         # open and read the data
-        data = pd.read_hdf(self.input().path)
+        if self.event_data:
+            data = pd.read_hdf(self.input().path)
+        else:
+            data = pd.HDFStore(self.input().path, mode='r')
         analysis.run(data, self.output_dir)
 
     @staticmethod

@@ -380,4 +380,64 @@ There are roughly 200 columns in the `DataFrame` so they will not be listed here
 `pd.DataFrame.columns` member.
 
 ## Writing a custom Distillery
-TODO
+Writing a custom distillery is neccessary to produce Plots and other useful information (like a summary or calibration parameters) from data aquired by the daq system.
+Distilleries are executed by the Datenraffinerie after aquiring the neccesary data. Distilleries like the DAQ procedures are only run, if the output
+of the procedure is not already present.
+
+A distillery is a python class without inheritance. The class needs to have three methods `__init__(self, parameters)` to initialize the class with
+the parameters from the analysis configuration, an `output(self, output_dir)` method that specifies the files that are produced by the Distillery and
+a `run(self, data)` method that is called to process the data gathered by the daq procedure.
+
+A minimal example that produces a single empty file `summary.csv` as output and ignores the data passed to it in the run method would be:
+```python
+from pathlib import Path
+
+class MyLittleDistillery(object):
+    def __init__(self, paramerets):
+        self._params = parameters
+
+    def output(self):
+        return {
+            'summary': 'summary.csv',
+            'plots': [],
+            'calibration': None
+        }
+
+    def run(self, data, output_dir):
+        op = Path(output_dir)
+        (op / self.output()['summary']).touch()
+```
+
+### Discovery of custom analyses
+The datenraffinerie needs to find the custom Distilleries to execute them. To make this possible, the different distilleries used must be placed
+together into a folder. along with the python files for the distillery/distilleries the directory must contian a `__init__.py` file. This turns the
+folder into a python module that can be imported by the datenraffinerie. During the import of a module the instructions in the `__init__.py` file
+are executed. So that the custom distillery can be found a line must be added into the `__init__.py` file. Assuming that the configuration for the
+analysis has the following setting:
+```
+python_module_name: example_analysis_class
+```
+and we are trying to make the `MyLittleDistillery` executable by the datenraffinerie and the `MyLittleDistillery` is located in
+`my_little_distillery.py`, then the line in `__init__.py` needs to be:
+```
+from my_little_distillery import MyLittleDistillery as example_analysis_class
+```
+
+### Different Input Formats
+The daq procedures can be run in `event_mode` or in `summary_mode`. In `summary_mode` the raw data is processed into aggregates together with
+statistical information.
+
+The `summary_mode` is the default if the `event_mode` configuration parameter is either not set or set to `False`. in summary mode the analysis
+receives a pre loaded pandas `DataFrame` as `data` argument of the `run` function.
+
+In `event_mode` every event that was recorded is listed in the output_data. This makes the loading the whole data into
+memmory unfeasable (Data files that are decompressed and loaded into memmory have sizes in the hundreds of Gigabytes). To mitigate this effect the
+pandas `HDFStore` object is utilized to open the file without loading the all the data into memmory. The `HDFStore` object is then passed to the
+`run` method instead of the dataframe. The `HDFStore` has a
+[select](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.HDFStore.select.html) method that can be used to query the properties of
+the data and load sections of data into main memmory that are needed by the analysis. Due to the structure of the HDF5 file, it is currently not
+possible to load the data as an iterator. Filters or the start/stop arguments can be used to successively load only a subset of all rows into main
+memmory. Please see the [pandas documentation](https://pandas.pydata.org/pandas-docs/stable/index.html) for more details.
+The underying file is opened in `read only` mode so the modifications made to the data loaded into memmory do not have an effect on the underlying
+file. Please keep in mind that the only files that are allowed to be created by an analysis/Distillery are the files specified in the `output(self)`
+method of the Distillery.

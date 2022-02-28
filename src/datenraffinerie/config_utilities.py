@@ -251,9 +251,9 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
         calibration = None
 
     try:
-        raw_data = scan_config['raw_data']
+        raw_data = scan_config['event_mode']
         if not isinstance(raw_data, bool):
-            raise ConfigFormatError("The raw_data field needs to contain a"
+            raise ConfigFormatError("The event_data field needs to contain a"
                                     " boolean")
     except KeyError:
         raw_data = False
