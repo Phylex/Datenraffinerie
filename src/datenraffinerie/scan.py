@@ -245,7 +245,10 @@ class DataField(luigi.Task):
         required_tasks = []
         values = self.scan_parameters[0][1]
         parameter = list(self.scan_parameters[0][0])
+        istargetparam = (self.scan_parameters[0][2] == 'target') #if false it is a daq parameter
         target_config = cfu.unfreeze(self.target_config)
+        daq_system_config = cfu.unfreeze(self.daq_system_config)
+
         # if there are more than one entry in the parameter list the scan still
         # has more than one dimension. So spawn more scan tasks for the lower
         # dimension
@@ -255,12 +258,23 @@ class DataField(luigi.Task):
             task_id_offset = reduce(operator.mul,
                                     [len(param[1]) for param in
                                      self.scan_parameters[1:]])
+            subscan_target_config = target_config
+            subscan_daq_config = daq_system_config
             for i, value in enumerate(values):
+
+                if type(value)==tuple:
+                    value=list(value)
+
                 patch = cfu.generate_patch(
                             parameter, value)
-                subscan_target_config = cfu.update_dict(
+                if istargetparam:
+                    subscan_target_config = cfu.update_dict(
                         target_config,
                         patch)
+                else:
+                    subscan_daq_config = cfu.update_dict(daq_system_config,
+                                                         patch)
+                    
                 if len(self.scan_parameters[1:]) == 1 and self.loop:
                     required_tasks.append(Fracker(self.identifier + 1 + task_id_offset * i,
                                                   self.label,
@@ -269,7 +283,7 @@ class DataField(luigi.Task):
                                                   self.scan_parameters[1:],
                                                   subscan_target_config,
                                                   self.target_default_config,
-                                                  self.daq_system_config,
+                                                  subscan_daq_config,
                                                   self.root_config_path,
                                                   self.calibration,
                                                   self.analysis_module_path,
@@ -284,7 +298,7 @@ class DataField(luigi.Task):
                                                     self.scan_parameters[1:],
                                                     subscan_target_config,
                                                     self.target_default_config,
-                                                    self.daq_system_config,
+                                                    subscan_daq_config,
                                                     self.root_config_path,
                                                     self.calibration,
                                                     self.analysis_module_path,
@@ -302,13 +316,21 @@ class DataField(luigi.Task):
                                    self.loop)
 
             for i, value in enumerate(values):
+                measurement_target_config = target_config
+                measurement_daq_config = daq_system_config
                 patch = cfu.generate_patch(parameter, value)
-                measurement_config = cfu.patch_configuration(
+                if istargetparam:
+                    measurement_target_config = cfu.patch_configuration(
                         target_config,
                         patch)
-                required_tasks.append(DrillingRig(measurement_config,
+                else:
+                    measurement_daq_config = cfu.patch_configuration(
+                        daq_system_config,
+                        patch)
+
+                required_tasks.append(DrillingRig(measurement_target_config,
                                                   self.target_default_config,
-                                                  self.daq_system_config,
+                                                  measurement_daq_config,
                                                   self.output_dir,
                                                   self.output_format,
                                                   self.label,
@@ -412,17 +434,26 @@ class DataField(luigi.Task):
             # perform the scan
             values = self.scan_parameters[0][1]
             parameter = list(self.scan_parameters[0][0])
-
+            istargetparam = (self.scan_parameters[0][2] == 'target') #if false it is a daq parameter
+            
             output_files = self.output()[1:]
             for raw_file, value in zip(output_files, values):
-
                 # patch the target config with the key for the current run
+                if type(value)==tuple:#luigi might have converted an input list to a tuple 
+                    value=list(value)
                 patch = cfu.generate_patch(parameter, value)
-                full_target_config = cfu.update_dict(target_config,
-                                                     patch)
-                tx_config = cfu.diff_dict(power_on_default, full_target_config)
-                complete_config = {'daq': daq_system_config,
-                                   'target': tx_config}
+                if istargetparam:
+                    full_target_config = cfu.update_dict(target_config,
+                                                         patch)
+                    tx_config = cfu.diff_dict(power_on_default, full_target_config)
+                    complete_config = {'daq': daq_system_config,
+                                       'target': tx_config}
+                else:
+                    full_daq_config = cfu.update_dict(daq_system_config,
+                                                      patch)
+                    complete_config = {'daq': full_daq_config,
+                                       'target': target_config}
+                    
                 socket.send_string('measure;'+yaml.safe_dump(complete_config))
                 # wait for the data to return
                 data = socket.recv()
@@ -514,6 +545,7 @@ class Fracker(luigi.Task):
     def run(self):
         # load the configurations
         target_config = cfu.unfreeze(self.target_config)
+        daq_config = cfu.unfreeze(self.daq_system_config)
         power_on_default = cfu.unfreeze(self.target_default_config)
         # load the calibration
         if self.calibration is not None:
@@ -538,7 +570,8 @@ class Fracker(luigi.Task):
         # get the parameters to build the patch from
         values = self.scan_parameters[0][1]
         parameter = list(self.scan_parameters[0][0])
-
+        istargetparam = (self.scan_parameters[0][2] == 'target')
+        
         expected_files = []
         data_fragments = []
         for i, raw_file in enumerate(self.input()[1:]):
@@ -566,11 +599,20 @@ class Fracker(luigi.Task):
             patch = cfu.generate_patch(parameter, values[i])
 
             # calculate the configuration to send to the backend
-            current_target_config = cfu.update_dict(target_config, patch)
+            current_target_config = target_config
+            current_daq_config = daq_config
+            if istargetparam:
+                current_target_config = cfu.update_dict(target_config, patch)
+            else:
+                current_daq_config = cfu.update_dict(daq_config, patch)
+                
             measurement_data = anu.add_channel_wise_data(measurement_data,
                                                          current_target_config)
             measurement_data = anu.add_half_wise_data(measurement_data,
                                                       current_target_config)
+            measurement_data = anu.add_l1a_generator_data(measurement_data,
+                                                current_daq_config)
+            
             measurement_data.to_hdf(formatted_data_path, 'data')
             data_fragments.append(measurement_data)
 

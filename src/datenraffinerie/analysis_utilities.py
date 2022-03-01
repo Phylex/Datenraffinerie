@@ -147,6 +147,28 @@ def add_half_wise_data(measurement_data: pd.DataFrame, complete_config: dict) ->
                     complete_config)[key], axis=1)
     return measurement_data
 
+def add_l1a_generator_data(measurement_data: pd.DataFrame, complete_config: dict) -> pd.DataFrame:
+    """add the config information of the chip half that corresponds to the particular
+    channel
+
+    :measurement_data: data measured from the rocs
+    :complete_config: configuration of the rocs at the time of measurement.
+        the half wise parameters of the rocs from this config will be added to every
+        channel of the corresponding half in the `measurement_data`
+    :returns: the dataframe measurement_data with added columns for the half wise
+              parameters
+
+    """
+    l1a_generators = complete_config["server"]["l1a_generator_settings"]
+    for l1a_generator in l1a_generators:
+        name = l1a_generator["name"]
+        for key,value in l1a_generator.items():
+            if key=="name": continue
+            output_key = name + "_" + str(key)
+            measurement_data[output_key] = value
+
+    return measurement_data
+
 
 def add_global_data(measurement_data: pd.DataFrame, global_config: dict) -> pd.DataFrame:
     """add global Data to the dataframe. Currently there is no global data

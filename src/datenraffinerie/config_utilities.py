@@ -100,6 +100,7 @@ def update_dict(original: dict, update: dict, offset: bool = False,
                 result[update_key] = deepcopy(update[update_key])
             continue
         if not isinstance(result[update_key], type(update[update_key])):
+
             if in_place is True:
                 result[update_key] = update[update_key]
             else:
@@ -340,14 +341,16 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
         raise ConfigFormatError("There needs to be a 'parameters' list"
                                 f" in the scan entry {daq_label}")
     for scan_dimension in scan_config['parameters']:
-        if scan_dimension['key'] is None:
-            continue
+        if 'key' in scan_dimension:
+            if scan_dimension['key'] is None:
+                continue
         step = 1
         start = None
         stop = None
-        if 'range' not in scan_dimension.keys():
-            raise ConfigFormatError("A range must be specified"
+        if ('range' not in scan_dimension.keys()) and ('values' not in scan_dimension.keys()):
+            raise ConfigFormatError("A range or a list of values must be specified"
                                     " for a scan dimension")
+        scan_range = list()
         for key, value in scan_dimension.items():
             if key == 'range':
                 for subkey, subval in value.items():
@@ -357,13 +360,27 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
                         start = subval
                     if subkey == 'stop':
                         stop = subval
-        if start is None or stop is None:
-            raise ConfigFormatError(f"The Scan configuration {daq_label} is"
-                                    " malformed. It misses either the start"
-                                    " or stop entry for one of it's "
-                                    " dimensions")
-        scan_range = list(range(start, stop, step))
-        scan_parameters.append((scan_dimension['key'], scan_range))
+                if start is None or stop is None:
+                    raise ConfigFormatError(f"The Scan configuration {daq_label} is"
+                                            " malformed. It misses either the start"
+                                            " or stop entry for one of it's "
+                                            " dimensions")
+                scan_range = list(range(start, stop, step))
+
+            elif key == 'values':
+                if type(value)!=list:
+                    raise ConfigFormatError(f"The Scan configuration {daq_label} is"
+                                            " malformed. The values key should contain"
+                                            " a list of values ")
+                scan_range = value
+                start = scan_range[0]
+                stop = scan_range[-1]
+                
+        if 'key' in scan_dimension:
+            scan_parameters.append((scan_dimension['key'], scan_range, 'target'))
+        elif 'daqkey' in scan_dimension:
+            scan_parameters.append((scan_dimension['daqkey'], scan_range, 'daq'))
+        
     if len(scan_parameters) == 0:
         scan_parameters = [({}, [0])]
     return {'parameters': scan_parameters,
