@@ -133,7 +133,7 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
     hd_file.close()
 
 
-@jit()
+@jit(forceobj=True)
 def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chunklength: int, raw_data: bool):
     """
     Add the configuration to the dataset
@@ -216,7 +216,7 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
     blk0 = hd_file.root.data.block0_values
     block1_items = hd_file.root.data.block1_items
     blk1 = hd_file.root.data.block1_values
-    chunksize = 10000
+    chunksize = 1000000
     for in_f in in_files:
         in_blk0 = in_f.root.data.block0_items
         in_blk1 = in_f.root.data.block1_items
