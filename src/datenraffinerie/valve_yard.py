@@ -62,7 +62,6 @@ class ValveYard(luigi.WrapperTask):
                               network_config=self.network_config,
                               loop=self.loop)
         if procedure['type'] == 'daq':
-            print(f"raw value: {procedure['raw']}")
             # the default values for the DAQ system and the target need to
             # be loaded on to the backend
             context = zmq.Context()
@@ -109,6 +108,5 @@ class ValveYard(luigi.WrapperTask):
                              network_config=self.network_config,
                              loop=self.loop,
                              raw=procedure['raw']) # indicate if to produce event by event data data
-
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")

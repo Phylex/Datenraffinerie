@@ -2,6 +2,7 @@
 Utilities for the use with the handling of the gathered data 
 in the datenraffinerie.
 """
+from . import config_utilities as cfu
 from pathlib import Path
 import shutil
 import pandas as pd
@@ -100,8 +101,8 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
         chan_config = roc_channel_to_dict(complete_config, 0, 0, 1)
         global_config = roc_channel_to_globals(complete_config, 0, 0, 1)
         l1a_config = l1a_generator_settings(complete_config)
-        chan_config.update(global_config)
-        chan_config.update(l1a_config)
+        chan_config = cfu.update_dict(chan_config, global_config)
+        chan_config = cfu.update_dict(chan_config, l1a_config)
         config_atom = tables.Int32Atom(shape=len(chan_config.values()))
 
         # create the rest of the needed data structures for the pandas dataframe
@@ -159,8 +160,8 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
     global_config = roc_channel_to_globals(complete_config,
                                            0, 0, 1)
     l1a_config = l1a_generator_settings(complete_config)
-    chan_config.update(global_config)
-    chan_config.update(l1a_config)
+    chan_config = cfu.update_dict(chan_config, global_config)
+    chan_config = cfu.update_dict(chan_config, l1a_config)
     chunks = int(len(chip_chan_indices) / chunklength)
     for i in range(chunks):
         chunk_array = np.zeros(shape=(chunklength, len(chan_config.items())))
@@ -174,12 +175,16 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
                                                              half_or_type)
             else:
                 chan_type = half_or_type
-            chan_config.update(roc_channel_to_dict(complete_config,
-                                                   chip,
-                                                   chan,
-                                                   chan_type))
-            chan_config.update(roc_channel_to_globals(complete_config,
-                                                      chip, chan, chan_type))
+            chan_config = cfu.update_dict(chan_config,
+                                          roc_channel_to_dict(complete_config,
+                                                              chip,
+                                                              chan,
+                                                              chan_type))
+            chan_config = cfu.update_dict(chan_config,
+                                          roc_channel_to_globals(complete_config,
+                                                                 chip,
+                                                                 chan,
+                                                                 chan_type))
             chunk_array[j] = np.array(list(chan_config.values()))
         dataset.append(chunk_array)
     # add to the configuration to the last of the items that dont fully
@@ -196,12 +201,16 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
                                                          half_or_type)
         else:
             chan_type = half_or_type
-        chan_config.update(roc_channel_to_dict(complete_config,
-                                               chip,
-                                               chan,
-                                               chan_type))
-        chan_config.update(roc_channel_to_globals(complete_config,
-                                                  chip, chan, chan_type))
+        chan_config = cfu.update_dict(chan_config,
+                                      roc_channel_to_dict(complete_config,
+                                                          chip,
+                                                          chan,
+                                                          chan_type))
+        chan_config = cfu.update_dict(chan_config,
+                                      roc_channel_to_globals(complete_config,
+                                                             chip,
+                                                             chan,
+                                                             chan_type))
         chunk_array[j] = np.array(list(chan_config.values()))
     dataset.append(chunk_array)
 
@@ -367,7 +376,7 @@ def test_reformat_data():
     test_hdf_path = Path('../../tests/data/event_run.hdf5')
     configuration = cfu.load_configuration('../../tests/data/default.yaml')
     overlay = cfu.load_configuration('../../tests/data/run.yaml')
-    configuration.update(overlay)
+    configuration = cfu.update_dict(configuration, overlay)
     reformat_data(test_data_path, test_hdf_path, configuration, True)
     expected_columns = [
         'Adc_pedestal',

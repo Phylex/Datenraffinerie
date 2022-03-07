@@ -253,7 +253,7 @@ class DataField(luigi.Task):
 
                 patch = cfu.generate_patch(
                             parameter, value)
-                complete_config.update(patch)
+                complete_config = cfu.update_dict(complete_config, patch)
                 subscan_daq_config = complete_config['daq']
                 subscan_target_config = complete_config['target']
                 if len(self.scan_parameters[1:]) == 1 and self.loop:
@@ -298,7 +298,7 @@ class DataField(luigi.Task):
 
             for i, value in enumerate(values):
                 patch = cfu.generate_patch(parameter, value)
-                complete_config.update(patch)
+                complete_config = cfu.update_dict(complete_config, patch)
                 measurement_daq_config = complete_config['daq']
                 measurement_target_config = complete_config['target']
                 required_tasks.append(DrillingRig(measurement_target_config,
@@ -384,8 +384,7 @@ class DataField(luigi.Task):
                     calibration = yaml.safe_load(
                         calibration_file.read())
                 # calculate the configuration to send to the backend
-                target_config = cfu.update_dict(target_config,
-                                                calibration)
+                target_config = cfu.update_dict(target_config, calibration)
 
             target_config = cfu.diff_dict(power_on_default,
                                           target_config)
@@ -402,7 +401,7 @@ class DataField(luigi.Task):
                 if type(value) == tuple:
                     value = list(value)
                 patch = cfu.generate_patch(parameter, value)
-                complete_config.update(patch)
+                complete_config = cfu.update_dict(complete_config, patch)
                 socket.send_string('measure;'+yaml.safe_dump(complete_config))
                 # wait for the data to return
                 data = socket.recv()
@@ -528,7 +527,7 @@ class Fracker(luigi.Task):
             try:
                 # calculate the patch that needs to be applied
                 patch = cfu.generate_patch(parameter, value)
-                complete_config.update(patch)
+                complete_config = cfu.update_dict(complete_config, patch)
                 anu.reformat_data(unpacked_file_path,
                                   formatted_data_path,
                                   complete_config,
