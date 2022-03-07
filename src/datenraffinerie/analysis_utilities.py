@@ -2,21 +2,18 @@
 Utilities for the use with the handling of the gathered data 
 in the datenraffinerie.
 """
-import pandas as pd
-import numpy as np
-import pytest
-import uproot
-import tables
-import os
-import yaml
 from pathlib import Path
 import shutil
-import subprocess
+import pandas as pd
+import numpy as np
+import uproot
+import tables
 from numba import jit
 
 
 class AnalysisError(Exception):
     def __init__(self, message):
+        super().__init__()
         self.message = message
 
 
@@ -40,12 +37,12 @@ def extract_data(rootfile: str, raw_data=False):
         return pd.DataFrame(run_data)
 
 
-def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool, chunk_length=10000):
+def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool, chunk_length=1000000):
     """ take in the unpacked root data and reformat into an hdf5 file.
     Also add in the configuration from the run.
     """
     # create a compression filter
-    compression_filter = tables.Filters(complib='zlib', complevel=5)
+    compression_filter = tables.Filters(complib='zlib', complevel=1)
     hd_file = tables.open_file(hdf_file, mode='w', filters=compression_filter)
     data = hd_file.create_group('/', 'data')
     # create the attributes that are needed for pandas to
@@ -102,7 +99,9 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
         # determin the size of the block that holds the configuration
         chan_config = roc_channel_to_dict(complete_config, 0, 0, 1)
         global_config = roc_channel_to_globals(complete_config, 0, 0, 1)
+        l1a_config = l1a_generator_settings(complete_config)
         chan_config.update(global_config)
+        chan_config.update(l1a_config)
         config_atom = tables.Int32Atom(shape=len(chan_config.values()))
 
         # create the rest of the needed data structures for the pandas dataframe
@@ -129,7 +128,8 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
                                           expectedrows=total_length)
         conf_dset._v_attrs['transposed'] = 1
         # merge in the configuration
-        add_config_to_dataset(chan_id_branches, conf_dset, complete_config, 10000, raw_data)
+        add_config_to_dataset(chan_id_branches, conf_dset, complete_config,
+                              chunk_length, raw_data)
     hd_file.close()
 
 
@@ -158,7 +158,9 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
     chan_config = roc_channel_to_dict(complete_config, 0, 0, 1)
     global_config = roc_channel_to_globals(complete_config,
                                            0, 0, 1)
+    l1a_config = l1a_generator_settings(complete_config)
     chan_config.update(global_config)
+    chan_config.update(l1a_config)
     chunks = int(len(chip_chan_indices) / chunklength)
     for i in range(chunks):
         chunk_array = np.zeros(shape=(chunklength, len(chan_config.items())))
@@ -166,18 +168,18 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
             row = chip_chan_indices[i*chunklength+j]
             chip, chan, half_or_type = row[0], row[1], row[2]
             if raw_data:
-                chip, chan, chan_type = compute_channel_type_from_event_data(chip,
-                                                                             chan,
-                                                                             half_or_type)
+                chip, chan, chan_type = \
+                        compute_channel_type_from_event_data(chip,
+                                                             chan,
+                                                             half_or_type)
             else:
                 chan_type = half_or_type
-            chan_config = roc_channel_to_dict(complete_config,
-                                              chip,
-                                              chan,
-                                              chan_type)
-            global_config = roc_channel_to_globals(complete_config,
-                                                   chip, chan, chan_type)
-            chan_config.update(global_config)
+            chan_config.update(roc_channel_to_dict(complete_config,
+                                                   chip,
+                                                   chan,
+                                                   chan_type))
+            chan_config.update(roc_channel_to_globals(complete_config,
+                                                      chip, chan, chan_type))
             chunk_array[j] = np.array(list(chan_config.values()))
         dataset.append(chunk_array)
     # add to the configuration to the last of the items that dont fully
@@ -188,15 +190,18 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
     for j, row in enumerate(remaining_items):
         chip, chan, half_or_type = row[0], row[1], row[2]
         if raw_data:
-            chip, chan, chan_type = compute_channel_type_from_event_data(chip,
-                                                                         chan,
-                                                                         half_or_type)
+            chip, chan, chan_type = \
+                    compute_channel_type_from_event_data(chip,
+                                                         chan,
+                                                         half_or_type)
         else:
-            chip, chan, chan_type = (chip, chan, half_or_type)
-        chan_config = roc_channel_to_dict(complete_config, chip, chan, chan_type)
-        global_config = roc_channel_to_globals(complete_config,
-                                               chip, chan, chan_type)
-        chan_config.update(global_config)
+            chan_type = half_or_type
+        chan_config.update(roc_channel_to_dict(complete_config,
+                                               chip,
+                                               chan,
+                                               chan_type))
+        chan_config.update(roc_channel_to_globals(complete_config,
+                                                  chip, chan, chan_type))
         chunk_array[j] = np.array(list(chan_config.values()))
     dataset.append(chunk_array)
 
@@ -216,6 +221,8 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
     blk0 = hd_file.root.data.block0_values
     block1_items = hd_file.root.data.block1_items
     blk1 = hd_file.root.data.block1_values
+    axis0 = hd_file.root.data.axis0
+    highest_index = len(axis0)
     chunksize = 1000000
     for in_f in in_files:
         in_blk0 = in_f.root.data.block0_items
@@ -234,7 +241,11 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
             start = chunk * chunksize
             stop = start + chunksize
             blk0.append(in_blk0.read(start, stop))
+            axis0.append(np.arange(highest_index, highest_index+chunksize))
+            highest_index = highest_index + chunksize
         blk0.append(in_blk0.read(chunks*chunksize, len(in_blk0)))
+        axis0.append(np.arange(highest_index,
+                               highest_index + len(in_blk0) - chunks*chunksize))
         # append the data for block1
         chunks = len(in_blk1) // chunksize
         for chunk in range(chunks):
@@ -243,6 +254,28 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
             blk1.append(in_blk1.read(start, stop))
         blk1.append(in_blk1.read(chunks*chunksize, len(in_blk1)))
         in_f.close()
+
+@jit(cache=True, forceobj=True)
+def l1a_generator_settings(complete_config: dict) -> dict:
+    """add the config information of the chip half that corresponds to the particular
+    channel
+
+    :measurement_data: data measured from the rocs
+    :complete_config: configuration of the rocs at the time of measurement.
+        the half wise parameters of the rocs from this config will be added to every
+        channel of the corresponding half in the `measurement_data`
+    :returns: the dataframe measurement_data with added columns for the half wise
+              parameters
+    """
+    l1a_config = {}
+    l1a_generators = complete_config['daq']["server"]["l1a_generator_settings"]
+    for l1a_generator in l1a_generators:
+        name = l1a_generator["name"]
+        for key,value in l1a_generator.items():
+            if key=="name": continue
+            output_key = name + "_" + str(key)
+            l1a_config[output_key] = value
+    return l1a_config
 
 
 @jit(nopython=True)
@@ -270,9 +303,10 @@ def roc_channel_to_dict(complete_config: dict, chip_id: int, channel_id: int, ch
     :returns: TODO
 
     """
+    target_subconfig = complete_config['target']
     id_map = {0: 'roc_s0', 1: 'roc_s1', 2: 'roc_s2'}
     channel_type_map = {0: 'ch', 1: 'calib', 100: 'cm'}
-    return complete_config[id_map[int(chip_id)]]\
+    return target_subconfig[id_map[int(chip_id)]]\
         [channel_type_map[int(channel_type)]][int(channel_id)]
 
 
@@ -287,6 +321,7 @@ def roc_channel_to_globals(complete_config: dict, chip_id: int, channel_id: int,
     :returns: a dictionary of all global setting for the given channel
 
     """
+    target_subconfig = complete_config['target']
     id_map = {0: 'roc_s0', 1: 'roc_s1', 2: 'roc_s2'}
     channel_type_map = {0: 'ch', 1: 'calib', 100: 'cm'}
     half_wise_keys = ['DigitalHalf', 'GlobalAnalog', 'MasterTdc', 'ReferenceVoltage']
@@ -298,7 +333,7 @@ def roc_channel_to_globals(complete_config: dict, chip_id: int, channel_id: int,
         chip_half = 0 if channel_id < 2 else 1
     if channel_type == 'calib':
         chip_half = channel_id
-    roc_config = complete_config[id_map[chip_id]]
+    roc_config = target_subconfig[id_map[chip_id]]
     result = {}
     for hw_key in half_wise_keys:
         for key, val in roc_config[hw_key][chip_half].items():

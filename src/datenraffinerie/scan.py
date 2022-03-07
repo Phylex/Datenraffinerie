@@ -168,7 +168,7 @@ class DrillingRig(luigi.Task):
         # data from the configuration for that run with the data
         output_path = Path(self.output().path)
         os.remove(raw_data_file_path)
-        anu.reformat_data(data_file_path, output_path, full_target_config, self.raw)
+        anu.reformat_data(data_file_path, output_path, complete_config, self.raw)
         os.remove(data_file_path)
 
 
@@ -231,6 +231,10 @@ class DataField(luigi.Task):
         values = self.scan_parameters[0][1]
         parameter = list(self.scan_parameters[0][0])
         target_config = cfu.unfreeze(self.target_config)
+        daq_system_config = cfu.unfreeze(self.daq_system_config)
+        complete_config = {'target': target_config,
+                           'daq': daq_system_config}
+
         # if there are more than one entry in the parameter list the scan still
         # has more than one dimension. So spawn more scan tasks for the lower
         # dimension
@@ -240,12 +244,18 @@ class DataField(luigi.Task):
             task_id_offset = reduce(operator.mul,
                                     [len(param[1]) for param in
                                      self.scan_parameters[1:]])
+            subscan_target_config = target_config
+            subscan_daq_config = daq_system_config
             for i, value in enumerate(values):
+
+                if type(value)==tuple:
+                    value=list(value)
+
                 patch = cfu.generate_patch(
                             parameter, value)
-                subscan_target_config = cfu.update_dict(
-                        target_config,
-                        patch)
+                complete_config.update(patch)
+                subscan_daq_config = complete_config['daq']
+                subscan_target_config = complete_config['target']
                 if len(self.scan_parameters[1:]) == 1 and self.loop:
                     required_tasks.append(Fracker(self.identifier + 1 + task_id_offset * i,
                                                   self.label,
@@ -254,7 +264,7 @@ class DataField(luigi.Task):
                                                   self.scan_parameters[1:],
                                                   subscan_target_config,
                                                   self.target_default_config,
-                                                  self.daq_system_config,
+                                                  subscan_daq_config,
                                                   self.root_config_path,
                                                   self.calibration,
                                                   self.analysis_module_path,
@@ -269,7 +279,7 @@ class DataField(luigi.Task):
                                                     self.scan_parameters[1:],
                                                     subscan_target_config,
                                                     self.target_default_config,
-                                                    self.daq_system_config,
+                                                    subscan_daq_config,
                                                     self.root_config_path,
                                                     self.calibration,
                                                     self.analysis_module_path,
@@ -288,12 +298,12 @@ class DataField(luigi.Task):
 
             for i, value in enumerate(values):
                 patch = cfu.generate_patch(parameter, value)
-                measurement_config = cfu.patch_configuration(
-                        target_config,
-                        patch)
-                required_tasks.append(DrillingRig(measurement_config,
+                complete_config.update(patch)
+                measurement_daq_config = complete_config['daq']
+                measurement_target_config = complete_config['target']
+                required_tasks.append(DrillingRig(measurement_target_config,
                                                   self.target_default_config,
-                                                  self.daq_system_config,
+                                                  measurement_daq_config,
                                                   self.output_dir,
                                                   self.output_format,
                                                   self.label,
@@ -382,33 +392,17 @@ class DataField(luigi.Task):
             complete_config = {'daq': daq_system_config,
                                'target': target_config}
 
-            # prepare the default configurations to compare against
-            daq_system_config = cfu.unfreeze(self.daq_system_config)
-            power_on_default = cfu.unfreeze(self.target_default_config)
-
-            # load the configurations
-            target_config = cfu.unfreeze(self.target_config)
-            with self.input().open('r') as calibrated_default_config_file:
-                calibration = yaml.safe_load(
-                    calibrated_default_config_file.read())
-            if calibration is not None:
-                target_config = cfu.update_dict(target_config,
-                                                calibration)
-
             # perform the scan
             values = self.scan_parameters[0][1]
             parameter = list(self.scan_parameters[0][0])
-
             output_files = self.output()[1:]
             for raw_file, value in zip(output_files, values):
-
                 # patch the target config with the key for the current run
+                # luigi might have converted an input list to a tuple
+                if type(value) == tuple:
+                    value = list(value)
                 patch = cfu.generate_patch(parameter, value)
-                full_target_config = cfu.update_dict(target_config,
-                                                     patch)
-                tx_config = cfu.diff_dict(power_on_default, full_target_config)
-                complete_config = {'daq': daq_system_config,
-                                   'target': tx_config}
+                complete_config.update(patch)
                 socket.send_string('measure;'+yaml.safe_dump(complete_config))
                 # wait for the data to return
                 data = socket.recv()
@@ -429,6 +423,7 @@ class DataField(luigi.Task):
             in_files = [data_file.path for data_file in self.input()]
             # merge the data together
             anu.merge_files(in_files, self.output().path, self.raw)
+
 
 class Fracker(luigi.Task):
     """
@@ -494,6 +489,7 @@ class Fracker(luigi.Task):
     def run(self):
         # load the configurations
         target_config = cfu.unfreeze(self.target_config)
+        daq_config = cfu.unfreeze(self.daq_system_config)
         power_on_default = cfu.unfreeze(self.target_default_config)
         # load the calibration
         if self.calibration is not None:
@@ -506,6 +502,8 @@ class Fracker(luigi.Task):
 
         target_config = cfu.update_dict(power_on_default,
                                         target_config)
+        complete_config = {'daq', daq_config,
+                           'target', target_config}
 
         for i, raw_file in enumerate(self.input()[1:]):
             data_file_base_name = os.path.splitext(raw_file.path)[0]
@@ -518,9 +516,8 @@ class Fracker(luigi.Task):
         # get the parameters to build the patch from
         values = self.scan_parameters[0][1]
         parameter = list(self.scan_parameters[0][0])
-
         expected_files = []
-        for i, raw_file in enumerate(self.input()[1:]):
+        for raw_file, value in zip(self.input()[1:], values):
             data_file_base_name = os.path.splitext(raw_file.path)[0]
             unpacked_file_path = Path(data_file_base_name + '.root')
             formatted_data_path = Path(data_file_base_name + '.hdf5')
@@ -530,11 +527,11 @@ class Fracker(luigi.Task):
             # data from the configuration for that run with the data
             try:
                 # calculate the patch that needs to be applied
-                patch = cfu.generate_patch(parameter, values[i])
-                current_target_config = cfu.update_dict(target_config, patch)
+                patch = cfu.generate_patch(parameter, value)
+                complete_config.update(patch)
                 anu.reformat_data(unpacked_file_path,
                                   formatted_data_path,
-                                  current_target_config,
+                                  complete_config,
                                   self.raw)
             except KeyInFileError:
                 os.remove(raw_file.path)
@@ -549,5 +546,6 @@ class Fracker(luigi.Task):
 
         for formatted_file_path in expected_files:
             if not formatted_file_path.exists():
-                raise ValueError('An unpacker failed, the datenraffinerie needs to be rerun')
+                raise ValueError('An unpacker failed, '
+                                 'the datenraffinerie needs to be rerun')
         anu.merge_files(expected_files, self.output().path)

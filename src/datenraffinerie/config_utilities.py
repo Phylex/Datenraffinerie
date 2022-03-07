@@ -100,6 +100,7 @@ def update_dict(original: dict, update: dict, offset: bool = False,
                 result[update_key] = deepcopy(update[update_key])
             continue
         if not isinstance(result[update_key], type(update[update_key])):
+
             if in_place is True:
                 result[update_key] = update[update_key]
             else:
@@ -162,6 +163,13 @@ def generate_patch(keys: list, value):
     # this is needed to work with luigi as it turns stuffinto
     # tuples
     keys = list(keys)
+    # here we need to insert 'target' if the key 'target' or 'daq' is not present
+    # as the top level key to extend the scannable parameters to both the daq and target
+    # configuration
+    if keys[0] not in ['target', 'daq']:
+        keys.insert(0, 'target')
+
+    # now the rest of the generation can run as usual
     if len(keys) == 0:
         return {}
     keys.reverse()
@@ -336,18 +344,22 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
 
     # parse the scan dimensions
     scan_parameters = []
-    if 'parameters' not in scan_config.keys():
+    if 'parameters' not in scan_config:
         raise ConfigFormatError("There needs to be a 'parameters' list"
                                 f" in the scan entry {daq_label}")
     for scan_dimension in scan_config['parameters']:
-        if scan_dimension['key'] is None:
-            continue
+        if 'key' not in scan_dimension or\
+            (('range' not in scan_dimension) and
+             ('values' not in scan_dimension)):
+            raise ConfigFormatError("A range or a list of values along with a key"
+                                    " must be specified"
+                                    " for a scan dimension")
+        if 'key' in scan_dimension:
+            if scan_dimension['key'] is None:
+                continue
         step = 1
         start = None
         stop = None
-        if 'range' not in scan_dimension.keys():
-            raise ConfigFormatError("A range must be specified"
-                                    " for a scan dimension")
         for key, value in scan_dimension.items():
             if key == 'range':
                 for subkey, subval in value.items():
@@ -357,13 +369,21 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
                         start = subval
                     if subkey == 'stop':
                         stop = subval
-        if start is None or stop is None:
-            raise ConfigFormatError(f"The Scan configuration {daq_label} is"
-                                    " malformed. It misses either the start"
-                                    " or stop entry for one of it's "
-                                    " dimensions")
-        scan_range = list(range(start, stop, step))
+                if start is None or stop is None:
+                    raise ConfigFormatError(f"The Scan configuration {daq_label} is"
+                                            " malformed. It misses either the start"
+                                            " or stop entry for one of it's "
+                                            " dimensions")
+                scan_range = list(range(start, stop, step))
+
+            elif key == 'values':
+                if type(value)!=list:
+                    raise ConfigFormatError(f"The Scan configuration {daq_label} is"
+                                            " malformed. The values key should contain"
+                                            " a list of values ")
+                scan_range = value
         scan_parameters.append((scan_dimension['key'], scan_range))
+
     if len(scan_parameters) == 0:
         scan_parameters = [({}, [0])]
     return {'parameters': scan_parameters,
