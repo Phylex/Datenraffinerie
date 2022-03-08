@@ -140,7 +140,7 @@ class DrillingRig(luigi.Task):
         full_target_config = cfu.update_dict(power_on_default,
                                              target_config)
         complete_config = {'daq': daq_system_config,
-                           'target': target_config}
+                           'target': full_target_config}
 
         # send config to the backend and wait for the response
         context = zmq.Context()
