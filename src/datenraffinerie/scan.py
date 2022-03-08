@@ -396,7 +396,7 @@ class DataField(luigi.Task):
             parameter = list(self.scan_parameters[0][0])
             output_files = self.output()[1:]
             for raw_file, value in zip(output_files, values):
-                if raw_file.path.exists():
+                if Path(raw_file.path).exists():
                     continue
                 # patch the target config with the key for the current run
                 # luigi might have converted an input list to a tuple
