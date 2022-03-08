@@ -31,9 +31,7 @@ def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False)
     output_command = ' -o ' + str(out_file_path)
     full_unpack_command = unpack_command + input_file + output_command\
         + output_type
-    print(full_unpack_command)
-    result = subprocess.run([unpack_command, input_file, output_command, output_type])
-    print(result.returncode)
+    return os.system(full_unpack_command)
 
 
 class Calibration(luigi.Task):
@@ -398,6 +396,8 @@ class DataField(luigi.Task):
             parameter = list(self.scan_parameters[0][0])
             output_files = self.output()[1:]
             for raw_file, value in zip(output_files, values):
+                if raw_file.path.exists():
+                    continue
                 # patch the target config with the key for the current run
                 # luigi might have converted an input list to a tuple
                 if type(value) == tuple:
@@ -510,9 +510,12 @@ class Fracker(luigi.Task):
             data_file_base_name = os.path.splitext(raw_file.path)[0]
             unpacked_file_path = data_file_base_name + '.root'
 
-            unpack_raw_data_into_root(raw_file.path,
-                                      unpacked_file_path,
-                                      raw_data=self.raw)
+            result = unpack_raw_data_into_root(
+                    raw_file.path,
+                    unpacked_file_path,
+                    raw_data=self.raw)
+            if result != 0:
+                os.remove(unpacked_file_path)
 
         # get the parameters to build the patch from
         values = self.scan_parameters[0][1]
@@ -526,6 +529,7 @@ class Fracker(luigi.Task):
             # check that the unpacker was able to convert the data into root
             # format
             if not unpacked_file_path.exists():
+                os.remove(raw_file.path)
                 continue
 
             # load the data from the unpacked root file and merge in the
