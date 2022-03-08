@@ -492,7 +492,7 @@ class Fracker(luigi.Task):
         power_on_default = cfu.unfreeze(self.target_default_config)
         # load the calibration
         if self.calibration is not None:
-            with self.input().open('r') as calibration_file:
+            with self.input()[0].open('r') as calibration_file:
                 calibration = yaml.safe_load(
                     calibration_file.read())
             # calculate the configuration to send to the backend
@@ -521,6 +521,10 @@ class Fracker(luigi.Task):
             unpacked_file_path = Path(data_file_base_name + '.root')
             formatted_data_path = Path(data_file_base_name + '.hdf5')
             expected_files.append(formatted_data_path)
+            # check that the unpacker was able to convert the data into root
+            # format
+            if not unpacked_file_path.exists():
+                continue
 
             # load the data from the unpacked root file and merge in the
             # data from the configuration for that run with the data
