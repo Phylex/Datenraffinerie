@@ -10,6 +10,7 @@ import operator
 import pandas as pd
 import luigi
 from luigi.parameter import ParameterVisibility
+import subprocess
 import yaml
 import zmq
 from uproot.exceptions import KeyInFileError
@@ -31,7 +32,8 @@ def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False)
     full_unpack_command = unpack_command + input_file + output_command\
         + output_type
     print(full_unpack_command)
-    os.system(full_unpack_command)
+    result = subprocess.run([unpack_command, input_file, output_command, output_type])
+    print(result.returncode)
 
 
 class Calibration(luigi.Task):
