@@ -501,8 +501,8 @@ class Fracker(luigi.Task):
 
         target_config = cfu.update_dict(power_on_default,
                                         target_config)
-        complete_config = {'daq', daq_config,
-                           'target', target_config}
+        complete_config = {'daq': daq_config,
+                           'target': target_config}
 
         for i, raw_file in enumerate(self.input()[1:]):
             data_file_base_name = os.path.splitext(raw_file.path)[0]
