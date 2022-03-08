@@ -2,7 +2,7 @@
 Utilities for the use with the handling of the gathered data 
 in the datenraffinerie.
 """
-import config_utilities as cfu
+from . import config_utilities as cfu
 from pathlib import Path
 import shutil
 import pandas as pd
