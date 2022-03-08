@@ -533,14 +533,10 @@ class Fracker(luigi.Task):
                                   complete_config,
                                   self.raw)
             except KeyInFileError:
-                os.remove(raw_file.path)
                 os.remove(unpacked_file_path.as_posix())
                 continue
             except FileNotFoundError:
-                os.remove(raw_file.path)
                 continue
-
-            os.remove(raw_file.path)
             os.remove(unpacked_file_path.as_posix())
 
         for formatted_file_path in expected_files:
