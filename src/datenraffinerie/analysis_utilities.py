@@ -2,7 +2,7 @@
 Utilities for the use with the handling of the gathered data 
 in the datenraffinerie.
 """
-from . import config_utilities as cfu
+import config_utilities as cfu
 from pathlib import Path
 import shutil
 import pandas as pd
@@ -38,29 +38,73 @@ def extract_data(rootfile: str, raw_data=False):
         return pd.DataFrame(run_data)
 
 
-def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool, chunk_length=1000000):
-    """ take in the unpacked root data and reformat into an hdf5 file.
-    Also add in the configuration from the run.
-    """
-    # create a compression filter
+def create_empty_hdf_file(filename: str,
+                          expectedrows: int,
+                          compression: int = 1) -> tables.File:
     compression_filter = tables.Filters(complib='zlib', complevel=1)
-    hd_file = tables.open_file(hdf_file, mode='w', filters=compression_filter)
-    data = hd_file.create_group('/', 'data')
+    hdf_file = tables.open_file(filename, mode='w', filters=compression_filter)
+    data = hdf_file.create_group('/', 'data')
     # create the attributes that are needed for pandas to
     # be able to read the hdf5 file as a dataframe
     data._v_attrs['axis0_variety'] = 'regular'
     data._v_attrs['axis1_variety'] = 'regular'
-    data._v_attrs['block0_items_variety'] = 'regular'
-    data._v_attrs['block1_items_variety'] = 'regular'
     data._v_attrs['encoding'] = 'UTF-8'
     data._v_attrs['errors'] = 'strict'
     data._v_attrs['ndim'] = 2
-    data._v_attrs['nblocks'] = 2
+    data._v_attrs['nblocks'] = 0
     data._v_attrs['pandas_type'] = 'frame'
     data._v_attrs['pandas_version'] = '0.15.2'
 
+    axis1 = hdf_file.create_earray(data, 'axis1', tables.IntAtom(),
+                                   shape=(0,))
+    axis1._v_attrs['kind'] = 'integer'
+    axis1._v_attrs['name'] = 'rows'
+    axis1._v_attrs['transposed'] = 1
 
-    # get the data from the 
+    axis0 = hdf_file.create_earray(data, 'axis0', tables.StringAtom(50),
+                                   shape=(0,))
+    axis0._v_attrs['kind'] = 'string'
+    axis0._v_attrs['name'] = 'columns'
+    axis0._v_attrs['transposed'] = 1
+    return hdf_file
+
+
+def add_data_block(column_names: list, data_type, hdf_file: tables.File, group_name: str):
+    hdf_group = hdf_file.get_node(f'/{group_name}')
+    blockcount = hdf_group._v_attrs['nblocks']
+    hdf_group._v_attrs[f'block{blockcount}_items_variety'] = 'regular'
+    hdf_group._v_attrs['nblocks'] = blockcount + 1
+    block_items = hdf_file.create_array(hdf_group,
+                                        f'block{blockcount}_items',
+                                        np.array(column_names))
+    block_items._v_attrs['kind'] = 'string'
+    block_items._v_attrs['name'] = 'N.'
+    block_items._v_attrs['transposed'] = 1
+    axis0 = hdf_file.get_node(f'/{group_name}/axis0')
+    axis0.append(np.array(column_names))
+
+    block_values = hdf_file.create_earray(hdf_group,
+                                          f'block{blockcount}_values',
+                                          data_type,
+                                          shape=(0, len(column_names)))
+    block_values._v_attrs['transposed'] = 1
+    return block_values
+
+
+def fill_block(file, group_name, block, data: np.ndarray):
+    axis1 = file.get_node(f'/{group_name}/axis1')
+    maxindex = len(axis1)
+    block.append(np.array(data))
+    if maxindex < len(block):
+        axis1.append(np.arange(maxindex, len(block)))
+
+
+def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool, chunk_length=1000000):
+    """ take in the unpacked root data and reformat into an hdf5 file.
+    Also add in the configuration from the run.
+    """
+    hd_file = create_empty_hdf_file(hdf_file, 1000000)
+
     if raw_data:
         tree_name = 'unpacker_data/hgcroc'
         chan_id_branch_names = ['chip', 'channel', 'half']
@@ -72,30 +116,11 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
         ttree = rfile[tree_name]
         keys = list(ttree.keys())
         root_data = np.array([ttree[key].array() for key in keys]).transpose()
-        total_length = len(root_data)
-
-        # create the hdf5 data structure for pandas
-        b0_items = hd_file.create_array('/data', 'block0_items', np.array(keys))
-        b0_items._v_attrs['kind'] = 'string'
-        b0_items._v_attrs['name'] = 'N.'
-        b0_items._v_attrs['transposed'] = 1
-
-        axis1 = hd_file.create_earray('/data', 'axis1', tables.IntAtom(),
-                                      shape=(0,),
-                                      expectedrows=total_length)
-        axis1.append(np.array(range(total_length)))
-        axis1._v_attrs['kind'] = 'integer'
-        axis1._v_attrs['name'] = 'N.'
-        axis1._v_attrs['transposed'] = 1
-
-        # fill the data from the root file into the hdf5
-        b0_values = hd_file.create_earray('/data', 'block0_values',
-                                          atom=tables.Float32Atom(len(keys)),
-                                          shape=(0,),
-                                          expectedrows=total_length)
-        b0_values.append(root_data)
-        b0_values._v_attrs['transposed'] = 1
+        blk_values = add_data_block(keys, tables.Int32Atom(), hd_file, 'data')
+        fill_block(hd_file, 'data', blk_values, root_data)
         hd_file.flush()
+        del root_data
+        chip_chan_indices = np.array([ttree[key].array() for key in chan_id_branch_names]).transpose()
 
         # determin the size of the block that holds the configuration
         chan_config = roc_channel_to_dict(complete_config, 0, 0, 1)
@@ -103,39 +128,16 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
         l1a_config = l1a_generator_settings(complete_config)
         chan_config = cfu.update_dict(chan_config, global_config)
         chan_config = cfu.update_dict(chan_config, l1a_config)
-        config_atom = tables.Int32Atom(shape=len(chan_config.values()))
+        config_blk = add_data_block(list(chan_config.keys()), tables.Int32Atom(), hd_file, 'data')
 
-        # create the rest of the needed data structures for the pandas dataframe
-        for key in chan_config.keys():
-            keys.append(key)
-        axis0 = hd_file.create_array('/data', 'axis0', np.array(keys))
-        axis0._v_attrs['kind'] = 'string'
-        axis0._v_attrs['name'] = 'N.'
-        axis0._v_attrs['transposed'] = 1
-        b1_items = hd_file.create_array('/data', 'block1_items',
-                                        np.array([str(k) for k in chan_config.keys()]))
-        b1_items._v_attrs['kind'] = 'string'
-        b1_items._v_attrs['name'] = 'N.'
-        b1_items._v_attrs['transposed'] = 1
-
-        # create the 2D array with every row being the chip channel and  (half|channeltype)
-        chan_id_branches = np.array([ttree[branch_name].array()
-                                     for branch_name in chan_id_branch_names],
-                                    dtype=np.int32).transpose()
-        conf_dset = hd_file.create_earray('/data',
-                                          'block1_values',
-                                          atom=config_atom,
-                                          shape=(0,),
-                                          expectedrows=total_length)
-        conf_dset._v_attrs['transposed'] = 1
         # merge in the configuration
-        add_config_to_dataset(chan_id_branches, conf_dset, complete_config,
+        add_config_to_dataset(chip_chan_indices, hd_file, config_blk, complete_config,
                               chunk_length, raw_data)
     hd_file.close()
 
 
 @jit(forceobj=True)
-def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chunklength: int, raw_data: bool):
+def add_config_to_dataset(chip_chan_indices, file, dataset, complete_config: dict, chunklength: int, raw_data: bool):
     """
     Add the configuration to the dataset
 
@@ -149,6 +151,8 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
     ----------
     chip_chan_indices : numpy.ndarray
         a 2D array where every row corresponds to [chip, channel, half_or_type]
+    file: tables.File
+        the file that the data should be written to
     dataset : tables.EArray
         the EArray that the data needs to be added to
     complete_config : dict
@@ -186,7 +190,8 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
                                                                  chan,
                                                                  chan_type))
             chunk_array[j] = np.array(list(chan_config.values()))
-        dataset.append(chunk_array)
+        fill_block(file, 'data', dataset, chunk_array)
+        file.flush()
     # add to the configuration to the last of the items that dont fully
     # fill up a chunk
     remaining_items = chip_chan_indices[chunks*chunklength:]
@@ -212,7 +217,7 @@ def add_config_to_dataset(chip_chan_indices, dataset, complete_config: dict, chu
                                                              chan,
                                                              chan_type))
         chunk_array[j] = np.array(list(chan_config.values()))
-    dataset.append(chunk_array)
+    fill_block(file, 'data', dataset, chunk_array)
 
 
 def merge_files(in_files: list, out_file: str, group_name: str='data'):
@@ -282,6 +287,8 @@ def l1a_generator_settings(complete_config: dict) -> dict:
         name = l1a_generator["name"]
         for key,value in l1a_generator.items():
             if key=="name": continue
+            if key=="flavor": continue
+            if key=="followMode": continue
             output_key = name + "_" + str(key)
             l1a_config[output_key] = value
     return l1a_config
