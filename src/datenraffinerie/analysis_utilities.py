@@ -37,6 +37,23 @@ def extract_data(rootfile: str, raw_data=False):
         return pd.DataFrame(run_data)
 
 
+def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False):
+    """
+    'unpack' the data from the raw data gathered into a root file that
+    can then be merged with the configuration into a large table
+    """
+    if raw_data:
+        output_type = ' > /dev/null'
+    else:
+        output_type = ' -t unpacked'
+    unpack_command = 'unpack'
+    input_file = ' -i ' + str(in_file_path)
+    output_command = ' -o ' + str(out_file_path)
+    full_unpack_command = unpack_command + input_file + output_command\
+        + output_type
+    return os.system(full_unpack_command)
+
+
 def create_empty_hdf_file(filename: str,
                           expectedrows: int,
                           compression: int = 1) -> tables.File:
@@ -492,6 +509,7 @@ def test_reformat_data():
     test_df = pd.read_hdf(test_hdf_path)
     for col in test_df.columns:
         assert col in expected_columns + data_columns + daq_columns
+
 
 def test_merge_files():
     pass

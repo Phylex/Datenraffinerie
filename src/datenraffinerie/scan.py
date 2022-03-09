@@ -17,22 +17,6 @@ from uproot.exceptions import KeyInFileError
 from . import config_utilities as cfu
 from . import analysis_utilities as anu
 
-def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False):
-    """
-    'unpack' the data from the raw data gathered into a root file that
-    can then be merged with the configuration into a large table
-    """
-    if raw_data:
-        output_type = ' > /dev/null'
-    else:
-        output_type = ' -t unpacked'
-    unpack_command = 'unpack'
-    input_file = ' -i ' + str(in_file_path)
-    output_command = ' -o ' + str(out_file_path)
-    full_unpack_command = unpack_command + input_file + output_command\
-        + output_type
-    return os.system(full_unpack_command)
-
 
 class Calibration(luigi.Task):
     """
@@ -160,7 +144,7 @@ class DrillingRig(luigi.Task):
 
         data_file_path = os.path.splitext(self.output().path)[0] + '.root'
 
-        unpack_raw_data_into_root(raw_data_file_path,
+        anu.unpack_raw_data_into_root(raw_data_file_path,
                                   data_file_path,
                                   raw_data=self.raw)
 
@@ -520,7 +504,7 @@ class Fracker(luigi.Task):
             data_file_base_name = os.path.splitext(raw_file.path)[0]
             unpacked_file_path = data_file_base_name + '.root'
 
-            result = unpack_raw_data_into_root(
+            result = anu.unpack_raw_data_into_root(
                     raw_file.path,
                     unpacked_file_path,
                     raw_data=self.raw)
