@@ -395,15 +395,25 @@ class DataField(luigi.Task):
             values = self.scan_parameters[0][1]
             parameter = list(self.scan_parameters[0][0])
             output_files = self.output()[1:]
-            for raw_file, value in zip(output_files, values):
+            output_configs = [os.path.splitext(of.path)[0] + '.yaml'
+                              for of in output_files]
+            for raw_file, output_config, value in\
+                    zip(output_files, output_configs, values):
                 if Path(raw_file.path).exists():
                     continue
                 # patch the target config with the key for the current run
                 # luigi might have converted an input list to a tuple
-                if type(value) == tuple:
+                if isinstance(value, tuple):
                     value = list(value)
+
+                # generate the run configuration and write it to a file
                 patch = cfu.generate_patch(parameter, value)
                 complete_config = cfu.update_dict(complete_config, patch)
+                with open(output_config, 'w') as run_config:
+                    run_config.write(yaml.safe_dump(complete_config))
+
+                # send the measurement command to the backend starting the
+                # measurement
                 socket.send_string('measure;'+yaml.safe_dump(complete_config))
                 # wait for the data to return
                 data = socket.recv()
