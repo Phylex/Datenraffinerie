@@ -149,9 +149,13 @@ class DrillingRig(luigi.Task):
 
         data_file_path = os.path.splitext(self.output().path)[0] + '.root'
 
-        anu.unpack_raw_data_into_root(raw_data_file_path,
+        result = anu.unpack_raw_data_into_root(raw_data_file_path,
                                   data_file_path,
                                   raw_data=self.raw)
+        if result != 0:
+            os.remove(raw_data_file_path)
+            os.remove(data_file_path)
+            raise ValueError(f"The unpacker failed for {raw_data_file_path}")
 
         # load the data from the unpacked root file and merge in the
         # data from the configuration for that run with the data
