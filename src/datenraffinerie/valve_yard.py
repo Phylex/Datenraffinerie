@@ -61,7 +61,7 @@ class ValveYard(luigi.WrapperTask):
                               analysis_module_path=self.analysis_module_path,
                               network_config=self.network_config,
                               loop=self.loop,
-                              event_data=procedure['raw'])
+                              event_mode=procedure['event_mode'])
         if procedure['type'] == 'daq':
             # the default values for the DAQ system and the target need to
             # be loaded on to the backend

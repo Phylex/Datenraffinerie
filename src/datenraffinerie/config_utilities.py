@@ -397,7 +397,7 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
             'daq_system_default_config': daq_system_default_config}
 
 
-def parse_analysis_config(analysis_config: dict) -> tuple:
+def parse_analysis_config(config: dict) -> tuple:
     """
     parse the analysis configuration from a dict and return it in the
     same way that the parse_scan_config
@@ -411,27 +411,35 @@ def parse_analysis_config(analysis_config: dict) -> tuple:
         analysis_label: name of the analysis
     """
     try:
-        analysis_label = analysis_config['name']
+        event_mode = config['event_mode']
+        if not isinstance(event_mode, bool):
+            raise ConfigFormatError("The event_data field needs to contain a"
+                                    " boolean")
+    except KeyError:
+        event_mode = False
+    try:
+        analysis_label = config['name']
     except KeyError as err:
         raise ConfigFormatError("The analysis configuration needs"
                                 " a name field") from err
     try:
-        analysis_object_name = analysis_config['python_module_name']
+        analysis_object_name = config['python_module_name']
     except KeyError as err:
         raise ConfigFormatError("The analysis configuration needs"
                                 " a python_module_name field") from err
     # parse the daq that is required for the analysis
-    if 'daq' not in analysis_config.keys():
+    if 'daq' not in config.keys():
         raise ConfigFormatError("an analysis must specify a daq task")
-    daq = analysis_config['daq']
+    daq = config['daq']
 
     analysis_parameters = {}
-    if 'parameters' in analysis_config.keys():
-        if not isinstance(analysis_config['parameters'], dict):
+    if 'parameters' in config.keys():
+        if not isinstance(config['parameters'], dict):
             raise ConfigFormatError("The parameters of an analysis must be"
                                     " a dictionary")
-        analysis_parameters = analysis_config['parameters']
+        analysis_parameters = config['parameters']
     return {'parameters': analysis_parameters,
+            'event_mode': event_mode,
             'daq': daq,
             'python_module': analysis_object_name,
             'name': analysis_label,
@@ -599,6 +607,7 @@ def test_analysis_config():
     assert parsed_config['name'] == 'example_analysis'
     assert parsed_config['type'] == 'analysis'
     ana_params = parsed_config['parameters']
+    assert not ana_params['event_mode']
     assert ana_params['p1'] == 346045
     assert ana_params['p2'] == 45346
     assert ana_params['p3'] == 'string option'
