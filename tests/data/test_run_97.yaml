@@ -1,0 +1,290 @@
+daq:
+  client:
+    data_push_port: 8888
+    hw_type: LD
+    serverIP: hc640256
+  server:
+    IdelayStep: 8
+    NChips: 3
+    NEvents: 1000
+    Number_of_events_per_readout: '-1'
+    delayScanData_port: '8889'
+    elinks_daq:
+    - idcode: 0
+      name: link0
+      polarity: 0
+    - idcode: 1
+      name: link1
+      polarity: 1
+    - idcode: 4
+      name: link4
+      polarity: 0
+    - idcode: 5
+      name: link5
+      polarity: 1
+    - idcode: 8
+      name: link8
+      polarity: 0
+    - idcode: 9
+      name: link9
+      polarity: 1
+    elinks_trg:
+    - idcode: 0
+      name: link0
+      polarity: 0
+    - idcode: 2
+      name: link1
+      polarity: 1
+    - idcode: 3
+      name: link2
+      polarity: 0
+    - idcode: 1
+      name: link3
+      polarity: 1
+    - idcode: 4
+      name: link4
+      polarity: 0
+    - idcode: 6
+      name: link5
+      polarity: 1
+    - idcode: 7
+      name: link6
+      polarity: 0
+    - idcode: 5
+      name: link7
+      polarity: 1
+    - idcode: 8
+      name: link8
+      polarity: 0
+    - idcode: 1
+      name: link9
+      polarity: 1
+    - idcode: 11
+      name: link10
+      polarity: 0
+    - idcode: 9
+      name: link11
+      polarity: 1
+    l1a_enables:
+      block_sequencer: 0
+      external_l1as: 0
+      random_l1a: 0
+    l1a_generator_settings:
+    - BX: 16
+      enable: 1
+      flavor: CALPULINT
+      followMode: DISABLE
+      length: 1
+      name: A
+      prescale: 0
+    - BX: 38
+      enable: 0
+      flavor: L1A
+      followMode: A
+      length: 1
+      name: B
+      prescale: 0
+    - BX: 48
+      enable: 0
+      flavor: L1A
+      followMode: DISABLE
+      length: 1
+      name: C
+      prescale: 0
+    - BX: 64
+      enable: 0
+      flavor: L1A
+      followMode: DISABLE
+      length: 1
+      name: D
+      prescale: 0
+    l1a_settings:
+      bx_spacing: 43
+      ext_delay: 0
+      external_debounce: 0
+      length: 1
+      log2_rand_bx_period: 0
+    zmqPushPull_port: '8888'
+target:
+  hostname: hc640256.cern.ch
+  port: 5555
+  roc_s0:
+    DigitalHalf:
+      0:
+        CalibrationSC: 1
+        IdleFrame: 214748364
+        L1Offset: 10
+      1:
+        CalibrationSC: 1
+        IdleFrame: 214748364
+        L1Offset: 10
+    GlobalAnalog:
+      0:
+        Delay40: 2
+        Delay65: 3
+        Delay87: 3
+        Delay9: 3
+        range_inv: 6
+        range_tot: 4
+      1:
+        Delay40: 2
+        Delay65: 3
+        Delay87: 3
+        Delay9: 3
+        range_inv: 6
+        range_tot: 4
+    ReferenceVoltage:
+      0:
+        Calib: 0
+        IntCtest: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Refi: 1
+        Toa_vref: 400
+        Tot_vref: 700
+        Vbg_1v: 3
+      1:
+        Calib: 0
+        IntCtest: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Refi: 1
+        Toa_vref: 400
+        Tot_vref: 700
+        Vbg_1v: 3
+    Top:
+      0:
+        BIAS_I_PLL_D: 63
+        EN_HIGH_CAPA: 1
+        RunL: 1
+        RunR: 1
+        phase_strobe: 6
+    ch:
+      10:
+        HighRange: 1
+      20:
+        HighRange: 1
+      40:
+        HighRange: 1
+      50:
+        HighRange: 1
+  roc_s1:
+    DigitalHalf:
+      0:
+        CalibrationSC: 1
+        IdleFrame: 214748364
+        L1Offset: 10
+      1:
+        CalibrationSC: 1
+        IdleFrame: 214748364
+        L1Offset: 10
+    GlobalAnalog:
+      0:
+        Delay40: 2
+        Delay65: 3
+        Delay87: 3
+        Delay9: 3
+        range_inv: 6
+        range_tot: 4
+      1:
+        Delay40: 2
+        Delay65: 3
+        Delay87: 3
+        Delay9: 3
+        range_inv: 6
+        range_tot: 4
+    ReferenceVoltage:
+      0:
+        Calib: 0
+        IntCtest: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Refi: 1
+        Toa_vref: 400
+        Tot_vref: 700
+        Vbg_1v: 3
+      1:
+        Calib: 0
+        IntCtest: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Refi: 1
+        Toa_vref: 400
+        Tot_vref: 700
+        Vbg_1v: 3
+    Top:
+      0:
+        BIAS_I_PLL_D: 63
+        EN_HIGH_CAPA: 1
+        RunL: 1
+        RunR: 1
+        phase_strobe: 6
+    ch:
+      10:
+        HighRange: 1
+      20:
+        HighRange: 1
+      40:
+        HighRange: 1
+      50:
+        HighRange: 1
+  roc_s2:
+    DigitalHalf:
+      0:
+        CalibrationSC: 1
+        IdleFrame: 214748364
+        L1Offset: 10
+      1:
+        CalibrationSC: 1
+        IdleFrame: 214748364
+        L1Offset: 10
+    GlobalAnalog:
+      0:
+        Delay40: 2
+        Delay65: 3
+        Delay87: 3
+        Delay9: 3
+        range_inv: 6
+        range_tot: 4
+      1:
+        Delay40: 2
+        Delay65: 3
+        Delay87: 3
+        Delay9: 3
+        range_inv: 6
+        range_tot: 4
+    ReferenceVoltage:
+      0:
+        Calib: 0
+        IntCtest: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Refi: 1
+        Toa_vref: 400
+        Tot_vref: 700
+        Vbg_1v: 3
+      1:
+        Calib: 0
+        IntCtest: 1
+        Inv_vref: 300
+        Noinv_vref: 100
+        Refi: 1
+        Toa_vref: 400
+        Tot_vref: 700
+        Vbg_1v: 3
+    Top:
+      0:
+        BIAS_I_PLL_D: 63
+        EN_HIGH_CAPA: 1
+        RunL: 1
+        RunR: 1
+        phase_strobe: 6
+    ch:
+      10:
+        HighRange: 1
+      20:
+        HighRange: 1
+      40:
+        HighRange: 1
+      50:
+        HighRange: 1
