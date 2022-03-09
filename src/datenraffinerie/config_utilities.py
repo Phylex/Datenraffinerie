@@ -544,13 +544,17 @@ def test_patch_generator():
     """
     test that the generate_patch_dict_from_key_tuple function
     """
-    keys = [['k1', 'k2', 'k3'], 'k4', 'k5']
+    keys = [[['k1', 'k2', 'k3'], 'k4', 'k5'], ['daq', ['k1', 'k2', 'k3'], 'k4', 'k5']]
     value = 1
-    expected_dict = {'k1': {'k4': {'k5': 1}},
+    expected_dict = [{'target' : {'k1': {'k4': {'k5': 1}},
                      'k2': {'k4': {'k5': 1}},
-                     'k3': {'k4': {'k5': 1}}}
-    patch_dict = generate_patch(keys, value)
-    assert patch_dict == expected_dict
+                     'k3': {'k4': {'k5': 1}}}},
+                     {'daq' : {'k1': {'k4': {'k5': 1}},
+                     'k2': {'k4': {'k5': 1}},
+                     'k3': {'k4': {'k5': 1}}}}]
+    for key, exd_dict in zip(keys, expected_dict):
+        patch_dict = generate_patch(key, value)
+        assert patch_dict == exd_dict
 
 
 def test_diff_dict():
@@ -573,7 +577,7 @@ def test_parse_scan_config():
                             'target_init_config',
                             'daq_system_config',
                             'daq_system_default_config',
-                            'calibration']
+                            'calibration', 'raw']
     for scan in test_config:
         scan_configs.append(parse_scan_config(scan, test_fpath))
     assert len(scan_configs) == 3  # number of different scans
