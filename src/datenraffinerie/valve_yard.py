@@ -81,7 +81,7 @@ class ValveYard(luigi.WrapperTask):
             if len(procedure['parameters']) == 1 and self.loop:
                 return Fracker(identifier=0,
                                label=self.procedure_label,
-                               output_dir=str(output_dir.resolve()),
+                               output_dir=str((output_dir / self.procedure_label).resolve()),
                                output_format='hdf5',
                                scan_parameters=procedure['parameters'],
                                target_config=procedure['target_init_config'],
@@ -96,7 +96,7 @@ class ValveYard(luigi.WrapperTask):
                                raw=procedure['raw']) # indicate if to produce event by event data data
             return DataField(identifier=0,
                              label=self.procedure_label,
-                             output_dir=str(output_dir.resolve()),
+                             output_dir=str((output_dir / self.procedure_label).resolve()),
                              output_format='hdf5',
                              scan_parameters=procedure['parameters'],
                              target_config=procedure['target_init_config'],

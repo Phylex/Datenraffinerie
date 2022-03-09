@@ -37,7 +37,7 @@ class Calibration(luigi.Task):
         if self.calibration is not None:
             return ValveYard(self.root_config_path,
                              self.calibration,
-                             str(Path(self.output_dir).resolve()),
+                             os.path.dirname(str(Path(self.output_dir).resolve())),
                              str(Path(self.analysis_module_path).resolve()),
                              self.loop)
 
