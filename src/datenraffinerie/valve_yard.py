@@ -40,7 +40,6 @@ class ValveYard(luigi.WrapperTask):
         data_dir = Path(self.output_dir)
         if not data_dir.exists():
             os.makedirs(data_dir)
-        output_dir = data_dir
         procedures, workflows = cfu.parse_config_file(self.root_config_file)
         procedure_names = list(map(lambda p: p['name'], procedures))
         if self.procedure_label in procedure_names:
@@ -48,13 +47,15 @@ class ValveYard(luigi.WrapperTask):
         else:
             raise ctrl.DAQConfigError(f"No '{self.procedure_label}' found in"
                                       " the config files")
+        output_dir = data_dir / self.procedure_label
+        if not output_dir.exists():
+            os.makedirs(output_dir)
         procedure = procedures[procedure_index]
         if procedure['type'] == 'analysis':
             return Distillery(name=self.procedure_label,
                               python_module=procedure['python_module'],
                               daq=procedure['daq'],
-                              output_dir=str(
-                                  (output_dir/self.procedure_label).resolve()),
+                              output_dir=str(output_dir.resolve()),
                               parameters=procedure['parameters'],
                               root_config_path=str(
                                   Path(self.root_config_file).resolve()),
@@ -81,7 +82,7 @@ class ValveYard(luigi.WrapperTask):
             if len(procedure['parameters']) == 1 and self.loop:
                 return Fracker(identifier=0,
                                label=self.procedure_label,
-                               output_dir=str((output_dir / self.procedure_label).resolve()),
+                               output_dir=str(output_dir.resolve()),
                                output_format='hdf5',
                                scan_parameters=procedure['parameters'],
                                target_config=procedure['target_init_config'],
@@ -96,7 +97,7 @@ class ValveYard(luigi.WrapperTask):
                                raw=procedure['raw']) # indicate if to produce event by event data data
             return DataField(identifier=0,
                              label=self.procedure_label,
-                             output_dir=str((output_dir / self.procedure_label).resolve()),
+                             output_dir=str(output_dir.resolve()),
                              output_format='hdf5',
                              scan_parameters=procedure['parameters'],
                              target_config=procedure['target_init_config'],
