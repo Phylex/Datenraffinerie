@@ -231,45 +231,45 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
     # copy the first of the input files to become the merged output
     shutil.copy(start_file, out_file)
     hd_file = tables.open_file(out_file, mode='r+')
-    block0_items = hd_file.root.data.block0_items
-    blk0 = hd_file.root.data.block0_values
-    block1_items = hd_file.root.data.block1_items
-    blk1 = hd_file.root.data.block1_values
-    axis0 = hd_file.root.data.axis0
-    highest_index = len(axis0)
-    chunksize = 1000000
+    axis1 = hd_file.root.data.axis1
+    nblocks = hd_file.root.data._v_attrs['nblocks']
+    chunksize = 100000
     for in_f in in_files:
-        in_blk0 = in_f.root.data.block0_items
-        in_blk1 = in_f.root.data.block1_items
-        for elem, in_elem in zip(block0_items, in_blk0):
+        in_ax1 = in_f.root.data.axis1
+        inblocks = in_f.root.data._v_attrs['nblocks']
+        for elem, in_elem in zip(axis1, in_ax1):
             if elem != in_elem:
-                raise AnalysisError('the block0_items of the files to be merged must match')
-        for elem, in_elem in zip(block1_items, in_blk1):
-            if elem != in_elem:
-                raise AnalysisError('the block1_items of the files to be merged must match')
-        in_blk0 = in_f.root.data.block0_values
-        in_blk1 = in_f.root.data.block1_values
-        # append the data for block0
-        chunks = len(in_blk0) // chunksize
-        for chunk in range(chunks):
-            start = chunk * chunksize
-            stop = start + chunksize
-            blk0.append(in_blk0.read(start, stop))
-            axis0.append(np.arange(highest_index, highest_index+chunksize))
-            highest_index = highest_index + chunksize
-        blk0.append(in_blk0.read(chunks*chunksize, len(in_blk0)))
-        axis0.append(np.arange(highest_index,
-                               highest_index + len(in_blk0) - chunks*chunksize))
-        # append the data for block1
-        chunks = len(in_blk1) // chunksize
-        for chunk in range(chunks):
-            start = chunk * chunksize
-            stop = start + chunksize
-            blk1.append(in_blk1.read(start, stop))
-        blk1.append(in_blk1.read(chunks*chunksize, len(in_blk1)))
+                raise AnalysisError('the columns of the files '
+                                    'to be merged must match')
+        if nblocks != inblocks:
+            raise AnalysisError('the number of Blocks must be '
+                                'Identical to merge the files')
+
+        for i in range(inblocks):
+            out_block_items = getattr(hd_file.root.data, f'block{i}_items')
+            out_block_values = getattr(hd_file.root.data, f'block{i}_values')
+            in_block_items = getattr(in_f.root.data, f'block{i}_items')
+            in_block_values = getattr(in_f.root.data, f'block{i}_values')
+            for elem, in_elem in zip(out_block_items, in_block_items):
+                if elem != in_elem:
+                    raise AnalysisError('The items in the '
+                                        f'block {i} don\'t match')
+            # append the data from the input block to the output block
+            chunks = len(in_block_values) // chunksize
+            for chunk in range(chunks):
+                start = chunk * chunksize
+                stop = start + chunksize
+                in_data = in_block_values.read(start, stop)
+                fill_block(hd_file, 'data', out_block_values, in_data)
+            # append the data that did not fill an entire chunk
+            start = chunks * chunksize
+            stop = len(in_block_values)
+            in_data = in_block_values.read(start, stop)
+            fill_block(hd_file, 'data', out_block_values, in_data)
         in_f.close()
 
-@jit(cache=True, forceobj=True)
+
+@jit(forceobj=True)
 def l1a_generator_settings(complete_config: dict) -> dict:
     """add the config information of the chip half that corresponds to the particular
     channel
@@ -363,14 +363,14 @@ def roc_channel_to_globals(complete_config: dict, chip_id: int, channel_id: int,
 def test_extract_data():
     test_root_path = Path('../../tests/data/run.root')
     frame = extract_data(test_root_path.resolve())
-    expected_columns = ['chip', 'channel', 'channeltype',
+    data_columns = ['chip', 'channel', 'channeltype',
                         'adc_median', 'adc_iqr', 'tot_median',
                         'tot_iqr', 'toa_median', 'toa_iqr', 'adc_mean',
                         'adc_stdd', 'tot_mean',
                         'tot_stdd', 'toa_mean', 'toa_stdd', 'tot_efficiency',
                         'tot_efficiency_error', 'toa_efficiency',
                         'toa_efficiency_error']
-    for col in expected_columns:
+    for col in data_columns:
         _ = frame[col]
 
 
@@ -379,233 +379,118 @@ def test_reformat_data():
     column in the dataframe
     """
     from . import config_utilities as cfu
-    test_data_path = Path('../../tests/data/event_run.root')
-    test_hdf_path = Path('../../tests/data/event_run.hdf5')
+    test_data_path = Path('../../tests/data/run.root')
+    test_hdf_path = Path('../../tests/data/run.hdf5')
+
+    # load the configuration of the target for the run
     configuration = cfu.load_configuration('../../tests/data/default.yaml')
     overlay = cfu.load_configuration('../../tests/data/run.yaml')
+
+    # load the daq config and merge everything together
+    daq_config = cfu.load_configuration('../../tests/configuration/defaults/daq-system-config.yaml')
     configuration = cfu.update_dict(configuration, overlay)
-    reformat_data(test_data_path, test_hdf_path, configuration, True)
+    configuration = {'target': configuration, 'daq': daq_config}
+
+    # run the function under test
+    reformat_data(test_data_path, test_hdf_path, configuration, False)
+
+    # check that the columns from the config show up in the dataframe
+    data_columns = ['chip', 'channel', 'channeltype',
+                        'adc_median', 'adc_iqr', 'tot_median',
+                        'tot_iqr', 'toa_median', 'toa_iqr', 'adc_mean',
+                        'adc_stdd', 'tot_mean',
+                        'tot_stdd', 'toa_mean', 'toa_stdd', 'tot_efficiency',
+                        'tot_efficiency_error', 'toa_efficiency',
+                        'toa_efficiency_error']
     expected_columns = [
-        'Adc_pedestal',
-        'Channel_off',
-        'DAC_CAL_CTDC_TOA',
-        'DAC_CAL_CTDC_TOT',
-        'DAC_CAL_FTDC_TOA',
-        'DAC_CAL_FTDC_TOT',
-        'DIS_TDC',
-        'ExtData',
-        'HZ_inv',
-        'HZ_noinv',
-        'HighRange',
-        'IN_FTDC_ENCODER_TOA',
-        'IN_FTDC_ENCODER_TOT',
-        'Inputdac',
-        'LowRange',
-        'mask_AlignBuffer',
-        'mask_adc',
-        'mask_toa',
-        'mask_tot',
-        'probe_inv',
-        'probe_noinv',
-        'probe_pa',
-        'probe_toa',
-        'probe_tot',
-        'sel_trig_toa',
-        'sel_trig_tot',
-        'trim_inv',
-        'trim_toa',
-        'trim_tot',
-        'Adc_TH',
-        'Bx_offset',
-        'CalibrationSC',
-        'ClrAdcTot_trig',
-        'IdleFrame',
-        'L1Offset',
-        'MultFactor',
-        'SC_testRAM',
-        'SelTC4',
-        'Tot_P0',
-        'Tot_P1',
-        'Tot_P2',
-        'Tot_P3',
-        'Tot_P_Add',
-        'Tot_TH0',
-        'Tot_TH1',
-        'Tot_TH2',
-        'Tot_TH3',
-        'sc_testRAM',
-        'Cf',
-        'Cf_comp',
-        'Clr_ADC',
-        'Clr_ShaperTail',
-        'Delay40',
-        'Delay65',
-        'Delay87',
-        'Delay9',
-        'En_hyst_tot',
-        'Ibi_inv',
-        'Ibi_inv_buf',
-        'Ibi_noinv',
-        'Ibi_noinv_buf',
-        'Ibi_sk',
-        'Ibo_inv',
-        'Ibo_inv_buf',
-        'Ibo_noinv',
-        'Ibo_noinv_buf',
-        'Ibo_sk',
-        'ON_pa',
-        'ON_ref_adc',
-        'ON_rtr',
-        'ON_toa',
-        'ON_tot',
-        'Rc',
-        'Rf',
-        'S_inv',
-        'S_inv_buf',
-        'S_noinv',
-        'S_noinv_buf',
-        'S_sk',
-        'SelExtADC',
-        'SelRisingEdge',
-        'dac_pol',
-        'gain_tot',
-        'neg',
-        'pol_trig_toa',
-        'range_indac',
-        'range_inv',
-        'range_tot',
-        'ref_adc',
-        'trim_vbi_pa',
-        'trim_vbo_pa',
-        'BIAS_CAL_DAC_CTDC_P_D',
-        'BIAS_CAL_DAC_CTDC_P_EN',
-        'BIAS_FOLLOWER_CAL_P_CTDC_EN',
-        'BIAS_FOLLOWER_CAL_P_D',
-        'BIAS_FOLLOWER_CAL_P_FTDC_D',
-        'BIAS_FOLLOWER_CAL_P_FTDC_EN',
-        'BIAS_I_CTDC_D',
-        'BIAS_I_FTDC_D',
-        'CALIB_CHANNEL_DLL',
-        'CTDC_CALIB_FREQUENCY',
-        'CTRL_IN_REF_CTDC_P_D',
-        'CTRL_IN_REF_CTDC_P_EN',
-        'CTRL_IN_REF_FTDC_P_D',
-        'CTRL_IN_REF_FTDC_P_EN',
-        'CTRL_IN_SIG_CTDC_P_D',
-        'CTRL_IN_SIG_CTDC_P_EN',
-        'CTRL_IN_SIG_FTDC_P_D',
-        'CTRL_IN_SIG_FTDC_P_EN',
-        'EN_MASTER_CTDC_DLL',
-        'EN_MASTER_CTDC_VOUT_INIT',
-        'EN_MASTER_FTDC_DLL',
-        'EN_MASTER_FTDC_VOUT_INIT',
-        'EN_REF_BG',
-        'FOLLOWER_CTDC_EN',
-        'FOLLOWER_FTDC_EN',
-        'FTDC_CALIB_FREQUENCY',
-        'GLOBAL_DISABLE_TOT_LIMIT',
-        'GLOBAL_EN_BUFFER_CTDC',
-        'GLOBAL_EN_BUFFER_FTDC',
-        'GLOBAL_EN_TOT_PRIORITY',
-        'GLOBAL_EN_TUNE_GAIN_DAC',
-        'GLOBAL_FORCE_EN_CLK',
-        'GLOBAL_FORCE_EN_OUTPUT_DATA',
-        'GLOBAL_FORCE_EN_TOT',
-        'GLOBAL_INIT_DAC_B_CTDC',
-        'GLOBAL_LATENCY_TIME',
-        'GLOBAL_MODE_FTDC_TOA',
-        'GLOBAL_MODE_NO_TOT_SUB',
-        'GLOBAL_MODE_TOA_DIRECT_OUTPUT',
-        'GLOBAL_SEU_TIME_OUT',
-        'GLOBAL_TA_SELECT_GAIN_TOA',
-        'GLOBAL_TA_SELECT_GAIN_TOT',
-        'INV_FRONT_40MHZ',
-        'START_COUNTER',
-        'VD_CTDC_N_D',
-        'VD_CTDC_N_DAC_EN',
-        'VD_CTDC_N_FORCE_MAX',
-        'VD_CTDC_P_D',
-        'VD_CTDC_P_DAC_EN',
-        'VD_FTDC_N_D',
-        'VD_FTDC_N_DAC_EN',
-        'VD_FTDC_N_FORCE_MAX',
-        'VD_FTDC_P_D',
-        'VD_FTDC_P_DAC_EN',
-        'sel_clk_rcg',
-        'Calib',
-        'ExtCtest',
-        'IntCtest',
-        'Inv_vref',
-        'Noinv_vref',
-        'ON_dac',
-        'Refi',
-        'Toa_vref',
-        'Tot_vref',
-        'Vbg_1v',
-        'probe_dc',
-        'probe_dc1',
-        'probe_dc2',
-        'BIAS_I_PLL_D',
-        'DIV_PLL',
-        'EN',
-        'EN_HIGH_CAPA',
-        'EN_LOCK_CONTROL',
-        'EN_PLL',
-        'EN_PhaseShift',
-        'EN_RCG',
-        'EN_REF_BG',
-        'EN_probe_pll',
-        'ENpE',
-        'ERROR_LIMIT_SC',
-        'EdgeSel_T1',
-        'FOLLOWER_PLL_EN',
-        'INIT_D',
-        'INIT_DAC_EN',
-        'Pll_Locked_sc',
-        'PreL1AOffset',
-        'RunL',
-        'RunR',
-        'S',
-        'TestMode',
-        'VOUT_INIT_EN',
-        'VOUT_INIT_EXT_D',
-        'VOUT_INIT_EXT_EN',
-        'b_in',
-        'b_out',
-        'err_countL',
-        'err_countR',
-        'fc_error_count',
-        'in_inv_cmd_rx',
-        'lock_count',
-        'n_counter_rst',
-        'phase_ck',
-        'phase_strobe',
-        'rcg_gain',
-        'sel_40M_ext',
-        'sel_error',
-        'sel_lock',
-        'sel_strobe_ext',
-        'srout',
-        'statusL',
-        'statusR']
-    df = pd.read_hdf(test_hdf_path)
-    for c in df.columns:
-        assert c in expected_columns
+        'Adc_pedestal', 'Channel_off', 'DAC_CAL_CTDC_TOA', 'DAC_CAL_CTDC_TOT',
+        'DAC_CAL_FTDC_TOA', 'DAC_CAL_FTDC_TOT', 'DIS_TDC', 'ExtData',
+        'HZ_inv', 'HZ_noinv', 'HighRange', 'IN_FTDC_ENCODER_TOA',
+        'IN_FTDC_ENCODER_TOT', 'Inputdac', 'LowRange', 'mask_AlignBuffer',
+        'mask_adc', 'mask_toa', 'mask_tot', 'probe_inv',
+        'probe_noinv', 'probe_pa', 'probe_toa', 'probe_tot',
+        'sel_trig_toa', 'sel_trig_tot', 'trim_inv', 'trim_toa',
+        'trim_tot', 'Adc_TH', 'Bx_offset', 'CalibrationSC',
+        'ClrAdcTot_trig', 'IdleFrame', 'L1Offset', 'MultFactor',
+        'SC_testRAM', 'SelTC4', 'Tot_P0', 'Tot_P1',
+        'Tot_P2', 'Tot ', 'Tot_P_Add',
+        'Tot_TH0', 'Tot_TH1', 'Tot_TH2', 'Tot_TH3',
+        'sc_testRAM', 'Cf', 'Cf_comp', 'Clr_ADC',
+        'Clr_ShaperTail', 'Delay40', 'Delay65', 'Delay87',
+        'Delay9', 'En_hyst_tot', 'Ibi_inv', 'Ibi_inv_buf',
+        'Ibi_noinv', 'Ibi_noinv_buf', 'Ibi_sk', 'Ibo_inv',
+        'Ibo_inv_buf', 'Ibo_no ', 'Ibo_noinv_buf',
+        'Ibo_sk', 'ON ', 'ON_ref_adc',
+        'ON_rtr', 'ON_toa', 'ON_tot', 'Rc',
+        'Rf', 'S_inv', 'S_inv_buf',
+        'S_noinv', 'S_noinv_buf', 'S_sk', 'SelExtADC',
+        'SelRisingEdge', 'dac_pol', 'gain_tot', 'neg',
+        'pol_trig_toa', 'range_indac', 'range_inv', 'range_tot',
+        'ref_adc', 'trim_vbi_pa', 'trim_vbo_pa', 'BIAS_CAL_DAC_CTDC_P_D',
+        'BIAS_CAL_DAC_CTDC_P_EN', 'BIAS_FOLLOWER_CAL_P_CTDC_EN',
+        'BIAS_FOLLOWER_CAL_P_D', 'BIAS_FOLLOWER_CAL_P_FTDC_D',
+        'BIAS_FOLLOWER_CAL_P_FTDC_EN', 'BIAS_I_CTDC_D',
+        'BIAS_I_FTDC_D', 'CALIB_CHANNEL_DLL',
+        'CTDC_CALIB_FREQUENCY', 'CTRL_IN_REF_CTDC_P_D',
+        'CTRL_IN_REF_CTDC_P_EN', 'CTRL_IN_REF_FTDC_P_D',
+        'CTRL_IN_REF_FTDC_P_EN', 'CTRL_IN_SIG_CTDC_P_D',
+        'CTRL_IN_SIG_CTDC_P_EN', 'CTRL_IN_SIG_FTDC_P_D',
+        'CTRL_IN_SIG_FTDC_P_EN', 'EN_MASTER_CTDC_DLL',
+        'EN_MASTER_CTDC_VOUT_INIT', 'EN_MASTER_FTDC_DLL',
+        'EN_MASTER_FTDC_VOUT_INIT', 'EN_REF_BG',
+        'FOLLOWER_CTDC_EN', 'FOLLOWER_FTDC_EN',
+        'FTDC_CALIB_FREQUENCY', 'GLOBAL_DISABLE_TOT_LIMIT',
+        'GLOBAL_EN_BUFFER_CTDC', 'GLOBAL_EN_BUFFER_FTDC',
+        'GLOBAL_EN_TOT_PRIORITY', 'GLOBAL_EN_TUNE_GAIN_DAC',
+        'GLOBAL_FORCE_EN_CLK', 'GLOBAL_FORCE_EN_OUTPUT_DATA',
+        'GLOBAL_FORCE_EN_TOT', 'GLOBAL_INIT_DAC_B_CTDC',
+        'GLOBAL_LATENCY_TIME', 'GLOBAL_MODE_FTDC_TOA',
+        'GLOBAL_MODE_NO_TOT_SUB', 'GLOBAL_MODE_TOA_DIRECT_OUTPUT',
+        'GLOBAL_SEU_TIME_OUT', 'GLOBAL_TA_SELECT_GAIN_TOA',
+        'GLOBAL_TA_SELECT_GAIN_TOT', 'INV_FRONT_40MHZ',
+        'START_COUNTER', 'VD_CTDC_N_D',
+        'VD_CTDC_N_DAC_EN', 'VD_CTDC_N_FORCE_MAX',
+        'VD_CTDC_P_D', 'VD_CTDC_P_DAC_EN',
+        'VD_FTDC_N_D', 'VD_FTDC_N_DAC_EN',
+        'VD_FTDC_N_FORCE_MAX', 'VD_FTDC_P_D',
+        'VD_FTDC_P_DAC_EN', 'sel_clk_rcg', 'Calib', 'ExtCtest',
+        'IntCtest', 'Inv_vref', 'Noinv_vref', 'ON_dac',
+        'Refi', 'Toa_vref', 'Tot_vref', 'Vbg_1v',
+        'probe_dc', 'probe_dc1', 'probe_dc2', 'BIAS_I_PLL_D',
+        'DIV_PLL', 'EN', 'EN_HIGH_CAPA', 'EN_LOCK_CONTROL',
+        'EN_PLL', 'EN_PhaseShift', 'EN_RCG', 'EN_REF_BG',
+        'EN_probe_pll', 'ENpE', 'ERROR_LIMIT_SC', 'EdgeSel_T1',
+        'FOLLOWER_PLL_EN', 'INIT_D', 'INIT_DAC_EN', 'Pll_Locked_sc',
+        'PreL1AOffset', 'RunL', 'RunR', 'S',
+        'TestMode', 'VOUT_INIT_EN', 'VOUT_INIT_EXT_D', 'VOUT_INIT_EXT_EN',
+        'b_in', 'b_out', 'err_countL', 'err_countR',
+        'fc_error_count', 'in_inv_cmd_rx', 'lock_count', 'n_counter_rst',
+        'phase_ck', 'phase_strobe', 'rcg_gain', 'sel_40M_ext',
+        'sel_error', 'sel_lock', 'sel_strobe_ext', 'srout',
+        'statusL', 'statusR', 'Tot_P3', 'Ibo_noinv', 'ON_pa'
+        ]
 
+    daq_columns = ['Bx_trigger',
+                   'A_enable',
+                   'B_enable',
+                   'C_enable',
+                   'D_enable',
+                   'A_BX',
+                   'B_BX',
+                   'C_BX',
+                   'D_BX',
+                   'A_length',
+                   'B_length',
+                   'C_length',
+                   'D_length',
+                   'A_prescale',
+                   'B_prescale',
+                   'C_prescale',
+                   'D_prescale',
+                   ]
+    test_df = pd.read_hdf(test_hdf_path)
+    for col in test_df.columns:
+        assert col in expected_columns + data_columns + daq_columns
 
-def test_add_half_wise_data():
-    """test that all the half_wise parameters are added to the dataframe
-    :returns: Nothing
-
-    """
-    from . import config_utilities as cfu
-    test_data_path = Path('../../tests/data/run.root')
-    frame = extract_data(test_data_path.resolve())
-    default = cfu.load_configuration('../../tests/data/default.yaml')
-    overlay = cfu.load_configuration('../../tests/data/run.yaml')
-    config = cfu.update_dict(default, overlay)
-    frame = add_half_wise_data(frame, config)
-    expected_columns = [
-           ]
-    for col in expected_columns:
-        print(frame[col])
+def test_merge_files():
+    pass
