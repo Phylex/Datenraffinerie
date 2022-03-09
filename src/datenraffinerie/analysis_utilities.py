@@ -14,8 +14,7 @@ from numba import jit
 
 class AnalysisError(Exception):
     def __init__(self, message):
-        super().__init__()
-        self.message = message
+        super().__init__(message)
 
 
 def extract_data(rootfile: str, raw_data=False):
@@ -231,19 +230,19 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
     # copy the first of the input files to become the merged output
     shutil.copy(start_file, out_file)
     hd_file = tables.open_file(out_file, mode='r+')
-    axis1 = hd_file.root.data.axis1
+    axis0 = hd_file.root.data.axis0
     nblocks = hd_file.root.data._v_attrs['nblocks']
     chunksize = 100000
     for in_f in in_files:
-        in_ax1 = in_f.root.data.axis1
+        in_ax0 = in_f.root.data.axis0
         inblocks = in_f.root.data._v_attrs['nblocks']
-        for elem, in_elem in zip(axis1, in_ax1):
-            if elem != in_elem:
-                raise AnalysisError('the columns of the files '
-                                    'to be merged must match')
         if nblocks != inblocks:
             raise AnalysisError('the number of Blocks must be '
                                 'Identical to merge the files')
+        for elem, in_elem in zip(axis0, in_ax0):
+            if elem != in_elem:
+                raise AnalysisError('the columns of the files '
+                                    'to be merged must match')
 
         for i in range(inblocks):
             out_block_items = getattr(hd_file.root.data, f'block{i}_items')
