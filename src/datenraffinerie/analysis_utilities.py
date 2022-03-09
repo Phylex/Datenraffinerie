@@ -266,6 +266,8 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
             in_data = in_block_values.read(start, stop)
             fill_block(hd_file, 'data', out_block_values, in_data)
         in_f.close()
+        hd_file.flush()
+    hd_file.close()
 
 
 @jit(forceobj=True)
