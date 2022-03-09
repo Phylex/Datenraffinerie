@@ -156,7 +156,6 @@ class DrillingRig(luigi.Task):
         # load the data from the unpacked root file and merge in the
         # data from the configuration for that run with the data
         output_path = Path(self.output().path)
-        os.remove(raw_data_file_path)
         anu.reformat_data(data_file_path, output_path, complete_config, self.raw)
         os.remove(data_file_path)
 
