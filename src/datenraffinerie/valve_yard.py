@@ -60,7 +60,7 @@ class ValveYard(luigi.WrapperTask):
                                   Path(self.root_config_file).resolve()),
                               analysis_module_path=self.analysis_module_path,
                               network_config=self.network_config,
-                              loop=self.loop,
+                              self.loop,
                               procedure['raw'])
         if procedure['type'] == 'daq':
             # the default values for the DAQ system and the target need to
