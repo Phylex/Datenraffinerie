@@ -120,7 +120,7 @@ def reformat_data(rootfile: str,
                   hdf_file: str,
                   complete_config: dict,
                   raw_data: bool,
-                  chunk_length=1000000,
+                  chunk_length=50000,
                   columns: list = None):
     """ take in the unpacked root data and reformat into an hdf5 file.
     Also add in the configuration from the run.
@@ -270,7 +270,7 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
     hd_file = tables.open_file(out_file, mode='r+')
     axis0 = hd_file.root.data.axis0
     nblocks = hd_file.root.data._v_attrs['nblocks']
-    chunksize = 100000
+    chunksize = 50000
     for in_f in in_files:
         in_ax0 = in_f.root.data.axis0
         inblocks = in_f.root.data._v_attrs['nblocks']
