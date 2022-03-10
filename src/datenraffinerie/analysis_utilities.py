@@ -116,7 +116,12 @@ def fill_block(file, group_name, block, data: np.ndarray):
         axis1.append(np.arange(maxindex, len(block)))
 
 
-def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data: bool, chunk_length=1000000):
+def reformat_data(rootfile: str,
+                  hdf_file: str,
+                  complete_config: dict,
+                  raw_data: bool,
+                  chunk_length=1000000,
+                  columns: list = None):
     """ take in the unpacked root data and reformat into an hdf5 file.
     Also add in the configuration from the run.
     """
@@ -131,7 +136,10 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
     with uproot.open(rootfile) as rfile:
         # extract the data from the root file
         ttree = rfile[tree_name]
-        keys = list(ttree.keys())
+        if columns is not None:
+            keys = list(filter(lambda x: x in columns, ttree.keys()))
+        else:
+            keys = list(ttree.keys())
         root_data = np.array([ttree[key].array() for key in keys]).transpose()
         blk_values = add_data_block(keys, tables.Int32Atom(), hd_file, 'data')
         fill_block(hd_file, 'data', blk_values, root_data)
@@ -145,16 +153,29 @@ def reformat_data(rootfile: str, hdf_file: str, complete_config: dict, raw_data:
         l1a_config = l1a_generator_settings(complete_config)
         chan_config = cfu.update_dict(chan_config, global_config)
         chan_config = cfu.update_dict(chan_config, l1a_config)
-        config_blk = add_data_block(list(chan_config.keys()), tables.Int32Atom(), hd_file, 'data')
+        if columns is not None:
+            config_keys = list(filter(lambda x: x in columns,
+                                      chan_config.keys()))
+        else:
+            config_keys = list(chan_config.keys())
+        config_blk = add_data_block(config_keys,
+                                    tables.Int32Atom(),
+                                    hd_file,
+                                    'data')
 
         # merge in the configuration
         add_config_to_dataset(chip_chan_indices, hd_file, config_blk, complete_config,
-                              chunk_length, raw_data)
+                              chunk_length, raw_data, columns)
     hd_file.close()
 
 
-@jit(forceobj=True)
-def add_config_to_dataset(chip_chan_indices, file, dataset, complete_config: dict, chunklength: int, raw_data: bool):
+def add_config_to_dataset(chip_chan_indices,
+                          file,
+                          dataset,
+                          complete_config: dict,
+                          chunklength: int,
+                          raw_data: bool,
+                          columns: list = None):
     """
     Add the configuration to the dataset
 
@@ -181,59 +202,58 @@ def add_config_to_dataset(chip_chan_indices, file, dataset, complete_config: dic
     global_config = roc_channel_to_globals(complete_config,
                                            0, 0, 1)
     l1a_config = l1a_generator_settings(complete_config)
-    chan_config = cfu.update_dict(chan_config, global_config)
-    chan_config = cfu.update_dict(chan_config, l1a_config)
+    chan_config.update(global_config)
+    chan_config.update(l1a_config)
+    if columns is not None:
+        config_keys = list(filter(lambda x: x in columns,
+                                  chan_config.keys()))
+    else:
+        config_keys = list(chan_config.keys())
     chunks = int(len(chip_chan_indices) / chunklength)
     for i in range(chunks):
-        chunk_array = np.zeros(shape=(chunklength, len(chan_config.items())))
+        chunk_array = np.zeros(shape=(chunklength, len(config_keys)))
         for j in range(chunklength):
             row = chip_chan_indices[i*chunklength+j]
             chip, chan, half_or_type = row[0], row[1], row[2]
             if raw_data:
                 chip, chan, chan_type = \
-                        compute_channel_type_from_event_data(chip,
-                                                             chan,
-                                                             half_or_type)
+                 compute_channel_type_from_event_data(chip, chan, half_or_type)
             else:
                 chan_type = half_or_type
-            chan_config = cfu.update_dict(chan_config,
-                                          roc_channel_to_dict(complete_config,
-                                                              chip,
-                                                              chan,
-                                                              chan_type))
-            chan_config = cfu.update_dict(chan_config,
-                                          roc_channel_to_globals(complete_config,
-                                                                 chip,
-                                                                 chan,
-                                                                 chan_type))
-            chunk_array[j] = np.array(list(chan_config.values()))
+            chan_config.update(roc_channel_to_dict(complete_config,
+                                                   chip, chan, chan_type))
+            chan_config.update(roc_channel_to_globals(complete_config,
+                                                      chip, chan, chan_type))
+            if columns is not None:
+                chunk_array[j] = np.array(list(map(lambda x: x[1],
+                                                   filter(lambda x: x[0] in columns,
+                                                          chan_config.items()))))
+            else:
+                chunk_array[j] = np.array(list(chan_config.values()))
         fill_block(file, 'data', dataset, chunk_array)
         file.flush()
     # add to the configuration to the last of the items that dont fully
     # fill up a chunk
     remaining_items = chip_chan_indices[chunks*chunklength:]
     chunk_array = np.zeros(shape=(len(remaining_items),
-                                  len(chan_config.items())))
+                                  len(config_keys)))
     for j, row in enumerate(remaining_items):
         chip, chan, half_or_type = row[0], row[1], row[2]
         if raw_data:
             chip, chan, chan_type = \
-                    compute_channel_type_from_event_data(chip,
-                                                         chan,
-                                                         half_or_type)
+                compute_channel_type_from_event_data(chip, chan, half_or_type)
         else:
             chan_type = half_or_type
-        chan_config = cfu.update_dict(chan_config,
-                                      roc_channel_to_dict(complete_config,
-                                                          chip,
-                                                          chan,
-                                                          chan_type))
-        chan_config = cfu.update_dict(chan_config,
-                                      roc_channel_to_globals(complete_config,
-                                                             chip,
-                                                             chan,
-                                                             chan_type))
-        chunk_array[j] = np.array(list(chan_config.values()))
+        chan_config.update(roc_channel_to_dict(complete_config,
+                                               chip, chan, chan_type))
+        chan_config.update(roc_channel_to_globals(complete_config,
+                                                  chip, chan, chan_type))
+        if columns is not None:
+            chunk_array[j] = np.array(list(map(lambda x: x[1],
+                                               filter(lambda x: x[0] in columns,
+                                                      chan_config.items()))))
+        else:
+            chunk_array[j] = np.array(list(chan_config.values()))
     fill_block(file, 'data', dataset, chunk_array)
 
 
@@ -371,11 +391,9 @@ def roc_channel_to_globals(complete_config: dict, chip_id: int, channel_id: int,
     roc_config = target_subconfig[id_map[chip_id]]
     result = {}
     for hw_key in half_wise_keys:
-        for key, val in roc_config[hw_key][chip_half].items():
-            result[key] = val
+        result.update(roc_config[hw_key][chip_half])
     for gl_key in global_keys:
-        for key, val in roc_config[gl_key][0].items():
-            result[key] = val
+        result.update(roc_config[gl_key][0])
     return result
 
 # this stuff we define for the tests
@@ -509,6 +527,17 @@ def test_reformat_data():
     for col in test_df.columns:
         assert col in expected_columns + data_columns + daq_columns
     os.remove(test_hdf_path)
+
+    filtered_columns = ['toa_stdd', 'chip', 'channel', 'channeltype', 'toa_mean',
+                        'A_BX', 'HighRange', 'LowRange']
+    filter_columns_not_in_data = ['this', 'that']
+    reformat_data(root_data_path, test_hdf_path, configuration, False,
+                  1000, filtered_columns + filter_columns_not_in_data)
+    test_df = pd.read_hdf(test_hdf_path)
+    for col in filtered_columns:
+        assert col in test_df.columns
+    assert test_df.shape[1] == len(filtered_columns)
+    os.remove(test_hdf_path)
     os.remove(root_data_path)
 
 
@@ -553,3 +582,4 @@ def test_merge_files():
     for df_path in dataframe_names:
         if df_path.exists():
             os.remove(df_path)
+    os.remove(out_file)
