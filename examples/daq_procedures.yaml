@@ -17,6 +17,7 @@
         start: 10
         stop: 50
         step: 4
+  data_columns: ['channel', 'chip', 'toa_mean', 'toa_stdd', 'channeltype']
 
 - name: timewalk_scan
   type: daq
