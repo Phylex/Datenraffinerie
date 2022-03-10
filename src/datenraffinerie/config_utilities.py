@@ -342,6 +342,14 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
         raise ConfigFormatError(f"The initial target config of {daq_label}"
                                 " could not be found") from err
 
+    try:
+        columns = scan_config['data_columns']
+        if not isinstance(columns, list):
+            raise ConfigFormatError("The columns key must be a list of the "
+                                    f" dataframe, columns is a {type(columns)}")
+    except KeyError:
+        columns = None
+
     # parse the scan dimensions
     scan_parameters = []
     if 'parameters' not in scan_config:
@@ -394,7 +402,8 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
             'target_power_on_default_config': target_power_on_config,
             'target_init_config': target_initial_config,
             'daq_system_config': daq_system_config,
-            'daq_system_default_config': daq_system_default_config}
+            'daq_system_default_config': daq_system_default_config,
+            'data_columns': columns}
 
 
 def parse_analysis_config(config: dict) -> tuple:
@@ -585,7 +594,9 @@ def test_parse_scan_config():
                             'target_init_config',
                             'daq_system_config',
                             'daq_system_default_config',
-                            'calibration', 'raw']
+                            'calibration', 'raw', 'data_columns']
+    expected_column_keys = ['channel', 'chip', 'toa_mean', 'toa_stdd',
+                            'channeltype']
     for scan in test_config:
         scan_configs.append(parse_scan_config(scan, test_fpath))
     assert len(scan_configs) == 3  # number of different scans
@@ -596,6 +607,9 @@ def test_parse_scan_config():
     assert test_config['name'] == 'injection_scan'
     assert len(test_config['parameters']) == 1
     assert test_config['parameters'][0][0][0] == 'level1_key1'
+    for colname in test_config['data_columns']:
+        assert colname in expected_column_keys
+    assert len(test_config['data_columns']) == len(expected_column_keys)
 
 
 def test_analysis_config():
@@ -606,8 +620,8 @@ def test_analysis_config():
     assert isinstance(parsed_config['parameters'], dict)
     assert parsed_config['name'] == 'example_analysis'
     assert parsed_config['type'] == 'analysis'
+    assert parsed_config['event_mode'] == False
     ana_params = parsed_config['parameters']
-    assert not ana_params['event_mode']
     assert ana_params['p1'] == 346045
     assert ana_params['p2'] == 45346
     assert ana_params['p3'] == 'string option'
