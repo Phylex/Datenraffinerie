@@ -119,13 +119,13 @@ to be searched for and subsequently depended upon by the new instantiation of th
 
 ### DAQ type procedures
 In contrast to the `analysis` type tasks discussed previously that rely on external code to run, and usually consist of a single task, the DAQ
-procedure is entirely implemented in the Datenraffinerie and relies on a recursive task called `Scan` to be able to generate the Cartesian product of
-the parameters specified by the user configuration. In the simplest case the `Scan` task does not recurs and directly starts a set of measurement tasks
+procedure is entirely implemented in the Datenraffinerie and relies on a recursive task called `DataField` to be able to generate the Cartesian product of
+the parameters specified by the user configuration. In the simplest case the `DataField` task does not recurs and directly starts a set of measurement tasks
 
 ![non recursive scan](docs/daq-task-dependency-graph-1D.svg)
 
-If mutiple parameter ranges are passed to the `Scan` task during the creation of the dependency graph it will not directly declare measurements as
-it's dependency but instead declare a set of `Scan` tasks as it's dependency, one for every value of the 'dimension' it is supposed to scan over.
+If mutiple parameter ranges are passed to the `DataField` task during the creation of the dependency graph it will not directly declare measurements as
+it's dependency but instead declare a set of `DataField` tasks as it's dependency, one for every value of the 'dimension' it is supposed to scan over.
 This is probably best visualized as in the following picture:
 
 ![recursive scan](docs/daq-task-dependency-graph-3D.svg)
@@ -135,8 +135,13 @@ are the final node in the dependency graph. As the computation of the dependency
 During execution, the measurement calculates the final measurement configuration and send it to the
 `daq_coordinator` which is in charge of managing the access to the measurement system for more on that see [The `daq_coordinator`](#DAQ Coordination).
 
-If a calibration is needed the Measurement tasks declare a common dependency on an instance of the `ValveYard` class to find the `analysis` type
-procedure for calculating the calibration. *This is currently not implemented yet!*.
+#### Alternate DAQ behaviour
+
+Along with the above mentioned execution mode, the `DataField` can be configured to acquire the data itself without spawning `DrillingRig`s to each
+acquire a single run. It performs the acquisition tasks in a loop before passing the raw data to the `Fracker` that processes the data into the
+DataFrames that are ultimately passed to the `Distillery`s. In this Mode the DAQ and the data processing are entirely decoupled. The Processing of the
+raw data will only start to commence after all the data has been gathered from the chip. To put the Datenraffinerie into this mode the `-l` option has
+to be passed to the Datenraffinerie on the command line.
 
 ## Configuration
 To get the Datenraffinerie to work properly, it needs to be configured. As mentioned earlier, there are examples of the configuration available in the
@@ -207,6 +212,7 @@ measurement performed during the acquisition.
 ```yaml
 - name: timewalk_scan
   type: daq
+  event_mode: false
   target_settings:
     power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
     initial_config: ./init_timewalk_scan.yaml
@@ -221,6 +227,7 @@ measurement performed during the acquisition.
       - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
   parameters:
     - key:
+      - target
       - ['roc_s0', 'roc_s1', 'roc_s2']
       - 'ReferenceVoltage'
       - [0, 1]
@@ -229,6 +236,20 @@ measurement performed during the acquisition.
         start: 0
         stop: 2048
         step: 32
+    - key:
+      - daq
+      - l1a_generator
+      values:
+        - {'special': 'value'}
+        - {'special': 'val2'}
+  data_columns:
+    - chip
+    - channel
+    - channeltype
+    - HighRange
+    - LowRange
+    - Calib
+    - phase_strobe
 ```
 
 Just as with the analysis procedure the `name` and `type` fields are present, specifying the name of the procedure as specified by the user and
@@ -238,8 +259,19 @@ The configuration is split into three sections the `target_settings` section tha
 `daq_settings` section that describe the configuration of the daq server and client and the parameters section that describes the parameters defining
 the axes of the 'phase space' that is scanned over.
 
-It is assumed that only parameters of the target change from one measurement to the other and that the daq system part of the backend does not change
-during a daq procedure.
+Both parameters of the target and daq system can be referenced in a scan. To select a parameter from the target system to scan over, the first entry
+of the `key` Field needs to be set to `target`, this is done in the first entry of the `parameters` field.
+To scan over a `daq` parameter, the first entry of the key field needs to be `daq`. If the first entry in the `key` parameter is neither `daq` or
+`target`, a `target` is automatically prepended. This was done to keep it backwards compatible with existing scan configurations. The automatic
+prefixing is considered  temporary feature and will be removed in a future release.
+
+Instead of providing a simple numerical range, it is also possible to specify individual values that should be scanned over. The values can be
+complex dictionary/lists structs. This makes single value scans with non numerical values possible. An example is shown in the second scan parameter
+of the above example.
+
+The columns of data that end up in the resulting DataFrame can now also be selected by specifying the optional `data_columns` list. If `data_columns`
+is not provided all available columns are written into the output DataFrame. If a column specified in the `data_columns` list is not found in the set
+of available columns it is simply ignored.
 
 ### Target Settings
 The `target_settings` section has two parts, the first is the `power_on_default` section.
@@ -378,6 +410,12 @@ connected. 5 measurements are taken. If an `adc_val` is below threshold, the Chi
 
 There are roughly 200 columns in the `DataFrame` so they will not be listed here. A list of the columns can be obtained with the
 `pd.DataFrame.columns` member.
+
+To limit the amount of columns in the output DataFrame to only the columns needed by the analysis they can be specified in the `data_columns` list of
+the daq configuration
+
+### Selecting columns in the output DataFrame
+
 
 ## Writing a custom Distillery
 Writing a custom distillery is neccessary to produce Plots and other useful information (like a summary or calibration parameters) from data aquired by the daq system.
