@@ -86,6 +86,7 @@ class DrillingRig(luigi.Task):
     network_config = luigi.DictParameter(significant=True)
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=True)
+    data_columns = luigi.ListParameter(significant=False)
 
     def requires(self):
         return Calibration(self.root_config_path,
@@ -160,7 +161,8 @@ class DrillingRig(luigi.Task):
         # load the data from the unpacked root file and merge in the
         # data from the configuration for that run with the data
         output_path = Path(self.output().path)
-        anu.reformat_data(data_file_path, output_path, complete_config, self.raw)
+        anu.reformat_data(data_file_path, output_path, complete_config, self.raw,
+                          columns=self.data_columns)
         os.remove(data_file_path)
 
 
@@ -200,6 +202,7 @@ class DataField(luigi.Task):
     network_config = luigi.DictParameter(significant=False)
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=False)
+    data_columns = luigi.ListParameter(significant=False)
 
     supported_formats = ['hdf5']
 
@@ -262,7 +265,8 @@ class DataField(luigi.Task):
                                                   self.analysis_module_path,
                                                   self.network_config,
                                                   self.loop,
-                                                  self.raw))
+                                                  self.raw,
+                                                  self.data_columns))
                 else:
                     required_tasks.append(DataField(self.identifier + 1 + task_id_offset * i,
                                                     self.label,
@@ -277,7 +281,8 @@ class DataField(luigi.Task):
                                                     self.analysis_module_path,
                                                     self.network_config,
                                                     self.loop,
-                                                    self.raw))
+                                                    self.raw,
+                                                    self.data_columns))
         # The scan has reached the one dimensional case. Spawn a measurement
         # for every value that takes part in the scan
         else:
@@ -305,7 +310,8 @@ class DataField(luigi.Task):
                                                   self.analysis_module_path,
                                                   self.network_config,
                                                   self.loop,
-                                                  self.raw))
+                                                  self.raw,
+                                                  self.data_columns))
         return required_tasks
 
     def output(self):
@@ -459,6 +465,7 @@ class Fracker(luigi.Task):
     network_config = luigi.DictParameter(significant=False)
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=False)
+    data_columns = luigi.ListParameter(significant=False)
     supported_formats = ['hdf5']
 
     def requires(self):
@@ -475,7 +482,8 @@ class Fracker(luigi.Task):
                          analysis_module_path=self.analysis_module_path,
                          network_config=self.network_config,
                          loop=self.loop,
-                         raw=self.raw)
+                         raw=self.raw,
+                         data_columns=self.data_columns)
 
     def output(self):
         """
@@ -543,7 +551,8 @@ class Fracker(luigi.Task):
                 anu.reformat_data(unpacked_file_path,
                                   formatted_data_path,
                                   complete_config,
-                                  self.raw)
+                                  self.raw,
+                                  columns=self.data_columns)
             except KeyInFileError:
                 os.remove(unpacked_file_path.as_posix())
                 continue
