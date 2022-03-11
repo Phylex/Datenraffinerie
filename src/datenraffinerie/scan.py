@@ -129,8 +129,9 @@ class DrillingRig(luigi.Task):
 
         # create the config on disk
         output_config = os.path.splitext(self.output().path)[0] + '.yaml'
+        config_string = yaml.safe_dump(complete_config)
         with open(output_config, 'w') as run_config:
-            run_config.write(yaml.safe_dump(complete_config))
+            run_config.write(config_string)
 
         # send config to the backend and wait for the response
         context = zmq.Context()
@@ -138,7 +139,7 @@ class DrillingRig(luigi.Task):
         socket.connect(
                 f"tcp://{self.network_config['daq_coordinator']['hostname']}:" +
                 f"{self.network_config['daq_coordinator']['port']}")
-        socket.send_string('measure;'+yaml.safe_dump(complete_config))
+        socket.send_string('measure;' + config_string)
         data = socket.recv()
         socket.close()
         context.term()
