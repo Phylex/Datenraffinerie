@@ -21,5 +21,6 @@ setup(
         'tables',
         'h5py',
         'numba',
+        'jinja2',
     ]
 )
