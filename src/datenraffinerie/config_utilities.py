@@ -9,8 +9,10 @@ what to expect of their behaviour
 from pathlib import Path
 import os
 from copy import deepcopy
+from typing import Union
 from luigi.freezing import FrozenOrderedDict
 import yaml
+import jinja2
 
 
 class ConfigPatchError(Exception):
@@ -34,7 +36,7 @@ def load_configuration(config_path):
         try:
             return yaml.safe_load(config_file.read())
         except yaml.YAMLError as e:
-            raise ConfigFormatError from e
+            raise ConfigFormatError("unable to load yaml") from e
 
 
 def unfreeze(config):
@@ -154,12 +156,20 @@ def patch_configuration(config: dict, patch: dict):
     return update_dict(config, patch)
 
 
-def generate_patch(keys: list, value):
+def generate_patch(keys: Union[list, str], value):
     """
     the Scan task receives a list of keys and values and needs
     to generate a patch from one of the values of the list
     and all the keys. This function does that
     """
+    # if the key is in fact a template for a yaml file
+    if isinstance(keys, str):
+        patch = yaml.safe_load(jinja2.Template(keys).render(value=value))
+        if len(patch.keys()) != 1 and \
+                (patch.keys()[0] != 'target' or patch.keys()[0] != 'daq'):
+            patch = {'target': patch}
+        return patch
+
     # this is needed to work with luigi as it turns stuffinto
     # tuples
     keys = list(keys)
@@ -356,15 +366,30 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
         raise ConfigFormatError("There needs to be a 'parameters' list"
                                 f" in the scan entry {daq_label}")
     for scan_dimension in scan_config['parameters']:
-        if 'key' not in scan_dimension or\
-            (('range' not in scan_dimension) and
-             ('values' not in scan_dimension)):
+        if ('key' not in scan_dimension and 'template' not in scan_dimension) or\
+              (('range' not in scan_dimension) and
+              ('values' not in scan_dimension)):
             raise ConfigFormatError("A range or a list of values along with a key"
                                     " must be specified"
                                     " for a scan dimension")
+        if 'key' in scan_dimension and 'template' in scan_dimension:
+            raise ConfigFormatError("'key' and 'template' are mutually exclusive");
         if 'key' in scan_dimension:
             if scan_dimension['key'] is None:
                 continue
+            scan_dim_key = scan_dimension['key']
+            if not isinstance(scan_dim_key, list):
+                raise ConfigFormatError("The key field in the parameter section"
+                        f" of {daq_label} needs to be a list")
+        if 'template' in scan_dimension:
+            template = scan_dimension['template']
+            try:
+                _ = jinja2.Template(template)
+            except jinja2.TemplateSyntaxError as e:
+                raise ConfigFormatError("The template in"
+                        " scan config {daq_label} is malformed") from e
+            scan_dim_key = template
+
         step = 1
         start = None
         stop = None
@@ -390,10 +415,10 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
                                             " malformed. The values key should contain"
                                             " a list of values ")
                 scan_range = value
-        scan_parameters.append((scan_dimension['key'], scan_range))
+        scan_parameters.append((scan_dim_key, scan_range))
 
     if len(scan_parameters) == 0:
-        scan_parameters = [({}, [0])]
+        scan_parameters = [([], [0])]
     return {'parameters': scan_parameters,
             'calibration': calibration,
             'name': daq_label,
@@ -654,3 +679,20 @@ def test_unfreeze():
     expected_dict = {'a': 1, 'b': [1,2,3],
                      'd': {'e': 4}}
     assert expected_dict == unfreeze(input_dict)
+
+def test_parse_scan_config_template_handling():
+    test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
+    config = load_configuration(test_fpath)
+    template_test_config = config[1]
+    test_scan_config = parse_scan_config(template_test_config, test_fpath)
+    print(test_scan_config['parameters'])
+    template = test_scan_config['parameters'][0][0]
+    values = test_scan_config['parameters'][0][1]
+    for value in values:
+        patch = generate_patch(template, value)
+        assert isinstance(patch['target'], dict)
+        assert 'roc_s0' in patch['target']
+        assert 'roc_s1' in patch['target']
+        assert 'roc_s2' in patch['target']
+        assert value in patch['target']['roc_s0']['ch']
+        assert patch['target']['roc_s0']['ch'][value]['HighRange'] == 1
