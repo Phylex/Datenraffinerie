@@ -225,7 +225,7 @@ class DataField(luigi.Task):
         """
         required_tasks = []
         values = self.scan_parameters[0][1]
-        parameter = list(self.scan_parameters[0][0])
+        parameter = self.scan_parameters[0][0]
         target_config = cfu.unfreeze(self.target_config)
         daq_system_config = cfu.unfreeze(self.daq_system_config)
         complete_config = {'target': target_config,
@@ -249,9 +249,9 @@ class DataField(luigi.Task):
 
                 patch = cfu.generate_patch(
                             parameter, value)
-                complete_config = cfu.update_dict(complete_config, patch)
-                subscan_daq_config = complete_config['daq']
-                subscan_target_config = complete_config['target']
+                complete_subscan_config = cfu.update_dict(complete_config, patch)
+                subscan_daq_config = complete_subscan_config['daq']
+                subscan_target_config = complete_subscan_config['target']
                 if len(self.scan_parameters[1:]) == 1 and self.loop:
                     required_tasks.append(Fracker(self.identifier + 1 + task_id_offset * i,
                                                   self.label,
