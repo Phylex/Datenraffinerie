@@ -1,34 +1,60 @@
-#include "yaml-tools.h"
+#ifndef _YAML_TOOL_H_
+#define _YAML_TOOL_H_
+
+#include <yaml-cpp/yaml.h>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <iostream>
+
+template<typename T>
+YAML::Node diff_dict(const YAML::Node&, const YAML::Node&);
 
 template<typename ValType>
-void update(YAML::Node &d1, const YAML::Node &d2) {
+YAML::Node diff_sequence(const YAML::Node &d1, const YAML::Node &d2);
+
+template<typename ValType>
+YAML::Node update(YAML::Node d1, const YAML::Node &d2);
+
+template<typename ValType>
+YAML::Node update_map(YAML::Node d1, const YAML::Node &d2);
+
+template<typename ValType>
+YAML::Node update_sequence(YAML::Node d1, const YAML::Node &d2);
+
+template<typename ValType>
+YAML::Node update(YAML::Node d1, const YAML::Node &d2) {
 	if (d1.Type() != d2.Type())
-		return;
+		return d1;
 	switch (d1.Type()) {
 		case YAML::NodeType::Sequence:
-			update_sequence<ValType>(d1, d2);
+			d1 = update_sequence<ValType>(d1, d2);
+			break;
 		case YAML::NodeType::Map:
-			update_map<ValType>(d1, d2);
+			d1 = update_map<ValType>(d1, d2);
+			break;
 		case YAML::NodeType::Scalar:
 			if (d1.as<ValType>() != d2.as<ValType>()) {
 				d1 = d2;
 			}
+			break;
 		default:
 			break;
 	}
+	return d1;
 }
 
 template<typename ValType>
-void update_map(YAML::Node &d1, const YAML::Node &d2) {
+YAML::Node update_map(YAML::Node d1, const YAML::Node &d2) {
 	for (YAML::const_iterator d2_node=d2.begin(); d2_node!=d2.end(); d2_node++) {
 		if (d1[d2_node->first.as<std::string>()]) {
 			if (d1[d2_node->first.as<std::string>()].Type() == d2_node->second.Type()) {
 				switch (d1[d2_node->first.as<std::string>()].Type()) {
 					case YAML::NodeType::Map:
-						update_map<ValType>(d1[d2_node->first.as<std::string>()], d2_node->second);
+						d1[d2_node->first.as<std::string>()] = update_map<ValType>(d1[d2_node->first.as<std::string>()], d2_node->second);
 						break;
 					case YAML::NodeType::Sequence:
-						update_sequence<ValType>(d1[d2_node->first.as<std::string>()], d2_node->second);
+						d1[d2_node->first.as<std::string>()] = update_sequence<ValType>(d1[d2_node->first.as<std::string>()], d2_node->second);
 						break;
 					case YAML::NodeType::Scalar:
 						if (d1[d2_node->first.as<std::string>()].as<ValType>() != d2_node->second.as<ValType>()) {
@@ -45,10 +71,11 @@ void update_map(YAML::Node &d1, const YAML::Node &d2) {
 			d1[d2_node->first.as<std::string>()] = d2_node->second;
 		}
 	}
+	return d1;
 }
 
 template<typename ValType>
-void update_sequence(YAML::Node &d1, const YAML::Node &d2) {
+YAML::Node update_sequence(YAML::Node d1, const YAML::Node &d2) {
 	size_t delta = d1.size() - d2.size();
 	size_t max_common_index;
 	if (delta >= 0) {
@@ -85,6 +112,7 @@ void update_sequence(YAML::Node &d1, const YAML::Node &d2) {
 			d1.push_back(d2[i]);
 		}
 	}
+	return d1;
 }
 
 template<typename ValType>
@@ -109,13 +137,16 @@ YAML::Node diff_sequence(const YAML::Node &d1, const YAML::Node &d2) {
 						sequence_matches = false;
 					}
 					break;
+				default:
+					break;
 			}
 		}
 	}
 	if (sequence_matches) {
 		return diff;
 	} else {
-		return d2;
+		diff = d2;
+		return diff;
 	}
 }
 
@@ -159,3 +190,4 @@ YAML::Node diff_dict(const YAML::Node &root, const YAML::Node &comp) {
 	}
 	return diff;
 }
+#endif
