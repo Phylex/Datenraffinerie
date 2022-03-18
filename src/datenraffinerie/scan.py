@@ -244,12 +244,13 @@ class DataField(luigi.Task):
             subscan_daq_config = daq_system_config
             for i, value in enumerate(values):
 
-                if type(value)==tuple:
-                    value=list(value)
+                if isinstance(value, tuple):
+                    value = list(value)
 
                 patch = cfu.generate_patch(
                             parameter, value)
-                complete_subscan_config = cfu.update_dict(complete_config, patch)
+                complete_subscan_config = cfu.update_dict(complete_config,
+                                                          patch)
                 subscan_daq_config = complete_subscan_config['daq']
                 subscan_target_config = complete_subscan_config['target']
                 if len(self.scan_parameters[1:]) == 1 and self.loop:
