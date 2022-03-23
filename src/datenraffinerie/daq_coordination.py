@@ -14,6 +14,7 @@ def coordinate_daq_access(network_config: dict):
 
     """
     logging.basicConfig(filename='daq_coordinator.log',
+                        mode='w',
                         encoding='utf-8',
                         level=logging.DEBUG)
     logger = logging.getLogger('daq_coordinator')
