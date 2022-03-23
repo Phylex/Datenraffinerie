@@ -300,6 +300,7 @@ class DAQAdapter(ControlAdapter):
                 make the neccesary changes to the config
         """
         self.variant = variant
+        self.running = False
         if config is not None:
             config = {self.variant_key_map[self.variant]:
                              config}
@@ -321,6 +322,7 @@ class DAQAdapter(ControlAdapter):
 
     def reset(self):
         self.configuration = self.default_config
+        self.running = False
         self.configure()
 
     def load_default_config(self, default_config):
@@ -337,12 +339,15 @@ class DAQAdapter(ControlAdapter):
         rep = ""
         while "running" not in rep.lower():
             rep = self._send_and_log('start')
+        self.running = True
 
     def is_done(self):
         """
         check if the current aquisition is ongoing or not
         """
         rep = self._send_and_log('run_done')
+        if self.running is False:
+            return True
         if "notdone" in rep.lower():
             return False
         return True
