@@ -2,15 +2,16 @@
 #define _HGCROC_CACHING_H_
 #include <yaml-cpp/yaml.h>
 #include <map>
+#include <iostream>
 #include <tuple>
 #include <vector>
 #include <array>
 
 #define ROC_CHAN_COUNT 72
 #define ROC_CHAN_TYPE 0
-#define ROC_CALIB_CHAN_COUNT 4
+#define ROC_CALIB_CHAN_COUNT 2
 #define ROC_CALIB_CHAN_TYPE 1
-#define ROC_CM_CHAN_COUNT 2
+#define ROC_CM_CHAN_COUNT 4
 #define ROC_CM_CHAN_TYPE 100
 
 static const std::array<unsigned int, 3> channel_types = {
@@ -109,35 +110,6 @@ static std::array<std::tuple<std::string, std::string>, 160> roc_half_config = {
 	std::make_tuple("MasterTdc", "VD_FTDC_P_D"),
 	std::make_tuple("MasterTdc", "VD_FTDC_P_DAC_EN"),
 	std::make_tuple("MasterTdc", "sel_clk_rcg"),
-	std::make_tuple("HalfWise", "Adc_pedestal"),
-	std::make_tuple("HalfWise", "Channel_off"),
-	std::make_tuple("HalfWise", "DAC_CAL_CTDC_TOA"),
-	std::make_tuple("HalfWise", "DAC_CAL_CTDC_TOT"),
-	std::make_tuple("HalfWise", "DAC_CAL_FTDC_TOA"),
-	std::make_tuple("HalfWise", "DAC_CAL_FTDC_TOT"),
-	std::make_tuple("HalfWise", "DIS_TDC"),
-	std::make_tuple("HalfWise", "ExtData"),
-	std::make_tuple("HalfWise", "HZ_inv"),
-	std::make_tuple("HalfWise", "HZ_noinv"),
-	std::make_tuple("HalfWise", "HighRange"),
-	std::make_tuple("HalfWise", "IN_FTDC_ENCODER_TOA"),
-	std::make_tuple("HalfWise", "IN_FTDC_ENCODER_TOT"),
-	std::make_tuple("HalfWise", "Inputdac"),
-	std::make_tuple("HalfWise", "LowRange"),
-	std::make_tuple("HalfWise", "mask_AlignBuffer"),
-	std::make_tuple("HalfWise", "mask_adc"),
-	std::make_tuple("HalfWise", "mask_toa"),
-	std::make_tuple("HalfWise", "mask_tot"),
-	std::make_tuple("HalfWise", "probe_inv"),
-	std::make_tuple("HalfWise", "probe_noinv"),
-	std::make_tuple("HalfWise", "probe_pa"),
-	std::make_tuple("HalfWise", "probe_toa"),
-	std::make_tuple("HalfWise", "probe_tot"),
-	std::make_tuple("HalfWise", "sel_trig_toa"),
-	std::make_tuple("HalfWise", "sel_trig_tot"),
-	std::make_tuple("HalfWise", "trim_inv"),
-	std::make_tuple("HalfWise", "trim_toa"),
-	std::make_tuple("HalfWise", "trim_tot"),
 	std::make_tuple("GlobalAnalog", "Cf"),
 	std::make_tuple("GlobalAnalog", "Cf_comp"),
 	std::make_tuple("GlobalAnalog", "Clr_ADC"),
@@ -283,12 +255,13 @@ static std::array<std::string, 29> chan_config_params = {
 using CacheKey = std::tuple<unsigned int, unsigned int, unsigned int>;
 using GlobalCacheKey = unsigned int;
 using HalfWiseCacheKey = std::tuple<unsigned int, unsigned int>;
+using ConfigKey = std::tuple<std::string, std::string>;
 
 std::vector<std::string> filter_channel_columns(std::vector<std::string> columns);
 
-std::vector<std::tuple<std::string, std::string>> filter_half_wise_columns(std::vector<std::string> columns);
+std::vector<ConfigKey> filter_half_wise_columns(std::vector<std::string> columns);
 
-std::vector<std::tuple<std::string, std::string>> filter_global_columns(std::vector<std::string> columns);
+std::vector<ConfigKey> filter_global_columns(std::vector<std::string> columns);
 
 
 template<typename T>
@@ -297,19 +270,17 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_chan_config_cache(YAML::Node 
 	std::map<CacheKey, std::vector<T>> channel_map;
 	std::vector<std::string> roc_names;
 	
-	// generate the roc keys for generating the config
-	if (config.size() >= 3) {
-		roc_names.push_back("roc_s0");
-		roc_names.push_back("roc_s1");
-		roc_names.push_back("roc_s2");
-	} if (config.size() == 6) {
-		roc_names.push_back("roc_s3");
-		roc_names.push_back("roc_s4");
-		roc_names.push_back("roc_s5");
+	YAML::Node roc_config;
+	// find the part of the config containing the roc config
+	if (config["target"]) {
+		roc_config = config["target"];
+	} else {
+		roc_config = config;
 	}
-	
 	// iterate over the rocs
-	for (size_t roc=0; roc < roc_names.size(); roc++) {
+	for (size_t roc = 0 ; roc < roc_config.size(); roc++) {
+		if (roc_config[chip_num_to_name[roc]]) {
+		}
 		//iterate over the differernt types of channels
 		for (auto chan_type: channel_types) {
 			// iterate over each channel of the particular type
@@ -320,7 +291,7 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_chan_config_cache(YAML::Node 
 				
 				// iterate over the selected parameters creating the entry
 				for (auto column: channel_columns) {
-					 channel_config_cache.push_back(config[roc_names[roc]][channel_type_map[chan_type]][chan][column].as<T>());
+					channel_config_cache.push_back(config[chip_num_to_name[roc]][channel_type_map[chan_type]][chan][column].as<T>());
 				}
 				// add the cache to the cached config to the map
 				channel_map[key] = channel_config_cache;
@@ -333,13 +304,20 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_chan_config_cache(YAML::Node 
 template<typename T>
 std::map<GlobalCacheKey, std::vector<T>> generate_hgcroc_global_config(YAML::Node config, std::vector<std::tuple<std::string, std::string>> global_columns) {
 	std::map<GlobalCacheKey, std::vector<T>> global_config_cache;
-	for (unsigned int i = 0; i < config.size(); i ++) {
+	YAML::Node roc_config;
+	// find the part of the config containing the roc config
+	if (config["target"]) {
+		roc_config = config["target"];
+	} else {
+		roc_config = config;
+	}
+	for (GlobalCacheKey i = 0; i < config.size(); i ++) {
 		YAML::Node chip_config = config[chip_num_to_name[i]];
 		// iterate over the global columns
 		std::vector<T> global_cache_row;
 		global_cache_row.reserve(global_columns.size());
 		for (auto g_column: global_columns) {
-			global_cache_row.push_back(chip_config[std::get<0>(g_column)][0][std::get<1>(g_column)]);
+			global_cache_row.push_back(chip_config[std::get<0>(g_column)][0][std::get<1>(g_column)].as<T>());
 		}
 		global_config_cache[i] = global_cache_row;
 	}
@@ -349,6 +327,13 @@ std::map<GlobalCacheKey, std::vector<T>> generate_hgcroc_global_config(YAML::Nod
 template<typename T>
 std::map<HalfWiseCacheKey, std::vector<T>> generate_hgcroc_halfwise_config(YAML::Node config, std::vector<std::tuple<std::string, std::string>> half_wise_columns) {
 	std::map<HalfWiseCacheKey, std::vector<T>> half_wise_config_cache;
+	YAML::Node roc_config;
+	// find the part of the config containing the roc config
+	if (config["target"]) {
+		roc_config = config["target"];
+	} else {
+		roc_config = config;
+	}
 	for (unsigned int i = 0; i < config.size(); i ++) {
 		YAML::Node chip_config = config[chip_num_to_name[i]];
 		// iterate over the global columns
@@ -365,6 +350,9 @@ std::map<HalfWiseCacheKey, std::vector<T>> generate_hgcroc_halfwise_config(YAML:
 	return half_wise_config_cache;
 };
 
-HalfWiseCacheKey calc_half_wise_key_summary_data(CacheKey row_key);
-CacheKey calc_channel_cache_key_event_data(CacheKey row_key);
+GlobalCacheKey calc_global_cache_key(CacheKey row_key);
+HalfWiseCacheKey calc_half_wise_cache_key(CacheKey row_key);
+CacheKey transform_event_row_to_cache_key(CacheKey row_key);
+
+
 #endif

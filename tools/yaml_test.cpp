@@ -59,20 +59,20 @@ int main() {
 	std::cout << "\nUpdate Test 1" << std::endl;
 	d1 = YAML::Load("{this: 1, that: 2, something: [1, 2]}");
 	d2 = YAML::Load("{this: 2, that: 2, something: [1, 2]}");
-	d1 = update<int>(d1, d2);
+	update<int>(d1, d2);
 	std::cout << d1 << std::endl;
 
 	std::cout << "\nUpdate Test 2" << std::endl;
 	YAML::Node d13 = YAML::Load("{this: 1, that: 2, something: [1, 2]}");
 	YAML::Node d14 = YAML::Load("{this: 2, that: 2, something: [{other: 3}, {that: 3}]}");
-	d13 = update<int>(d13, d14);
+	update<int>(d13, d14);
 	std::cout << d13 << std::endl;
 	
 	std::cout << "\nUpdate Test 3" << std::endl;
 	d1 = YAML::LoadFile("../../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml");
 	YAML::Node d3 = YAML::LoadFile("../../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml");
 	d2 = YAML::LoadFile("../../tests/configuration/defaults/initLDV3.yaml");
-	d1 = update<int>(d1, d2);
+	update<int>(d1, d2);
 	diff = diff_dict<int>(d3, d1);
 	std::cout << diff << std::endl;
 	return 0;

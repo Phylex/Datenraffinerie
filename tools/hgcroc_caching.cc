@@ -1,6 +1,6 @@
 #include "hgcroc_caching.h"
 
-std::vector<std::tuple<std::string, std::string>> filter_global_columns (std::vector<std::string> columns) {
+std::vector<ConfigKey> filter_global_columns (std::vector<std::string> columns) {
 	std::vector<std::tuple<std::string, std::string>> filtered_global_cols;
 	for (auto col: columns) {
 		for (auto available_col: roc_global_config) {
@@ -12,8 +12,8 @@ std::vector<std::tuple<std::string, std::string>> filter_global_columns (std::ve
 	return filtered_global_cols;
 }
 
-std::vector<std::tuple<std::string, std::string>> filter_half_wise_columns (std::vector<std::string> columns) {
-	std::vector<std::tuple<std::string, std::string>> filtered_half_wise_cols;
+std::vector<ConfigKey> filter_half_wise_columns (std::vector<std::string> columns) {
+	std::vector<ConfigKey> filtered_half_wise_cols;
 	for (auto col: columns) {
 		for (auto available_col: roc_half_config) {
 			if (std::get<1>(available_col) == col) {
@@ -38,11 +38,15 @@ std::vector<std::string> filter_channel_columns(std::vector<std::string> columns
 	return channel_cols;
 }
 
-HalfWiseCacheKey calc_half_wise_key_summary_data(CacheKey row_key) {
+GlobalCacheKey calc_global_cache_key(CacheKey row_key) {
+	return std::get<0>(row_key);
+};
+
+HalfWiseCacheKey calc_half_wise_cache_key(CacheKey row_key) {
 	unsigned int chip = std::get<0>(row_key);
 	unsigned int channel = std::get<1>(row_key);
 	unsigned int type = std::get<2>(row_key);
-	unsigned int half = -1;
+	unsigned int half = 0;
 	if (type == 0) {
 		if (channel < 36) {
 			half = 0;
@@ -63,7 +67,7 @@ HalfWiseCacheKey calc_half_wise_key_summary_data(CacheKey row_key) {
 }
 
 
-CacheKey calc_channel_cache_key_event_data(CacheKey row_key) {
+CacheKey transform_event_row_to_cache_key(CacheKey row_key) {
 	unsigned int chip = std::get<0>(row_key);
 	unsigned int channel = std::get<1>(row_key);
 	unsigned int half = std::get<2>(row_key);
