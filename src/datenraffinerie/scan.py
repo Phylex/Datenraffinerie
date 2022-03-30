@@ -526,7 +526,7 @@ class Fracker(luigi.Task):
                     raw_file.path,
                     unpacked_file_path,
                     raw_data=self.raw)
-            if result != 0:
+            if result != 0 and os.path.exists(unpacked_file_path):
                 os.remove(unpacked_file_path)
 
         # get the parameters to build the patch from
