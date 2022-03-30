@@ -345,12 +345,16 @@ class DAQAdapter(ControlAdapter):
         """
         check if the current aquisition is ongoing or not
         """
-        rep = self._send_and_log('run_done')
+        self.logger.debug('checking if run is done')
         if self.running is False:
             return True
+        rep = self._send_and_log('run_done')
         if "notdone" in rep.lower():
             return False
-        return True
+        if "done" in rep.lower():
+            self.running = False
+            return True
+        raise DAQError('Invalid answer from the DAQ component')
 
     def stop(self):
         """
