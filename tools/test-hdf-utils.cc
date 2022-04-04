@@ -1,5 +1,4 @@
-#include "hdf-utils.h"
-#include "hdf5.h"
+#include "include/hdf-utils.h"
 #define FNAME "test_hdf_out.h5"
 
 int main() {
