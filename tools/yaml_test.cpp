@@ -1,4 +1,4 @@
-#include "yaml-tools.h"
+#include "include/yaml-tools.h"
 
 void print_node_type(const YAML::Node& node) {
 	switch (node.Type()) {
@@ -21,6 +21,11 @@ void print_node_type(const YAML::Node& node) {
 }
 
 int main() {
+	try {
+		YAML::Node d0 = YAML::LoadFile("nonexistingfile");
+	} catch (YAML::BadFile e) {
+		std::cout << "Encountered bad file" << std::endl;
+	}
 	std::cout << "First Test" << std::endl;
 	YAML::Node d1 = YAML::Load("{1B: Prince Fielder, 2B: Rickie Weeks, LF: Ryan Braun}");
 	YAML::Node d2 = YAML::Load("{1B: Someone Else, 2B: Rickie Weeks, ALF: Ryan Braun}");
