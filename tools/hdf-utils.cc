@@ -225,33 +225,55 @@ hid_t set_up_file(hid_t file_id, std::string group_name) {
 /* the caller must make sure that data is large enough to hold all the data indicated
  * by the number of columns of the block and the number of rows indicated */
 void write_to_block(hid_t ds_block_id, hid_t axis1_id, size_t rows, void *data) {
+	hid_t block_datatype = H5Dget_type(ds_block_id);
+	
 	/* get the dimensions of the block */
 	hid_t block_dataspace = H5Dget_space(ds_block_id);
-	hid_t block_datatype = H5Dget_type(ds_block_id);
 	hsize_t ds_rank = H5Sget_simple_extent_ndims(block_dataspace);
 	hsize_t *ds_dims = (hsize_t *)malloc(ds_rank * sizeof(hsize_t));
 	hsize_t *max_ds_dims = (hsize_t *)malloc(ds_rank * sizeof(hsize_t));
-	hsize_t *mem_ds_dims = (hsize_t *)malloc(ds_rank * sizeof(hsize_t));
 	ds_rank = H5Sget_simple_extent_dims(block_dataspace, ds_dims, max_ds_dims);
 	H5Sclose(block_dataspace);
-	if (ds_dims + rows > max_ds_dims) {
+
+	/* exit if there is no space in the dataframe */
+	if (ds_dims[0] + rows > max_ds_dims[0]) {
 		std::cout << "Adding rows to dataset extends beyond the maximal dimensions" << std::endl;
 		free(ds_dims);
 		free(max_ds_dims);
-		free(mem_ds_dims);
 		H5Tclose(block_datatype);
 		exit(EXIT_FAILURE);
 	}
-	/* extend the block and write data to it */
+	free(max_ds_dims);
+
+	/* initialize the size of the region in memmory */
+	hsize_t *mem_ds_dims = (hsize_t *)malloc(ds_rank * sizeof(hsize_t));
 	mem_ds_dims[0] = rows;
-	hsize_t tmp = ds_dims[0];
+	for (size_t i = 1; i < ds_rank; i++) {
+		mem_ds_dims[i] = ds_dims [i];
+	}
+	
+	/* extend the block and write data to it */
+	hsize_t start_row = ds_dims[0];
 	ds_dims[0] += rows;
 	H5Dextend(ds_block_id, ds_dims);
-	ds_dims[0] = tmp;
 	block_dataspace = H5Dget_space(ds_block_id);
+
+	/* reuse ds_dims as start point for the hyperslab */
+	ds_dims[0] = start_row;
+	for (int i = 1; i < ds_rank; i++ ) {
+		ds_dims[i] = 0;
+	}
+
+	/* select the block of memmory in the file that corresponds to the added space */
 	H5Sselect_hyperslab(block_dataspace, H5S_SELECT_SET, ds_dims, NULL, mem_ds_dims, NULL);
+
+	/* create the data space description for the memmory space*/
 	hid_t mem_space = H5Screate_simple(ds_rank, mem_ds_dims, NULL);
+
+	/* compy the data over from memmory to file space */
 	H5Dwrite(ds_block_id, block_datatype, mem_space, block_dataspace, H5P_DEFAULT, data);
+	
+	H5Sclose(mem_space);
 
 	/* extend axis1 if necessary */
 	hid_t axis_dataspace = H5Dget_space(axis1_id);
@@ -261,10 +283,11 @@ void write_to_block(hid_t ds_block_id, hid_t axis1_id, size_t rows, void *data) 
 	hsize_t *ax_mem_dims = (hsize_t *)malloc(ax_rank * sizeof(hsize_t));
 	H5Sget_simple_extent_dims(axis_dataspace, original_ax_dims, NULL);
 	H5Sget_simple_extent_dims(axis_dataspace, ax_mem_dims, NULL);
-	hsize_t old_ax_dims = original_ax_dims[0];
 	ax_mem_dims[0] = rows;
 	H5Sclose(axis_dataspace);
+
 	if (original_ax_dims[0] < ds_dims[0] + rows) {
+		hsize_t old_ax_dims = original_ax_dims[0];
 		original_ax_dims[0] = ds_dims[0] + rows;
 		H5Dextend(axis1_id, original_ax_dims);
 		original_ax_dims[0] = old_ax_dims;
@@ -281,16 +304,14 @@ void write_to_block(hid_t ds_block_id, hid_t axis1_id, size_t rows, void *data) 
 		free(new_ax_dims);
 		H5Dwrite(axis1_id, axis_datatype, axis_memspace, axis_dataspace, H5P_DEFAULT, buffer.data());
 		H5Sclose(axis_memspace);
+		H5Sclose(axis_dataspace);
 	}
 	/* tidy up */
-	H5Sclose(axis_dataspace);
 	H5Tclose(axis_datatype);
 	free(original_ax_dims);
 	free(ax_mem_dims);
 	free(ds_dims);
-	free(max_ds_dims);
 	free(mem_ds_dims);
 	H5Sclose(block_dataspace);
 	H5Tclose(block_datatype);
-	H5Sclose(mem_space);
 }
