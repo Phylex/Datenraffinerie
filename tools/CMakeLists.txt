@@ -3,7 +3,7 @@ project(datenraffinerie-tools LANGUAGES CXX C)
 
 include_directories(include)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS=ON)
 set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
@@ -11,6 +11,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 find_library (zmq NAMES zmq REQUIRED)
 find_package (yaml-cpp REQUIRED)
 find_package (HDF5 REQUIRED COMPONENTS CXX C HL)
+find_package (ROOT REQUIRED )
 
 # compile the main libraries
 add_library(hgcroc-caching
@@ -18,6 +19,12 @@ add_library(hgcroc-caching
 
 add_library(hdf-utils
 	hdf-utils.cc)
+
+add_library(root-tools
+	root-tools.cc )
+target_link_libraries(root-tools
+	ROOT::Core
+	ROOT::Tree )
 
 # compile the main thest executables
 add_executable(hdf-test
@@ -47,3 +54,13 @@ add_executable(hdf-extended-dataset
 	hdf5-extended-dataset-experiments.cc )
 target_link_libraries(hdf-extended-dataset
 	HDF5::HDF5)
+
+add_executable(add_config
+	add_config.cc )
+target_link_libraries(add_config
+	hdf-utils
+	hgcroc-caching
+	yaml-cpp
+	root-tools
+	ROOT::Core
+	ROOT::Tree )
