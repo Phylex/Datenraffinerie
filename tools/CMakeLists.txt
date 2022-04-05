@@ -55,8 +55,8 @@ add_executable(hdf-extended-dataset
 target_link_libraries(hdf-extended-dataset
 	HDF5::HDF5)
 
-add_executable(add_config
-	add_config.cc )
+add_executable( fracker
+	fracker.cc )
 target_link_libraries(add_config
 	hdf-utils
 	hgcroc-caching
