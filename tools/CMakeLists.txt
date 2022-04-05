@@ -19,6 +19,8 @@ add_library(hgcroc-caching
 
 add_library(hdf-utils
 	hdf-utils.cc)
+target_link_libraries(hdf-utils
+	PUBLIC HDF5::HDF5 )
 
 add_library(root-tools
 	root-tools.cc )
@@ -57,7 +59,7 @@ target_link_libraries(hdf-extended-dataset
 
 add_executable( fracker
 	fracker.cc )
-target_link_libraries(add_config
+target_link_libraries(fracker
 	hdf-utils
 	hgcroc-caching
 	yaml-cpp
