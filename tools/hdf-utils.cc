@@ -88,7 +88,7 @@ void create_axes(hid_t root_id, hid_t *axis0_id, hid_t *axis1_id) {
 	create_utf8_attribute(root_id, "axis1_variety", "regular");
 	std::vector<int> axis1_data;
 	dimensions[0] = 0;
-	chunk_dimensions[0] = 10000;
+	chunk_dimensions[0] = 200000;
 	datatype = H5Tcopy(H5T_STD_I32LE);
 	*axis1_id = create_dataset<int>(root_id, "axis1", datatype, ndims, dimensions, max_dimensions, chunk_dimensions, 0, axis1_data);
 	create_utf8_attribute(*axis1_id, "CLASS", "EARRAY");
