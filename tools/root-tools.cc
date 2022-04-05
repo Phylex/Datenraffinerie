@@ -1,8 +1,8 @@
 #include "include/root-tools.h"
 
-TTree *openRootTree(std::string root_file_path, bool *event_mode) {
+TTree *openRootTree(TFile *Measurement, std::string root_file_path, bool *event_mode) {
 	/* open the ROOT file containing the measurement data */
-	std::unique_ptr<TFile> Measurement(TFile::Open(root_file_path.c_str(), "READ"));
+	Measurement = TFile::Open(root_file_path.c_str(), "READ");
 	/* make sure that the file can be opened by root */
 	if ( !Measurement || Measurement->IsZombie() ) {
 		std::cout << "Unable to open Root file: " << root_file_path << std::endl;
@@ -11,11 +11,11 @@ TTree *openRootTree(std::string root_file_path, bool *event_mode) {
 
 	/* determine if we are running in event mode or in summary mode */
 	/* and select the tree containing the data from the root file */
-	bool event_mode = false;
+	*event_mode = false;
 	TTree *tree;
 	TObject *data_dir = Measurement->Get("runsummary");
 	if ( data_dir == NULL ) {
-		event_mode = true;
+		*event_mode = true;
 		tree = (TTree *)Measurement->Get("unpacker_data/hgcroc");
 	} else {
 		tree = (TTree *)Measurement->Get("runsummary/summary");
