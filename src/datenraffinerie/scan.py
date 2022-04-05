@@ -296,6 +296,8 @@ class DataField(luigi.Task):
                                    self.loop)
 
             for i, value in enumerate(values):
+                measurement_target_config = target_config
+                measurement_daq_config = daq_system_config
                 patch = cfu.generate_patch(parameter, value)
                 complete_config = cfu.update_dict(complete_config, patch)
                 measurement_daq_config = complete_config['daq']
