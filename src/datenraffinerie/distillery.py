@@ -21,6 +21,7 @@ class Distillery(luigi.Task):
                                                    default=None)
     network_config = luigi.DictParameter(significant=False)
     loop = luigi.BoolParameter(significant=False)
+    event_mode = luigi.BoolParameter(significant=False)
 
     def requires(self):
         from .valve_yard import ValveYard
@@ -28,7 +29,8 @@ class Distillery(luigi.Task):
         the data for the analysis
         :returns: The acquisition procedure needed to produce the data
         """
-        return ValveYard(self.root_config_path, self.daq, self.output_dir,
+        return ValveYard(self.root_config_path, self.daq,
+                         os.path.dirname(self.output_dir),
                          self.analysis_module_path, self.network_config,
                          self.loop)
 
@@ -76,7 +78,10 @@ class Distillery(luigi.Task):
         analysis = analysis(unfreeze(self.parameters))
 
         # open and read the data
-        data = pd.read_hdf(self.input().path)
+        if not self.event_mode:
+            data = pd.read_hdf(self.input().path)
+        else:
+            data = pd.HDFStore(self.input().path, mode='r')
         analysis.run(data, self.output_dir)
 
     @staticmethod

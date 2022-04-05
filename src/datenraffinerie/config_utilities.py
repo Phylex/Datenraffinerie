@@ -9,8 +9,10 @@ what to expect of their behaviour
 from pathlib import Path
 import os
 from copy import deepcopy
+from typing import Union
 from luigi.freezing import FrozenOrderedDict
 import yaml
+import jinja2
 
 
 class ConfigPatchError(Exception):
@@ -34,7 +36,7 @@ def load_configuration(config_path):
         try:
             return yaml.safe_load(config_file.read())
         except yaml.YAMLError as e:
-            raise ConfigFormatError from e
+            raise ConfigFormatError("unable to load yaml") from e
 
 
 def unfreeze(config):
@@ -154,15 +156,30 @@ def patch_configuration(config: dict, patch: dict):
     return update_dict(config, patch)
 
 
-def generate_patch(keys: list, value):
+def generate_patch(keys: Union[list, str], value):
     """
     the Scan task receives a list of keys and values and needs
     to generate a patch from one of the values of the list
     and all the keys. This function does that
     """
+    # if the key is in fact a template for a yaml file
+    if isinstance(keys, str):
+        patch = yaml.safe_load(jinja2.Template(keys).render(value=value))
+        if len(patch.keys()) != 1 and \
+                (patch.keys()[0] != 'target' or patch.keys()[0] != 'daq'):
+            patch = {'target': patch}
+        return patch
+
     # this is needed to work with luigi as it turns stuffinto
     # tuples
     keys = list(keys)
+    # here we need to insert 'target' if the key 'target' or 'daq' is not present
+    # as the top level key to extend the scannable parameters to both the daq and target
+    # configuration
+    if keys[0] not in ['target', 'daq']:
+        keys.insert(0, 'target')
+
+    # now the rest of the generation can run as usual
     if len(keys) == 0:
         return {}
     keys.reverse()
@@ -252,9 +269,9 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
         calibration = None
 
     try:
-        raw_data = scan_config['raw_data']
+        raw_data = scan_config['event_mode']
         if not isinstance(raw_data, bool):
-            raise ConfigFormatError("The raw_data field needs to contain a"
+            raise ConfigFormatError("The event_data field needs to contain a"
                                     " boolean")
     except KeyError:
         raw_data = False
@@ -335,22 +352,47 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
         raise ConfigFormatError(f"The initial target config of {daq_label}"
                                 " could not be found") from err
 
+    try:
+        columns = scan_config['data_columns']
+        if not isinstance(columns, list):
+            raise ConfigFormatError("The columns key must be a list of the "
+                                    f" dataframe, columns is a {type(columns)}")
+    except KeyError:
+        columns = None
+
     # parse the scan dimensions
     scan_parameters = []
-    if 'parameters' not in scan_config.keys():
+    if 'parameters' not in scan_config:
         raise ConfigFormatError("There needs to be a 'parameters' list"
                                 f" in the scan entry {daq_label}")
     for scan_dimension in scan_config['parameters']:
+        if ('key' not in scan_dimension and 'template' not in scan_dimension) or\
+              (('range' not in scan_dimension) and
+              ('values' not in scan_dimension)):
+            raise ConfigFormatError("A range or a list of values along with a key"
+                                    " must be specified"
+                                    " for a scan dimension")
+        if 'key' in scan_dimension and 'template' in scan_dimension:
+            raise ConfigFormatError("'key' and 'template' are mutually exclusive");
         if 'key' in scan_dimension:
             if scan_dimension['key'] is None:
                 continue
+            scan_dim_key = scan_dimension['key']
+            if not isinstance(scan_dim_key, list):
+                raise ConfigFormatError("The key field in the parameter section"
+                        f" of {daq_label} needs to be a list")
+        if 'template' in scan_dimension:
+            template = scan_dimension['template']
+            try:
+                _ = jinja2.Template(template)
+            except jinja2.TemplateSyntaxError as e:
+                raise ConfigFormatError("The template in"
+                        " scan config {daq_label} is malformed") from e
+            scan_dim_key = template
+
         step = 1
         start = None
         stop = None
-        if ('range' not in scan_dimension.keys()) and ('values' not in scan_dimension.keys()):
-            raise ConfigFormatError("A range or a list of values must be specified"
-                                    " for a scan dimension")
-        scan_range = list()
         for key, value in scan_dimension.items():
             if key == 'range':
                 for subkey, subval in value.items():
@@ -373,16 +415,10 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
                                             " malformed. The values key should contain"
                                             " a list of values ")
                 scan_range = value
-                start = scan_range[0]
-                stop = scan_range[-1]
-                
-        if 'key' in scan_dimension:
-            scan_parameters.append((scan_dimension['key'], scan_range, 'target'))
-        elif 'daqkey' in scan_dimension:
-            scan_parameters.append((scan_dimension['daqkey'], scan_range, 'daq'))
-        
+        scan_parameters.append((scan_dim_key, scan_range))
+
     if len(scan_parameters) == 0:
-        scan_parameters = [({}, [0])]
+        scan_parameters = [([], [0])]
     return {'parameters': scan_parameters,
             'calibration': calibration,
             'name': daq_label,
@@ -391,10 +427,11 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
             'target_power_on_default_config': target_power_on_config,
             'target_init_config': target_initial_config,
             'daq_system_config': daq_system_config,
-            'daq_system_default_config': daq_system_default_config}
+            'daq_system_default_config': daq_system_default_config,
+            'data_columns': columns}
 
 
-def parse_analysis_config(analysis_config: dict) -> tuple:
+def parse_analysis_config(config: dict) -> tuple:
     """
     parse the analysis configuration from a dict and return it in the
     same way that the parse_scan_config
@@ -408,27 +445,35 @@ def parse_analysis_config(analysis_config: dict) -> tuple:
         analysis_label: name of the analysis
     """
     try:
-        analysis_label = analysis_config['name']
+        event_mode = config['event_mode']
+        if not isinstance(event_mode, bool):
+            raise ConfigFormatError("The event_data field needs to contain a"
+                                    " boolean")
+    except KeyError:
+        event_mode = False
+    try:
+        analysis_label = config['name']
     except KeyError as err:
         raise ConfigFormatError("The analysis configuration needs"
                                 " a name field") from err
     try:
-        analysis_object_name = analysis_config['python_module_name']
+        analysis_object_name = config['python_module_name']
     except KeyError as err:
         raise ConfigFormatError("The analysis configuration needs"
                                 " a python_module_name field") from err
     # parse the daq that is required for the analysis
-    if 'daq' not in analysis_config.keys():
+    if 'daq' not in config.keys():
         raise ConfigFormatError("an analysis must specify a daq task")
-    daq = analysis_config['daq']
+    daq = config['daq']
 
     analysis_parameters = {}
-    if 'parameters' in analysis_config.keys():
-        if not isinstance(analysis_config['parameters'], dict):
+    if 'parameters' in config.keys():
+        if not isinstance(config['parameters'], dict):
             raise ConfigFormatError("The parameters of an analysis must be"
                                     " a dictionary")
-        analysis_parameters = analysis_config['parameters']
+        analysis_parameters = config['parameters']
     return {'parameters': analysis_parameters,
+            'event_mode': event_mode,
             'daq': daq,
             'python_module': analysis_object_name,
             'name': analysis_label,
@@ -541,13 +586,17 @@ def test_patch_generator():
     """
     test that the generate_patch_dict_from_key_tuple function
     """
-    keys = [['k1', 'k2', 'k3'], 'k4', 'k5']
+    keys = [[['k1', 'k2', 'k3'], 'k4', 'k5'], ['daq', ['k1', 'k2', 'k3'], 'k4', 'k5']]
     value = 1
-    expected_dict = {'k1': {'k4': {'k5': 1}},
+    expected_dict = [{'target' : {'k1': {'k4': {'k5': 1}},
                      'k2': {'k4': {'k5': 1}},
-                     'k3': {'k4': {'k5': 1}}}
-    patch_dict = generate_patch(keys, value)
-    assert patch_dict == expected_dict
+                     'k3': {'k4': {'k5': 1}}}},
+                     {'daq' : {'k1': {'k4': {'k5': 1}},
+                     'k2': {'k4': {'k5': 1}},
+                     'k3': {'k4': {'k5': 1}}}}]
+    for key, exd_dict in zip(keys, expected_dict):
+        patch_dict = generate_patch(key, value)
+        assert patch_dict == exd_dict
 
 
 def test_diff_dict():
@@ -570,7 +619,9 @@ def test_parse_scan_config():
                             'target_init_config',
                             'daq_system_config',
                             'daq_system_default_config',
-                            'calibration']
+                            'calibration', 'raw', 'data_columns']
+    expected_column_keys = ['channel', 'chip', 'toa_mean', 'toa_stdd',
+                            'channeltype']
     for scan in test_config:
         scan_configs.append(parse_scan_config(scan, test_fpath))
     assert len(scan_configs) == 3  # number of different scans
@@ -581,6 +632,9 @@ def test_parse_scan_config():
     assert test_config['name'] == 'injection_scan'
     assert len(test_config['parameters']) == 1
     assert test_config['parameters'][0][0][0] == 'level1_key1'
+    for colname in test_config['data_columns']:
+        assert colname in expected_column_keys
+    assert len(test_config['data_columns']) == len(expected_column_keys)
 
 
 def test_analysis_config():
@@ -591,6 +645,7 @@ def test_analysis_config():
     assert isinstance(parsed_config['parameters'], dict)
     assert parsed_config['name'] == 'example_analysis'
     assert parsed_config['type'] == 'analysis'
+    assert parsed_config['event_mode'] == False
     ana_params = parsed_config['parameters']
     assert ana_params['p1'] == 346045
     assert ana_params['p2'] == 45346
@@ -624,3 +679,20 @@ def test_unfreeze():
     expected_dict = {'a': 1, 'b': [1,2,3],
                      'd': {'e': 4}}
     assert expected_dict == unfreeze(input_dict)
+
+def test_parse_scan_config_template_handling():
+    test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
+    config = load_configuration(test_fpath)
+    template_test_config = config[1]
+    test_scan_config = parse_scan_config(template_test_config, test_fpath)
+    print(test_scan_config['parameters'])
+    template = test_scan_config['parameters'][0][0]
+    values = test_scan_config['parameters'][0][1]
+    for value in values:
+        patch = generate_patch(template, value)
+        assert isinstance(patch['target'], dict)
+        assert 'roc_s0' in patch['target']
+        assert 'roc_s1' in patch['target']
+        assert 'roc_s2' in patch['target']
+        assert value in patch['target']['roc_s0']['ch']
+        assert patch['target']['roc_s0']['ch'][value]['HighRange'] == 1

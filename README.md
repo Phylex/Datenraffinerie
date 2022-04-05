@@ -119,13 +119,13 @@ to be searched for and subsequently depended upon by the new instantiation of th
 
 ### DAQ type procedures
 In contrast to the `analysis` type tasks discussed previously that rely on external code to run, and usually consist of a single task, the DAQ
-procedure is entirely implemented in the Datenraffinerie and relies on a recursive task called `Scan` to be able to generate the Cartesian product of
-the parameters specified by the user configuration. In the simplest case the `Scan` task does not recurs and directly starts a set of measurement tasks
+procedure is entirely implemented in the Datenraffinerie and relies on a recursive task called `DataField` to be able to generate the Cartesian product of
+the parameters specified by the user configuration. In the simplest case the `DataField` task does not recurs and directly starts a set of measurement tasks
 
 ![non recursive scan](docs/daq-task-dependency-graph-1D.svg)
 
-If mutiple parameter ranges are passed to the `Scan` task during the creation of the dependency graph it will not directly declare measurements as
-it's dependency but instead declare a set of `Scan` tasks as it's dependency, one for every value of the 'dimension' it is supposed to scan over.
+If mutiple parameter ranges are passed to the `DataField` task during the creation of the dependency graph it will not directly declare measurements as
+it's dependency but instead declare a set of `DataField` tasks as it's dependency, one for every value of the 'dimension' it is supposed to scan over.
 This is probably best visualized as in the following picture:
 
 ![recursive scan](docs/daq-task-dependency-graph-3D.svg)
@@ -135,8 +135,13 @@ are the final node in the dependency graph. As the computation of the dependency
 During execution, the measurement calculates the final measurement configuration and send it to the
 `daq_coordinator` which is in charge of managing the access to the measurement system for more on that see [The `daq_coordinator`](#DAQ Coordination).
 
-If a calibration is needed the Measurement tasks declare a common dependency on an instance of the `ValveYard` class to find the `analysis` type
-procedure for calculating the calibration. *This is currently not implemented yet!*.
+#### Alternate DAQ behaviour
+
+Along with the above mentioned execution mode, the `DataField` can be configured to acquire the data itself without spawning `DrillingRig`s to each
+acquire a single run. It performs the acquisition tasks in a loop before passing the raw data to the `Fracker` that processes the data into the
+DataFrames that are ultimately passed to the `Distillery`s. In this Mode the DAQ and the data processing are entirely decoupled. The Processing of the
+raw data will only start to commence after all the data has been gathered from the chip. To put the Datenraffinerie into this mode the `-l` option has
+to be passed to the Datenraffinerie on the command line.
 
 ## Configuration
 To get the Datenraffinerie to work properly, it needs to be configured. As mentioned earlier, there are examples of the configuration available in the
@@ -207,6 +212,7 @@ measurement performed during the acquisition.
 ```yaml
 - name: timewalk_scan
   type: daq
+  event_mode: false
   target_settings:
     power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
     initial_config: ./init_timewalk_scan.yaml
@@ -221,6 +227,7 @@ measurement performed during the acquisition.
       - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
   parameters:
     - key:
+      - target
       - ['roc_s0', 'roc_s1', 'roc_s2']
       - 'ReferenceVoltage'
       - [0, 1]
@@ -229,6 +236,20 @@ measurement performed during the acquisition.
         start: 0
         stop: 2048
         step: 32
+    - key:
+      - daq
+      - l1a_generator
+      values:
+        - {'special': 'value'}
+        - {'special': 'val2'}
+  data_columns:
+    - chip
+    - channel
+    - channeltype
+    - HighRange
+    - LowRange
+    - Calib
+    - phase_strobe
 ```
 
 Just as with the analysis procedure the `name` and `type` fields are present, specifying the name of the procedure as specified by the user and
@@ -238,8 +259,19 @@ The configuration is split into three sections the `target_settings` section tha
 `daq_settings` section that describe the configuration of the daq server and client and the parameters section that describes the parameters defining
 the axes of the 'phase space' that is scanned over.
 
-It is assumed that only parameters of the target change from one measurement to the other and that the daq system part of the backend does not change
-during a daq procedure.
+Both parameters of the target and daq system can be referenced in a scan. To select a parameter from the target system to scan over, the first entry
+of the `key` Field needs to be set to `target`, this is done in the first entry of the `parameters` field.
+To scan over a `daq` parameter, the first entry of the key field needs to be `daq`. If the first entry in the `key` parameter is neither `daq` or
+`target`, a `target` is automatically prepended. This was done to keep it backwards compatible with existing scan configurations. The automatic
+prefixing is considered  temporary feature and will be removed in a future release.
+
+Instead of providing a simple numerical range, it is also possible to specify individual values that should be scanned over. The values can be
+complex dictionary/lists structs. This makes single value scans with non numerical values possible. An example is shown in the second scan parameter
+of the above example.
+
+The columns of data that end up in the resulting DataFrame can now also be selected by specifying the optional `data_columns` list. If `data_columns`
+is not provided all available columns are written into the output DataFrame. If a column specified in the `data_columns` list is not found in the set
+of available columns it is simply ignored.
 
 ### Target Settings
 The `target_settings` section has two parts, the first is the `power_on_default` section.
@@ -379,5 +411,71 @@ connected. 5 measurements are taken. If an `adc_val` is below threshold, the Chi
 There are roughly 200 columns in the `DataFrame` so they will not be listed here. A list of the columns can be obtained with the
 `pd.DataFrame.columns` member.
 
+To limit the amount of columns in the output DataFrame to only the columns needed by the analysis they can be specified in the `data_columns` list of
+the daq configuration
+
+### Selecting columns in the output DataFrame
+
+
 ## Writing a custom Distillery
-TODO
+Writing a custom distillery is neccessary to produce Plots and other useful information (like a summary or calibration parameters) from data aquired by the daq system.
+Distilleries are executed by the Datenraffinerie after aquiring the neccesary data. Distilleries like the DAQ procedures are only run, if the output
+of the procedure is not already present.
+
+A distillery is a python class without inheritance. The class needs to have three methods `__init__(self, parameters)` to initialize the class with
+the parameters from the analysis configuration, an `output(self, output_dir)` method that specifies the files that are produced by the Distillery and
+a `run(self, data)` method that is called to process the data gathered by the daq procedure.
+
+A minimal example that produces a single empty file `summary.csv` as output and ignores the data passed to it in the run method would be:
+```python
+from pathlib import Path
+
+class MyLittleDistillery(object):
+    def __init__(self, paramerets):
+        self._params = parameters
+
+    def output(self):
+        return {
+            'summary': 'summary.csv',
+            'plots': [],
+            'calibration': None
+        }
+
+    def run(self, data, output_dir):
+        op = Path(output_dir)
+        (op / self.output()['summary']).touch()
+```
+
+### Discovery of custom analyses
+The datenraffinerie needs to find the custom Distilleries to execute them. To make this possible, the different distilleries used must be placed
+together into a folder. along with the python files for the distillery/distilleries the directory must contian a `__init__.py` file. This turns the
+folder into a python module that can be imported by the datenraffinerie. During the import of a module the instructions in the `__init__.py` file
+are executed. So that the custom distillery can be found a line must be added into the `__init__.py` file. Assuming that the configuration for the
+analysis has the following setting:
+```
+python_module_name: example_analysis_class
+```
+and we are trying to make the `MyLittleDistillery` executable by the datenraffinerie and the `MyLittleDistillery` is located in
+`my_little_distillery.py`, then the line in `__init__.py` needs to be:
+```
+from my_little_distillery import MyLittleDistillery as example_analysis_class
+```
+
+### Different Input Formats
+The daq procedures can be run in `event_mode` or in `summary_mode`. In `summary_mode` the raw data is processed into aggregates together with
+statistical information.
+
+The `summary_mode` is the default if the `event_mode` configuration parameter is either not set or set to `False`. in summary mode the analysis
+receives a pre loaded pandas `DataFrame` as `data` argument of the `run` function.
+
+In `event_mode` every event that was recorded is listed in the output_data. This makes the loading the whole data into
+memmory unfeasable (Data files that are decompressed and loaded into memmory have sizes in the hundreds of Gigabytes). To mitigate this effect the
+pandas `HDFStore` object is utilized to open the file without loading the all the data into memmory. The `HDFStore` object is then passed to the
+`run` method instead of the dataframe. The `HDFStore` has a
+[select](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.HDFStore.select.html) method that can be used to query the properties of
+the data and load sections of data into main memmory that are needed by the analysis. Due to the structure of the HDF5 file, it is currently not
+possible to load the data as an iterator. Filters or the start/stop arguments can be used to successively load only a subset of all rows into main
+memmory. Please see the [pandas documentation](https://pandas.pydata.org/pandas-docs/stable/index.html) for more details.
+The underying file is opened in `read only` mode so the modifications made to the data loaded into memmory do not have an effect on the underlying
+file. Please keep in mind that the only files that are allowed to be created by an analysis/Distillery are the files specified in the `output(self)`
+method of the Distillery.

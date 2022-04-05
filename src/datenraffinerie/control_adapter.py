@@ -300,6 +300,7 @@ class DAQAdapter(ControlAdapter):
                 make the neccesary changes to the config
         """
         self.variant = variant
+        self.running = False
         if config is not None:
             config = {self.variant_key_map[self.variant]:
                              config}
@@ -321,6 +322,7 @@ class DAQAdapter(ControlAdapter):
 
     def reset(self):
         self.configuration = self.default_config
+        self.running = False
         self.configure()
 
     def load_default_config(self, default_config):
@@ -337,15 +339,22 @@ class DAQAdapter(ControlAdapter):
         rep = ""
         while "running" not in rep.lower():
             rep = self._send_and_log('start')
+        self.running = True
 
     def is_done(self):
         """
         check if the current aquisition is ongoing or not
         """
+        self.logger.debug('checking if run is done')
+        if self.running is False:
+            return True
         rep = self._send_and_log('run_done')
-        if "notdone" in rep:
+        if "notdone" in rep.lower():
             return False
-        return True
+        if "done" in rep.lower():
+            self.running = False
+            return True
+        raise DAQError('Invalid answer from the DAQ component')
 
     def stop(self):
         """
@@ -501,8 +510,7 @@ class DAQSystem:
         """
         self.client.start()
         self.server.start()
-        while not self.server.is_done() or\
-                len(os.listdir(self.daq_data_folder)) == 0:
+        while not self.server.is_done() or len(os.listdir(self.daq_data_folder)) == 0:
             sleep(0.01)
         data_files = os.listdir(self.daq_data_folder)
         if len(data_files) > 1:

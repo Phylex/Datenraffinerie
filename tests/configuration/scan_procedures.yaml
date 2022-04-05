@@ -22,3 +22,38 @@
         start: 0
         stop: 2048
         step: 32
+
+- name: timewalk_scan_with_template
+  type: daq
+  target_settings:
+    power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ./init_timewalk_scan.yaml
+  daq_settings:
+    default: ./defaults/daq-system-config.yaml
+    server_override:
+      NEvents: 1000
+      l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
+      - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
+      - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
+      - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+      - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+  parameters:
+    - range:
+        start: 1
+        stop: 36
+        step: 1
+      template: |-
+       target:
+         roc_s0:
+           ch:
+             {{ value }}:
+               HighRange: 1
+         roc_s1:
+           ch:
+             {{ value }}:
+               HighRange: 1
+         roc_s2:
+           ch:
+             {{ value }}:
+               HighRange: 1
+
