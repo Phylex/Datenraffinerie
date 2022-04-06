@@ -2,7 +2,6 @@
 #include <yaml-cpp/yaml.h>
 #include <vector>
 #include <tuple>
-#include <ranges>
 #include <string>
 #include <iostream>
 #include "include/hgcroc_caching.h"
