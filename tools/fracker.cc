@@ -114,6 +114,7 @@ int main(int argc, char **argv) {
 			}
 			std::cout << std::endl;
 			std::cout << "Config: " << std::endl << config <<std::endl;
+			exit(EXIT_FAILURE);
 		}
 		channel_cache = true;
 		channel_config_block = add_block(group_id, H5T_STD_I32LE, axis0, channel_columns);
@@ -126,7 +127,18 @@ int main(int argc, char **argv) {
 		for (ConfigKey ck: half_wise_columns) {
 			half_wise_column_names.push_back(std::get<1>(ck));
 		}
-		half_wise_config = generate_hgcroc_halfwise_config<int>(config, half_wise_columns);
+		try {
+			half_wise_config = generate_hgcroc_halfwise_config<int>(config, half_wise_columns);
+		} catch (YAML::TypedBadConversion<int>) {
+			std::cout << "Encountered an Error building the Channel Cache" << std::endl;
+			std::cout << "Columns exported: " << std::endl;
+			for (auto col: channel_columns) { 
+				std::cout << col << ", ";
+			}
+			std::cout << std::endl;
+			std::cout << "Config: " << std::endl << config <<std::endl;
+			exit(EXIT_FAILURE);
+		}
 		half_wise_cache = true;
 		half_wise_config_block = add_block(group_id, H5T_STD_I32LE, axis0, half_wise_column_names);
 	}
@@ -138,7 +150,18 @@ int main(int argc, char **argv) {
 		for (ConfigKey ck: global_columns) {
 			global_column_names.push_back(std::get<1>(ck));
 		}
-		global_config = generate_hgcroc_global_config<int>(config, global_columns);
+		try {
+			global_config = generate_hgcroc_global_config<int>(config, global_columns);
+		} catch (YAML::TypedBadConversion<int>) {
+			std::cout << "Encountered an Error building the Channel Cache" << std::endl;
+			std::cout << "Columns exported: " << std::endl;
+			for (auto col: channel_columns) { 
+				std::cout << col << ", ";
+			}
+			std::cout << std::endl;
+			std::cout << "Config: " << std::endl << config <<std::endl;
+			exit(EXIT_FAILURE);
+		}
 		global_cache = true;
 		global_config_block = add_block(group_id, H5T_STD_I32LE, axis0, global_column_names);
 	}
