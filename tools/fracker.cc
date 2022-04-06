@@ -268,7 +268,6 @@ int main(int argc, char **argv) {
 				}
 			}
 		}
-		std::cout << "Converted " << (float)row/(float)total_rows*100 << "%          \r";
 		size_t write_row_count = 0;
 		if ( row == total_rows )
 			write_row_count = row % block_size;

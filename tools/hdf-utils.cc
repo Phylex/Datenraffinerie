@@ -180,7 +180,7 @@ hid_t add_block(hid_t group_id, hid_t value_datatype, hid_t axis0, std::vector<s
 	/* extend the axis0 */
 	ax_dim[0] += block_items.size();
 	herr_t status = H5Dextend(axis0, ax_dim);
-	if (status == 0) std::cout << status << std::endl;
+	if (status != 0) std::cout << status << std::endl;
 	H5Sclose(ax0_dataspace);
 
 	/* copy the data from the vector of block_item names into the file */
