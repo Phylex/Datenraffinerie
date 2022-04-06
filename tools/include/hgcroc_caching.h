@@ -280,21 +280,21 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_chan_config_cache(YAML::Node 
 	// iterate over the rocs
 	for (size_t roc = 0 ; roc < roc_config.size(); roc++) {
 		if (roc_config[chip_num_to_name[roc]]) {
-		}
-		//iterate over the differernt types of channels
-		for (auto chan_type: channel_types) {
-			// iterate over each channel of the particular type
-			for (size_t chan=0; chan < channel_type_to_channel_cout[chan_type]; chan++) {
-				CacheKey key(roc, chan, chan_type);
-				std::vector<T> channel_config_cache;
-				channel_config_cache.reserve(channel_columns.size());
-				
-				// iterate over the selected parameters creating the entry
-				for (auto column: channel_columns) {
-					channel_config_cache.push_back(config[chip_num_to_name[roc]][channel_type_map[chan_type]][chan][column].as<T>());
+			//iterate over the differernt types of channels
+			for (auto chan_type: channel_types) {
+				// iterate over each channel of the particular type
+				for (size_t chan=0; chan < channel_type_to_channel_cout[chan_type]; chan++) {
+					CacheKey key(roc, chan, chan_type);
+					std::vector<T> channel_config_cache;
+					channel_config_cache.reserve(channel_columns.size());
+					
+					// iterate over the selected parameters creating the entry
+					for (auto column: channel_columns) {
+						channel_config_cache.push_back(config[chip_num_to_name[roc]][channel_type_map[chan_type]][chan][column].as<T>());
+					}
+					// add the cache to the cached config to the map
+					channel_map[key] = channel_config_cache;
 				}
-				// add the cache to the cached config to the map
-				channel_map[key] = channel_config_cache;
 			}
 		}
 	}
@@ -312,14 +312,16 @@ std::map<GlobalCacheKey, std::vector<T>> generate_hgcroc_global_config(YAML::Nod
 		roc_config = config;
 	}
 	for (GlobalCacheKey i = 0; i < config.size(); i ++) {
-		YAML::Node chip_config = config[chip_num_to_name[i]];
-		// iterate over the global columns
-		std::vector<T> global_cache_row;
-		global_cache_row.reserve(global_columns.size());
-		for (auto g_column: global_columns) {
-			global_cache_row.push_back(chip_config[std::get<0>(g_column)][0][std::get<1>(g_column)].as<T>());
+		if (roc_config[chip_num_to_name[i]]) {
+			YAML::Node chip_config = config[chip_num_to_name[i]];
+			// iterate over the global columns
+			std::vector<T> global_cache_row;
+			global_cache_row.reserve(global_columns.size());
+			for (auto g_column: global_columns) {
+				global_cache_row.push_back(chip_config[std::get<0>(g_column)][0][std::get<1>(g_column)].as<T>());
+			}
+			global_config_cache[i] = global_cache_row;
 		}
-		global_config_cache[i] = global_cache_row;
 	}
 	return global_config_cache;
 };
@@ -335,16 +337,18 @@ std::map<HalfWiseCacheKey, std::vector<T>> generate_hgcroc_halfwise_config(YAML:
 		roc_config = config;
 	}
 	for (unsigned int i = 0; i < config.size(); i ++) {
-		YAML::Node chip_config = config[chip_num_to_name[i]];
-		// iterate over the global columns
-		std::vector<T> halfwise_cache_row;
-		halfwise_cache_row.reserve(half_wise_columns.size());
-		for (unsigned int j = 0; j < 2; j ++) {
-			HalfWiseCacheKey key = {i, j};
-			for (auto hw_column: half_wise_columns) {
-				halfwise_cache_row.push_back(chip_config[std::get<0>(hw_column)][j][std::get<1>(hw_column)].as<T>());
+		if (roc_config[chip_num_to_name[i]]) {
+			YAML::Node chip_config = config[chip_num_to_name[i]];
+			// iterate over the global columns
+			std::vector<T> halfwise_cache_row;
+			halfwise_cache_row.reserve(half_wise_columns.size());
+			for (unsigned int j = 0; j < 2; j ++) {
+				HalfWiseCacheKey key = {i, j};
+				for (auto hw_column: half_wise_columns) {
+					halfwise_cache_row.push_back(chip_config[std::get<0>(hw_column)][j][std::get<1>(hw_column)].as<T>());
+				}
+				half_wise_config_cache[key] = halfwise_cache_row;
 			}
-			half_wise_config_cache[key] = halfwise_cache_row;
 		}
 	}
 	return half_wise_config_cache;
