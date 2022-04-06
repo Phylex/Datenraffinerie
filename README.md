@@ -53,6 +53,31 @@ $ pip install .
 ```
 This should install all needed runtime requirements for and datenraffinerie itself.
 
+### Installing native code
+Processing larger files becomes very time consuming using python. As a result, performance critical parts are now implemented in C and therefore need
+to be compiled and installed for the Datenraffinerie to be able to work properly.
+
+As this level of performance is rarely needed, the Datenraffinerie will keep the needed code to perform the task without the need for the compiled
+code to be available. It also switches automatically to the compiled code if it detects it's presence on the system.
+
+The sources for the compiled code are located in the `tools` directory. The software uses the CMake build system and requires there to be a working
+installation of the HDF5 and Root libraries along with a C++ 11 capable compiler.
+
+On CentOS 7 the host compiler does not support C++11 and the version of CMake installed by the `cmake` package is too old (it's from 2006).
+So please be sure to install `cmake3` and use it instead of `cmake` where applicable.
+
+To migrate to a compiler that supports the needed features of C++ 11 a tutorial will follow soon.
+
+To build and install the software the following commands need to be run from inside the `tools` directory:
+```
+$ mkdir build
+$ cd build
+$ cmake ..
+$ sudo make install
+```
+
+This installs the `fracker` program onto the system. After running the above commands the fracker command should be available on the command line.
+
 ## Running Datenraffinerie
 After the installation the command `datenraffinerie` is available.
 To find out about the options of the command line tool run:

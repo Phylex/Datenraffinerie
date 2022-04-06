@@ -10,6 +10,8 @@ import pandas as pd
 import numpy as np
 import uproot
 import tables
+import yaml
+import uuid
 from numba import jit
 
 
@@ -116,6 +118,41 @@ def fill_block(file, group_name, block, data: np.ndarray):
         axis1.append(np.arange(maxindex, len(block)))
 
 
+def run_compiled_fracker(rootfile, hdf_file, complete_config, raw_data, columns):
+    """
+    Assuming there is a fracker command that merges in the configuration
+    and transforms the root into the hdf file call it with the proper arguments
+    """
+    compiled_fracker_path = shutil.which('fracker')
+    # build the column list if none has been provided
+    if columns is None:
+        if raw_data:
+            columns = event_mode_data_columns.copy()
+        else:
+            columns = data_columns.copy()
+        columns += expected_columns
+    # dump the complete config so that the fracker can use it
+    run_yaml = yaml.dump(complete_config)
+    run_yaml_path = Path('.tmp_run_yaml_' + str(uuid.uuid1()))
+    with open(run_yaml_path) as run_yaml_file:
+        run_yaml_file.write(run_yaml)
+    # assemble the fracker command string passed to the system
+    fracker_input = f'-c {run_yaml_path} -i {rootfile} '
+    fracker_output = f'-o {hdf_file} '
+    fracker_options = '-b 2000000 '
+    fracker_columns = ' -c '
+    for col in columns:
+        fracker_columns += f'{col} '
+    full_fracker_command = compiled_fracker_path + ' ' +\
+        fracker_input + fracker_output +\
+        fracker_options + fracker_columns
+    # run the compiled fracker
+    retval = os.system(full_fracker_command)
+    # remove the temporary file
+    os.remove(run_yaml_path)
+    return retval
+
+
 def reformat_data(rootfile: str,
                   hdf_file: str,
                   complete_config: dict,
@@ -125,6 +162,16 @@ def reformat_data(rootfile: str,
     """ take in the unpacked root data and reformat into an hdf5 file.
     Also add in the configuration from the run.
     """
+
+    # if the fracker is a command that can be run, then we run the fracker
+    # instead running the python code that does the same thing just a LOT
+    # slower
+    compiled_fracker_path = shutil.which('fracker')
+    if compiled_fracker_path is not None:
+        retval = run_compiled_fracker(rootfile, hdf_file, complete_config,
+                                      raw_data, columns)
+
+    # execute the native code if the fracker is not found
     hd_file = create_empty_hdf_file(hdf_file, 1000000)
 
     if raw_data:
@@ -167,6 +214,7 @@ def reformat_data(rootfile: str,
         add_config_to_dataset(chip_chan_indices, hd_file, config_blk, complete_config,
                               chunk_length, raw_data, columns)
     hd_file.close()
+
 
 
 def add_config_to_dataset(chip_chan_indices,
@@ -308,7 +356,6 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
     hd_file.close()
 
 
-@jit(forceobj=True)
 def l1a_generator_settings(complete_config: dict) -> dict:
     """add the config information of the chip half that corresponds to the particular
     channel
@@ -396,7 +443,11 @@ def roc_channel_to_globals(complete_config: dict, chip_id: int, channel_id: int,
         result.update(roc_config[gl_key][0])
     return result
 
-# this stuff we define for the tests
+event_mode_data_columns = [
+        'event', 'chip', 'half', 'channel', 'adc', 'adcm', 'toa',
+        'tot', 'totflag', 'trigtime', 'trigwidth', 'corruption',
+        'bxcounter', 'eventcounter', 'orbitcounter' ]
+
 data_columns = ['chip', 'channel', 'channeltype',
                     'adc_median', 'adc_iqr', 'tot_median',
                     'tot_iqr', 'toa_median', 'toa_iqr', 'adc_mean',

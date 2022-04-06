@@ -64,5 +64,8 @@ target_link_libraries(fracker
 	hgcroc-caching
 	yaml-cpp
 	root-tools
-	ROOT::Core
-	ROOT::Tree )
+	ROOT::Core )
+install( TARGETS fracker
+	CONFIGURATIONS Release
+	RUNTIME DESTINATION bin )
+
