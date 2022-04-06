@@ -134,19 +134,20 @@ def run_compiled_fracker(rootfile, hdf_file, complete_config, raw_data, columns)
     # dump the complete config so that the fracker can use it
     run_yaml = yaml.dump(complete_config)
     run_yaml_path = Path('.tmp_run_yaml_' + str(uuid.uuid1()))
-    with open(run_yaml_path) as run_yaml_file:
+    with open(run_yaml_path, 'w+') as run_yaml_file:
         run_yaml_file.write(run_yaml)
     # assemble the fracker command string passed to the system
     fracker_input = f'-c {run_yaml_path} -i {rootfile} '
     fracker_output = f'-o {hdf_file} '
     fracker_options = '-b 2000000 '
-    fracker_columns = ' -c '
+    fracker_columns = ' -s '
     for col in columns:
         fracker_columns += f'{col} '
     full_fracker_command = compiled_fracker_path + ' ' +\
         fracker_input + fracker_output +\
         fracker_options + fracker_columns
     # run the compiled fracker
+    print(f"Running: {full_fracker_command}")
     retval = os.system(full_fracker_command)
     # remove the temporary file
     os.remove(run_yaml_path)

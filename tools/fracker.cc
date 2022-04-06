@@ -104,7 +104,17 @@ int main(int argc, char **argv) {
 	}
 	std::map<CacheKey, std::vector<int>> channel_config;
 	if (channel_columns.size() > 0 ) {
-		channel_config = generate_hgcroc_chan_config_cache<int>(config, channel_columns);
+		try {
+			channel_config = generate_hgcroc_chan_config_cache<int>(config, channel_columns);
+		} catch (YAML::TypedBadConversion<int>) {
+			std::cout << "Encountered an Error building the Channel Cache" << std::endl;
+			std::cout << "Columns exported: " << std::endl;
+			for (auto col: channel_columns) { 
+				std::cout << col << ", ";
+			}
+			std::cout << std::endl;
+			std::cout << "Config: " << std::endl << config <<std::endl;
+		}
 		channel_cache = true;
 		channel_config_block = add_block(group_id, H5T_STD_I32LE, axis0, channel_columns);
 	}
