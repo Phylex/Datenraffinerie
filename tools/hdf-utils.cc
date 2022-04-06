@@ -1,5 +1,86 @@
 #include "include/hdf-utils.h"
 
+size_t get_dimensions(hid_t dataspace, hsize_t *dims, hsize_t *maxdims) {
+	if (dims != NULL) return -1;
+	if (maxdims != NULL) return -1;
+	size_t ds_rank;
+	ds_rank = H5Sget_simple_extent_ndims(dataspace);
+	dims = (hsize_t *)malloc(sizeof(hsize_t) * ds_rank);
+	maxdims = (hsize_t *)malloc(sizeof(hsize_t) * ds_rank);
+	H5Sget_simple_extent_dims(dataspace, dims, maxdims);
+	return ds_rank;
+}
+
+bool validate_dataset_shape(hid_t src_dataset, hid_t dest_dataset) {
+	hid_t src_datatype = H5Dget_type(src_dataset);
+	hid_t src_dataspace = H5Dget_space(src_dataset);
+	hid_t dest_datatype = H5Dget_type(dest_dataset);
+	hid_t dest_dataspace = H5Dget_space(dest_dataset);
+	size_t src_rank, dest_rank;
+	bool sizes_match = true;
+	hsize_t *src_dims = NULL;
+	hsize_t *src_maxdims = NULL;
+	hsize_t *dest_dims = NULL;
+	hsize_t *dest_maxdims = NULL;
+	src_rank = get_dimensions(src_dataspace, src_dims, src_maxdims);
+	dest_rank = get_dimensions(dest_dataspace, dest_dims, dest_maxdims);
+	if (!H5Tequal (src_datatype, dest_datatype)) {
+		sizes_match = false;
+		goto validate_dataspace_shape_cleanup;
+	}
+	if (src_rank != dest_rank) {
+		sizes_match = false;
+		goto validate_dataspace_shape_cleanup;
+	}
+	for (size_t i = 0; i < src_rank; i ++) {
+		if (src_dims[i] != dest_dims[i]) {
+			sizes_match = false;
+			goto validate_dataspace_shape_cleanup;
+		}
+	}
+validate_dataspace_shape_cleanup:
+	free(src_dims);
+	free(dest_dims);
+	free(src_maxdims);
+	free(dest_maxdims);
+	return sizes_match;
+}
+
+size_t transfer_data(hid_t src_dataset, hid_t dest_dataset) {
+	/* get the data contained in the source dataset and append it to the 
+	 * dest dataset. Extend the dest dataset as needed after checking that that is
+	 * possible firs
+	 */
+
+	bool datasets_match = validate_dataset_shape(src_dataset, dest_dataset);
+	hid_t src_dataspace = H5Dget_space(src_dataset);
+	hid_t src_datatype = H5Dget_type(src_dataset);
+	hsize_t *src_dims = NULL;
+	hsize_t *src_maxdims = NULL;
+	/* reserve space in main memmory to store the src_data temporarily */
+	size_t src_rank = get_dimensions(src_dataspace, src_dims, src_maxdims);
+	size_t appended_rows = src_dims[0];
+	hsize_t src_total_element_count = 1;
+	for (int i = 0; i < src_rank; i ++) {
+		src_total_element_count *= src_dims[i];
+	}
+	void *in_mem_buffer = malloc(H5Tget_size(src_datatype) * src_total_element_count);
+	if (in_mem_buffer == NULL) {
+		std::cout << "Could not allocate the memmory necessary to hold the data of a"
+			<< " source file" << std::endl;
+		free(src_dims);
+		free(src_maxdims);
+		exit(EXIT_FAILURE);
+	}
+	hid_t buffer_space = H5Screate_simple(src_rank, src_dims, NULL);
+	/* TODO extend the dest dataframe and get the hyperslab coresponding to the extention
+	 * then write from the src dataspace to the dest dataspace (may not even need appli
+	 * cation managed buffer in the middle )
+	 */
+
+	return appended_rows;
+}
+
 herr_t create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
 	hid_t attribute_space_id;
 	hid_t datatype_id;

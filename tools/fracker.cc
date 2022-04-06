@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
 		->required()
 		->check(CLI::ExistingFile);
 	app.add_option("-b", block_size, "The size of a block to copy data from the root to the hdf file")
-		->default_val(10000);
+		->default_val(1000000);
 	app.add_option("-s", columns, "The selection of columns that should appear in the output data");
 	app.add_option("-o", output_path, "path to the output containing the data and config specified");
 
