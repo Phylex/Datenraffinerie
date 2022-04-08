@@ -245,7 +245,20 @@ class DataField(luigi.Task):
                 'target': cfu.unfreeze(self.target_default_config)}
             socket.send_string('load defaults;' +
                                yaml.safe_dump(complete_default_config))
+            socket.setsockopt(zmq.RCVTIMEO, 20000)
+            try:
+                resp = socket.recv()
+            except zmq.error.Again as e:
+                raise RuntimeError("Socket is not responding. "
+                                   "Please check that client and server apps are running, "
+                                   "and that your network configuration is correct") from e
+            else:
+                if resp != b'defaults loaded':
+                    raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
+
+
             resp = socket.recv()
+
             if resp != b'defaults loaded':
                 raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
 
