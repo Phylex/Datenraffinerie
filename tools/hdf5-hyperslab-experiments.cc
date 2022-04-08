@@ -1,15 +1,22 @@
 #include <stdio.h>
 #include <malloc.h>
 #include "hdf5.h"
+#include "include/CLI11.hpp"
 
 #define FNAME "test-hdf-routines.h5"
+#define FNAME2 "test-hdf-merge.h5"
 
 #define DSET_NAME "data"
 #define RANK 2
 #define NROW 100
 #define NCOL 10
 
-int main() {
+int main(int argc, char** argv) {
+	CLI::App app {"play around with hyperslabs"};
+	int merged;
+	app.add_option("-m", merged, "try merging files");
+
+	CLI11_PARSE(app, argc, argv);
 	/* create an error variable to store possible errors in*/
 	herr_t status;
 	/* create an hdf5 file */
@@ -65,16 +72,11 @@ int main() {
 	dims = NULL;
 	
 	/* select a hyperslab from the file dataspace */
-	hsize_t slice_start[2];
-	hsize_t slice_stride[2];
-	hsize_t slice_block[2];
-	hsize_t slice_count[2];
-	slice_start[0] = 0; slice_start[1] = 0;
-	slice_stride[0] = 10; slice_stride[1] = 3;
-	slice_block[0] = 5; slice_block[1] = 2;
-	slice_count[0] = 3; slice_count[1] = 2;
-	hsize_t element_count;
-	element_count = slice_block[0] * slice_block[1] * slice_count[0] * slice_count[1];
+	hsize_t slice_start[2] = {0, 0};
+	hsize_t slice_stride[2] = {10, 3};
+	hsize_t slice_block[2] = {5, 2};
+	hsize_t slice_count[2] = {3, 2};
+	hsize_t element_count = slice_block[0] * slice_block[1] * slice_count[0] * slice_count[1];
 	status = H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, slice_start, slice_stride, slice_count, slice_block);
 	printf("Status from the \'select hyperslab\' call: %i\n", status);
 	printf("Number of elements: %lli\n", element_count);
