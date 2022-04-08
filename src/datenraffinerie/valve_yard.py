@@ -64,21 +64,6 @@ class ValveYard(luigi.WrapperTask):
                               loop=self.loop,
                               event_mode=procedure['event_mode'])
         if procedure['type'] == 'daq':
-            # the default values for the DAQ system and the target need to
-            # be loaded on to the backend
-            context = zmq.Context()
-            socket = context.socket(zmq.REQ)
-            socket.connect(
-                    f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
-                    f"{self.network_config['daq_coordinator']['port']}")
-            complete_default_config = {
-                    'daq': procedure['daq_system_default_config'],
-                    'target': procedure['target_power_on_default_config']}
-            socket.send_string('load defaults;' +
-                               yaml.safe_dump(complete_default_config))
-            resp = socket.recv()
-            if resp != b'defaults loaded':
-                raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
             if len(procedure['parameters']) == 1 and self.loop:
                 return Fracker(identifier=0,
                                label=self.procedure_label,
@@ -88,6 +73,7 @@ class ValveYard(luigi.WrapperTask):
                                target_config=procedure['target_init_config'],
                                target_default_config=procedure['target_power_on_default_config'],
                                daq_system_config=procedure['daq_system_config'],
+                               daq_system_default_config=procedure['daq_system_default_config'],
                                root_config_path=str(
                                    Path(self.root_config_file).resolve()),
                                calibration=procedure['calibration'],
@@ -95,7 +81,8 @@ class ValveYard(luigi.WrapperTask):
                                network_config=self.network_config,
                                loop=self.loop,
                                raw=procedure['raw'],
-                               data_columns=procedure['data_columns']) # indicate if to produce event by event data data
+                               data_columns=procedure['data_columns'], # indicate if to produce event by event data data
+                               initialized_to_default=False) 
             return DataField(identifier=0,
                              label=self.procedure_label,
                              output_dir=str(output_dir.resolve()),
@@ -104,6 +91,7 @@ class ValveYard(luigi.WrapperTask):
                              target_config=procedure['target_init_config'],
                              target_default_config=procedure['target_power_on_default_config'],
                              daq_system_config=procedure['daq_system_config'],
+                             daq_system_default_config=procedure['daq_system_default_config'],
                              root_config_path=str(
                                  Path(self.root_config_file).resolve()),
                              calibration=procedure['calibration'],
@@ -111,6 +99,7 @@ class ValveYard(luigi.WrapperTask):
                              network_config=self.network_config,
                              loop=self.loop,
                              raw=procedure['raw'],
-                             data_columns=procedure['data_columns']) # indicate if to produce event by event data data
+                             data_columns=procedure['data_columns'], # indicate if to produce event by event data data
+                             initialized_to_default=False) 
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")
