@@ -16,6 +16,11 @@ void extend_axis1(hid_t axis, size_t new_min_size);
 hid_t set_up_file(hid_t file_id, std::string group_name);
 hid_t add_block(hid_t group_id, hid_t datatype, hid_t axis0,
                std::vector<std::string> block_columns);
+size_t get_dimensions(hid_t dataspace, hsize_t **dims, hsize_t **maxdims);
+std::vector<std::string> get_columns_in_block(hid_t group_id, int block_id);
+hid_t get_block_dataset(hid_t group, int block_id);
+bool validate_dataset_shape(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim);
+size_t transfer_data(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim);
 void write_to_block(hid_t ds_block_id, hid_t axis0_id, size_t rows, void *data);
 std::vector<char> make_h5_compat_string(std::vector<std::string> strings,
                                         size_t hdf_string_size);

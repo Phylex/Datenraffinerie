@@ -1,17 +1,28 @@
 #include "include/hdf-utils.h"
 
-size_t get_dimensions(hid_t dataspace, hsize_t *dims, hsize_t *maxdims) {
-	if (dims != NULL) return -1;
-	if (maxdims != NULL) return -1;
+size_t get_dimensions(hid_t dataspace, hsize_t **dims, hsize_t **maxdims) {
 	size_t ds_rank;
+	hsize_t *call_dims, *call_max_dims;
 	ds_rank = H5Sget_simple_extent_ndims(dataspace);
-	dims = (hsize_t *)malloc(sizeof(hsize_t) * ds_rank);
-	maxdims = (hsize_t *)malloc(sizeof(hsize_t) * ds_rank);
-	H5Sget_simple_extent_dims(dataspace, dims, maxdims);
+	if (dims != NULL) {
+		*dims = new hsize_t[ds_rank];
+		call_dims = *dims;
+	} else {
+		call_dims = NULL;
+	}
+	if (maxdims != NULL) {
+		*maxdims = new hsize_t[ds_rank];
+		call_max_dims = *maxdims;
+	} else {
+		call_max_dims = NULL;
+	}
+	H5Sget_simple_extent_dims(dataspace, call_dims, call_max_dims);
 	return ds_rank;
 }
 
-bool validate_dataset_shape(hid_t src_dataset, hid_t dest_dataset) {
+bool validate_dataset_shape(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim) {
+	/* take two datasets and validate that the dimensionality and type
+	 * of the two datasets are the same */
 	hid_t src_datatype = H5Dget_type(src_dataset);
 	hid_t src_dataspace = H5Dget_space(src_dataset);
 	hid_t dest_datatype = H5Dget_type(dest_dataset);
@@ -22,8 +33,8 @@ bool validate_dataset_shape(hid_t src_dataset, hid_t dest_dataset) {
 	hsize_t *src_maxdims = NULL;
 	hsize_t *dest_dims = NULL;
 	hsize_t *dest_maxdims = NULL;
-	src_rank = get_dimensions(src_dataspace, src_dims, src_maxdims);
-	dest_rank = get_dimensions(dest_dataspace, dest_dims, dest_maxdims);
+	src_rank = get_dimensions(src_dataspace, &src_dims, &src_maxdims);
+	dest_rank = get_dimensions(dest_dataspace, &dest_dims, &dest_maxdims);
 	if (!H5Tequal (src_datatype, dest_datatype)) {
 		sizes_match = false;
 		goto validate_dataspace_shape_cleanup;
@@ -33,32 +44,38 @@ bool validate_dataset_shape(hid_t src_dataset, hid_t dest_dataset) {
 		goto validate_dataspace_shape_cleanup;
 	}
 	for (size_t i = 0; i < src_rank; i ++) {
+		/* skip the dimension that the dataset is extended into */
+		if ( i == extension_dim ) continue;
 		if (src_dims[i] != dest_dims[i]) {
 			sizes_match = false;
 			goto validate_dataspace_shape_cleanup;
 		}
 	}
 validate_dataspace_shape_cleanup:
-	free(src_dims);
-	free(dest_dims);
-	free(src_maxdims);
-	free(dest_maxdims);
+	delete[] src_dims;
+	delete[] dest_dims;
+	delete[] src_maxdims;
+	delete[] dest_maxdims;
 	return sizes_match;
 }
 
-size_t transfer_data(hid_t src_dataset, hid_t dest_dataset) {
+size_t transfer_data(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim) {
 	/* get the data contained in the source dataset and append it to the 
 	 * dest dataset. Extend the dest dataset as needed after checking that that is
 	 * possible firs
+	 *
+	 * It is assumed that the data is of equal rank and dimensionality. This is
+	 * validated before any of the code is run
+	 * The data is extended along the extension_dim axis
 	 */
 
-	bool datasets_match = validate_dataset_shape(src_dataset, dest_dataset);
+	bool datasets_match = validate_dataset_shape(src_dataset, dest_dataset, extension_dim);
 	hid_t src_dataspace = H5Dget_space(src_dataset);
 	hid_t src_datatype = H5Dget_type(src_dataset);
 	hsize_t *src_dims = NULL;
 	hsize_t *src_maxdims = NULL;
 	/* reserve space in main memmory to store the src_data temporarily */
-	size_t src_rank = get_dimensions(src_dataspace, src_dims, src_maxdims);
+	size_t src_rank = get_dimensions(src_dataspace, &src_dims, &src_maxdims);
 	size_t appended_rows = src_dims[0];
 	hsize_t src_total_element_count = 1;
 	for (int i = 0; i < src_rank; i ++) {
@@ -72,12 +89,37 @@ size_t transfer_data(hid_t src_dataset, hid_t dest_dataset) {
 		free(src_maxdims);
 		exit(EXIT_FAILURE);
 	}
-	hid_t buffer_space = H5Screate_simple(src_rank, src_dims, NULL);
-	/* TODO extend the dest dataframe and get the hyperslab coresponding to the extention
-	 * then write from the src dataspace to the dest dataspace (may not even need appli
-	 * cation managed buffer in the middle )
-	 */
-
+	/* extend the dataspace of the destination dataset */
+	hid_t dest_dataspace = H5Dget_space(dest_dataset);
+	hsize_t *dest_dims;
+	hsize_t *dest_maxdims;
+	size_t dest_rank = get_dimensions(dest_dataspace, &dest_dims, &dest_maxdims);
+	if (extension_dim >= dest_rank) {
+		std::cout << "The extension dimension of the dataset that is to be merged is"
+			<< " larger than the dimensionality of the dataset" << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	dest_dims[extension_dim] += src_dims[extension_dim];
+	H5Dextend(dest_dataspace, dest_dims);
+	H5Sclose(dest_dataspace);
+	dest_dataspace = H5Dget_space(dest_dataset);
+	/* calculate the starting point of the hyperslab in the extended dataspace */
+	/* the size of the hyperslab is the src_dims */
+	dest_dims[extension_dim] -= src_dims[extension_dim] + 1;
+	for (size_t i = 0; i < dest_rank; i ++) {
+		if ( i != extension_dim ) dest_dims[i] = 0;
+	}
+	H5Sselect_hyperslab(dest_dataspace, H5S_SELECT_SET, dest_dims, NULL, NULL, src_dims);
+	H5Dread(src_dataset, src_datatype, src_dataspace, src_dataspace, H5P_DEFAULT, in_mem_buffer);
+	H5Dwrite(dest_dataspace, src_datatype, src_dataspace, dest_dataspace, H5P_DEFAULT, in_mem_buffer);
+	H5Tclose(src_datatype);
+	H5Sclose(src_dataspace);
+	H5Sclose(dest_dataspace);
+	delete[] src_dims;
+	delete[] src_maxdims;
+	free(in_mem_buffer);
+	delete[] dest_dims;
+	delete[] dest_maxdims;
 	return appended_rows;
 }
 
@@ -101,9 +143,16 @@ herr_t create_utf8_attribute(hid_t root_id, std::string name, std::string value)
 	status = H5Awrite(attribute_id, datatype_id, value.c_str());
 
 	//close the attribute
-	if (status != 0) std::cout << status << std::endl;
+	if (status != 0) std::cout
+		<< "create_utf8_attribute error writing attribute"
+		<< status
+		<< std::endl;
 	status = H5Aclose(attribute_id);
-	if (status != 0) std::cout << status << std::endl;
+	if (status != 0)
+		std::cout
+		<< "create_utf8_attribute error closing attribute"
+		<< status
+		<< std::endl;
 	status = H5Sclose(attribute_space_id);
 	return status;
 }
@@ -121,7 +170,10 @@ herr_t create_empty_utf8_attribute(hid_t root_id, std::string attr_name) {
 							datatype_id, attribute_space_id,
 							H5P_DEFAULT, H5P_DEFAULT);
 	status = H5Aclose(attribute_id);
-	if (status != 0) std::cout << status << std::endl;
+	if (status != 0)
+		std::cout << "create_empty_utf8_attribute error closing attribute"
+		<< status
+		<< std::endl;
 	status = H5Sclose(attribute_space_id);
 	return status;
 }
@@ -181,6 +233,56 @@ void create_axes(hid_t root_id, hid_t *axis0_id, hid_t *axis1_id) {
 	create_numeric_attribute<long>(*axis1_id, "transposed", H5T_STD_I64LE, &transposed);
 }
 
+std::vector<std::string> get_columns_in_block(hid_t group_id, int block_id) {
+	/* get the columns in the block indicated by the block id */
+	std::stringstream block_name;
+	block_name << "block" << block_id << "_items";
+	hid_t block_items = H5Dopen(group_id, block_name.str().c_str(), H5P_DEFAULT);
+	if (block_items == H5I_INVALID_HID) {
+		std::cout << block_name.str() << " does not exist in file, exiting";
+		exit(EXIT_FAILURE);
+	}
+	hid_t block_item_type = H5Dget_type(block_items);
+	if (H5Tget_class(block_item_type) != H5T_STRING) {
+		std::cout << "The type of the item datatype is not STRING aborting." << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	hsize_t block_item_str_size = H5Tget_size(block_item_type);
+	hsize_t *bi_dims = NULL;
+	hsize_t *bi_max_dims = NULL;
+	hid_t block_item_space = H5Dget_space(block_items);
+	size_t bi_rank = get_dimensions(block_item_space, &bi_dims, &bi_max_dims);
+	if (bi_rank != 1) {
+		std::cout << "the block items has to be a 1D array" << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	hid_t item_mem_space = H5Screate_simple(1, bi_dims, NULL);
+	char *buffer = new char[bi_dims[0] * block_item_str_size];
+	H5Dread(block_items, block_item_type, item_mem_space, block_item_space, H5P_DEFAULT, buffer);
+	std::vector<std::string> columns;
+	for (size_t i = 0; i < bi_dims[0]; i++){
+		columns.push_back(buffer + i * block_item_str_size);
+	}
+	H5Tclose(block_item_type);
+	H5Sclose(block_item_space);
+	H5Sclose(item_mem_space);
+	H5Dclose(block_items);
+	delete[] buffer;
+	delete[] bi_dims;
+	delete[] bi_max_dims;
+	return columns;
+}
+
+hid_t get_block_dataset(hid_t group_id, int block_number) {
+	std::stringstream block_values_name;
+	block_values_name << "block" << block_number << "_values";
+	hid_t block_values = H5Dopen(group_id, block_values_name.str().c_str(), H5P_DEFAULT);
+	if ( block_values == H5I_INVALID_HID) {
+		std::cout << "Error no " << block_values_name.str() << "in group" << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	return block_values;
+}
 
 hid_t add_block(hid_t group_id, hid_t value_datatype, hid_t axis0, std::vector<std::string> block_items) {
 	/* get the number of blocks already in the group and create the attributes for the
@@ -261,7 +363,7 @@ hid_t add_block(hid_t group_id, hid_t value_datatype, hid_t axis0, std::vector<s
 	/* extend the axis0 */
 	ax_dim[0] += block_items.size();
 	herr_t status = H5Dextend(axis0, ax_dim);
-	if (status != 0) std::cout << status << std::endl;
+	if (status != 0) std::cout << "error extending axis0" << status << std::endl;
 	H5Sclose(ax0_dataspace);
 
 	/* copy the data from the vector of block_item names into the file */
@@ -277,6 +379,54 @@ hid_t add_block(hid_t group_id, hid_t value_datatype, hid_t axis0, std::vector<s
 	H5Tclose(axis0_type);
 	free(ax_dim);
 	return val_dataset;
+}
+
+void extend_axis1(hid_t axis1, hsize_t new_min_size) {
+	hsize_t *ax_dim, *ax_maxdim;
+	hid_t ax_type = 0;
+	hid_t ax_space = 0;
+	hid_t mem_space = 0;
+	hsize_t delta_entries;
+	int *buffer = NULL;
+	ax_space = H5Dget_space(axis1);
+	hsize_t ax_rank = get_dimensions(ax_space, &ax_dim, &ax_maxdim);
+	if (ax_rank != 1) {
+		std::cout << "An axis has more than one dimension, aborting" << std::endl;
+		exit(EXIT_FAILURE);
+	}
+
+	/* check if we need to extend and are able to */
+	if ( new_min_size <= ax_dim[0] ) {
+		goto extend_axis_cleanup;
+	}
+	if ( ax_maxdim[0] != H5S_UNLIMITED ) {
+		if ( new_min_size > ax_maxdim[0] ) {
+			goto extend_axis_cleanup;
+		}
+	}
+
+	/* extend the axis to the new size and select the hyperslab corresponding to the new elements*/
+	delta_entries = new_min_size - ax_dim[0];
+	H5Dextend(axis1, &new_min_size);
+	ax_type = H5Dget_type(axis1);
+	ax_space = H5Dget_space(axis1);
+	H5Sselect_hyperslab(ax_space, H5S_SELECT_SET, ax_dim, NULL, &delta_entries, NULL);
+	
+	/* create and initialize the buffer holding the elements to be added onto the axis1 */
+	buffer = (int *)malloc(delta_entries * sizeof(int));
+	for (int i = ax_dim[0]; i < new_min_size; i ++) {
+		buffer[i-ax_dim[0]] = i;
+	}
+	mem_space = H5Screate_simple(1, &delta_entries, NULL);
+	H5Dwrite(axis1, ax_type, mem_space, ax_space, H5P_DEFAULT, buffer);
+	H5Sclose(mem_space);
+	H5Sclose(ax_space);
+	H5Tclose(ax_type);
+	free(buffer);
+extend_axis_cleanup:
+	delete[] ax_dim;
+	delete[] ax_maxdim;
+	return;
 }
 
 hid_t set_up_file(hid_t file_id, std::string group_name) {
@@ -301,7 +451,6 @@ hid_t set_up_file(hid_t file_id, std::string group_name) {
 	create_utf8_attribute(group_id, "pandas_version", "0.15.2");
 	return group_id;
 }
-
 /* write a number of rows to the block indicated by ds_block_id from data */
 /* the caller must make sure that data is large enough to hold all the data indicated
  * by the number of columns of the block and the number of rows indicated */
