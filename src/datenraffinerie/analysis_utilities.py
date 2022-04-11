@@ -154,6 +154,19 @@ def run_compiled_fracker(rootfile, hdf_file, complete_config, raw_data, columns)
     return retval
 
 
+def run_turbo_pump(output_file: str, input_files: list):
+    """
+    run the compiled turbo pump to merge files
+    """
+    turbo_pump_path = shutil.which('turbo-pump')
+    tp_output = " -o " + output_file
+    tp_input = " -i"
+    for inp in input_files:
+        tp_input += " " + inp
+    full_turbo_p_command = turbo_pump_path + tp_output + tp_input
+    os.system(full_turbo_p_command)
+
+
 def reformat_data(rootfile: str,
                   hdf_file: str,
                   complete_config: dict,
@@ -311,6 +324,11 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
     Merge the files of the different runs into a single file containing all
     the data
     """
+    # run the compiled turbo pump if available
+    if shutil.which('turbo-pump') is not None:
+        run_turbo_pump(out_file, in_files)
+        return
+
     start_file = in_files[0]
     in_files = [tables.open_file(in_f, 'r') for in_f in in_files[1:]]
     # compression_filter = tables.Filters(complib='zlib', complevel=5)
