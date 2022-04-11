@@ -193,6 +193,7 @@ class DataField(luigi.Task):
     target_config = luigi.DictParameter(significant=False)
     target_default_config = luigi.DictParameter(significant=False)
     daq_system_config = luigi.DictParameter(significant=False)
+    daq_system_default_config = luigi.DictParameter(significant=False)
 
     root_config_path = luigi.Parameter(significant=True)
     # calibration if one is required
@@ -204,7 +205,7 @@ class DataField(luigi.Task):
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=False)
     data_columns = luigi.ListParameter(significant=False)
-
+    initialized_to_default = luigi.BoolParameter(significant=False)
     supported_formats = ['hdf5']
 
     @property
@@ -231,6 +232,39 @@ class DataField(luigi.Task):
         complete_config = {'target': target_config,
                            'daq': daq_system_config}
 
+        # the default values for the DAQ system and the target need to
+        # be loaded on to the backend only once 
+        if not self.initialized_to_default:
+            context = zmq.Context()
+            socket = context.socket(zmq.REQ)
+            socket.connect(
+                f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
+                f"{self.network_config['daq_coordinator']['port']}")
+            complete_default_config = {
+                'daq': cfu.unfreeze(self.daq_system_default_config),
+                'target': cfu.unfreeze(self.target_default_config)}
+            socket.send_string('load defaults;' +
+                               yaml.safe_dump(complete_default_config))
+            socket.setsockopt(zmq.RCVTIMEO, 20000)
+            try:
+                resp = socket.recv()
+            except zmq.error.Again as e:
+                raise RuntimeError("Socket is not responding. "
+                                   "Please check that client and server apps are running, "
+                                   "and that your network configuration is correct") from e
+            else:
+                if resp != b'defaults loaded':
+                    raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
+
+
+            resp = socket.recv()
+
+            if resp != b'defaults loaded':
+                raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
+
+            self.initialized_to_default=True
+
+        
         # if there are more than one entry in the parameter list the scan still
         # has more than one dimension. So spawn more scan tasks for the lower
         # dimension
@@ -244,12 +278,13 @@ class DataField(luigi.Task):
             subscan_daq_config = daq_system_config
             for i, value in enumerate(values):
 
-                if type(value)==tuple:
-                    value=list(value)
+                if isinstance(value, tuple):
+                    value = list(value)
 
                 patch = cfu.generate_patch(
                             parameter, value)
-                complete_subscan_config = cfu.update_dict(complete_config, patch)
+                complete_subscan_config = cfu.update_dict(complete_config,
+                                                          patch)
                 subscan_daq_config = complete_subscan_config['daq']
                 subscan_target_config = complete_subscan_config['target']
                 if len(self.scan_parameters[1:]) == 1 and self.loop:
@@ -261,13 +296,15 @@ class DataField(luigi.Task):
                                                   subscan_target_config,
                                                   self.target_default_config,
                                                   subscan_daq_config,
+                                                  self.daq_system_default_config,
                                                   self.root_config_path,
                                                   self.calibration,
                                                   self.analysis_module_path,
                                                   self.network_config,
                                                   self.loop,
                                                   self.raw,
-                                                  self.data_columns))
+                                                  self.data_columns,
+                                                  self.initialized_to_default))
                 else:
                     required_tasks.append(DataField(self.identifier + 1 + task_id_offset * i,
                                                     self.label,
@@ -277,13 +314,15 @@ class DataField(luigi.Task):
                                                     subscan_target_config,
                                                     self.target_default_config,
                                                     subscan_daq_config,
+                                                    self.daq_system_default_config,
                                                     self.root_config_path,
                                                     self.calibration,
                                                     self.analysis_module_path,
                                                     self.network_config,
                                                     self.loop,
                                                     self.raw,
-                                                    self.data_columns))
+                                                    self.data_columns,
+                                                    self.initialized_to_default))
         # The scan has reached the one dimensional case. Spawn a measurement
         # for every value that takes part in the scan
         else:
@@ -295,6 +334,8 @@ class DataField(luigi.Task):
                                    self.loop)
 
             for i, value in enumerate(values):
+                measurement_target_config = target_config
+                measurement_daq_config = daq_system_config
                 patch = cfu.generate_patch(parameter, value)
                 complete_config = cfu.update_dict(complete_config, patch)
                 measurement_daq_config = complete_config['daq']
@@ -456,6 +497,7 @@ class Fracker(luigi.Task):
     target_config = luigi.DictParameter(significant=False)
     target_default_config = luigi.DictParameter(significant=False)
     daq_system_config = luigi.DictParameter(significant=False)
+    daq_system_default_config = luigi.DictParameter(significant=False)
 
     root_config_path = luigi.Parameter(significant=True)
     # calibration if one is required
@@ -467,6 +509,7 @@ class Fracker(luigi.Task):
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=False)
     data_columns = luigi.ListParameter(significant=False)
+    initialized_to_default = luigi.BoolParameter(significant=False)
     supported_formats = ['hdf5']
 
     def requires(self):
@@ -478,13 +521,15 @@ class Fracker(luigi.Task):
                          target_config=self.target_config,
                          target_default_config=self.target_default_config,
                          daq_system_config=self.daq_system_config,
+                         daq_system_default_config=self.daq_system_default_config,
                          root_config_path=self.root_config_path,
                          calibration=self.calibration,
                          analysis_module_path=self.analysis_module_path,
                          network_config=self.network_config,
                          loop=self.loop,
                          raw=self.raw,
-                         data_columns=self.data_columns)
+                         data_columns=self.data_columns,
+                         initialized_to_default=self.initialized_to_default)
 
     def output(self):
         """
@@ -525,7 +570,7 @@ class Fracker(luigi.Task):
                     raw_file.path,
                     unpacked_file_path,
                     raw_data=self.raw)
-            if result != 0:
+            if result != 0 and os.path.exists(unpacked_file_path):
                 os.remove(unpacked_file_path)
 
         # get the parameters to build the patch from
