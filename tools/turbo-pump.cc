@@ -14,8 +14,7 @@ int main(int argc, char **argv) {
 		->required()
 		->check(CLI::ExistingFile);
 	app.add_option("-o", output_path, "path to the file containing the merged data")
-		->required()
-		->check(CLI::ExistingPath);
+		->required();
 	app.add_option("-b", block_size, "Set the size of a chunk in the hdf file")
 		->default_val(1000000);
 	app.add_option("-g", group_name, "Specify the name of the group holding the dataset in the in and output")
@@ -27,10 +26,12 @@ int main(int argc, char **argv) {
 		std::cout << "Invalid arguments:" << std::endl << e.what() << std::endl;
 		exit(EXIT_FAILURE);
 	}
-
-	hid_t output = H5Fcreate(output_path.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-	hid_t group_id = set_up_file(output, group_name.c_str());
-	hid_t axis0 = 0;
-	hid_t axis1 = 0;
-	create_axes(group_id, &axis0, &axis1);
+	if (input_file_paths.size() <= 1) {
+		std::cout << "More than one input file needs to be specified" << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	hid_t output = create_merge_output_file(output_path, group_name, input_file_paths[0]);
+	for (size_t i = 1; i < input_file_paths.size(); i++) {
+		append_file(output, group_name, input_file_paths[i]);
+	}
 }

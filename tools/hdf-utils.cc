@@ -1,4 +1,18 @@
 #include "include/hdf-utils.h"
+#include "include/exceptions.h"
+
+long get_block_count(hid_t group_id) {
+	hid_t nblocks_attr;
+	long block_count = 0;
+	if (H5Aexists(group_id, "nblocks") > 0) {
+		nblocks_attr = H5Aopen(group_id, "nblocks", H5P_DEFAULT);
+		H5Aread(nblocks_attr, H5T_STD_I64LE, &block_count);
+		H5Aclose(nblocks_attr);
+	} else {
+		throw std::runtime_error("nblocks Attribute can not be found in group");
+	}
+	return block_count;
+}
 
 size_t get_dimensions(hid_t dataspace, hsize_t **dims, hsize_t **maxdims) {
 	size_t ds_rank;
@@ -64,12 +78,10 @@ size_t transfer_data(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim
 	 * dest dataset. Extend the dest dataset as needed after checking that that is
 	 * possible firs
 	 *
-	 * It is assumed that the data is of equal rank and dimensionality. This is
-	 * validated before any of the code is run
+	 * It is assumed that the data is of equal rank and dimensionality.
 	 * The data is extended along the extension_dim axis
 	 */
 
-	bool datasets_match = validate_dataset_shape(src_dataset, dest_dataset, extension_dim);
 	hid_t src_dataspace = H5Dget_space(src_dataset);
 	hid_t src_datatype = H5Dget_type(src_dataset);
 	hsize_t *src_dims = NULL;
@@ -100,18 +112,18 @@ size_t transfer_data(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim
 		exit(EXIT_FAILURE);
 	}
 	dest_dims[extension_dim] += src_dims[extension_dim];
-	H5Dextend(dest_dataspace, dest_dims);
+	H5Dextend(dest_dataset, dest_dims);
 	H5Sclose(dest_dataspace);
 	dest_dataspace = H5Dget_space(dest_dataset);
 	/* calculate the starting point of the hyperslab in the extended dataspace */
 	/* the size of the hyperslab is the src_dims */
-	dest_dims[extension_dim] -= src_dims[extension_dim] + 1;
+	dest_dims[extension_dim] -= src_dims[extension_dim];
 	for (size_t i = 0; i < dest_rank; i ++) {
 		if ( i != extension_dim ) dest_dims[i] = 0;
 	}
-	H5Sselect_hyperslab(dest_dataspace, H5S_SELECT_SET, dest_dims, NULL, NULL, src_dims);
+	H5Sselect_hyperslab(dest_dataspace, H5S_SELECT_SET, dest_dims, NULL, src_dims, NULL);
 	H5Dread(src_dataset, src_datatype, src_dataspace, src_dataspace, H5P_DEFAULT, in_mem_buffer);
-	H5Dwrite(dest_dataspace, src_datatype, src_dataspace, dest_dataspace, H5P_DEFAULT, in_mem_buffer);
+	H5Dwrite(dest_dataset, src_datatype, src_dataspace, dest_dataspace, H5P_DEFAULT, in_mem_buffer);
 	H5Tclose(src_datatype);
 	H5Sclose(src_dataspace);
 	H5Sclose(dest_dataspace);
@@ -544,4 +556,135 @@ void write_to_block(hid_t ds_block_id, hid_t axis1_id, size_t rows, void *data) 
 	free(mem_ds_dims);
 	H5Sclose(block_dataspace);
 	H5Tclose(block_datatype);
+}
+
+void append_file(hid_t dest_file, std::string group_name, std::string filename) {
+
+	/* open the appropriate datasets from the output file */
+	hid_t out_group = H5Gopen(dest_file, group_name.c_str(), H5P_DEFAULT);
+	hid_t out_axis1 = H5Dopen(out_group, "axis1", H5P_DEFAULT);
+	if (out_axis1 == H5I_INVALID_HID) {
+		throw std::runtime_error("opening axis1 failed");
+	}
+	hsize_t *out_axis1_dim;
+	hid_t axis1_space = H5Dget_space(out_axis1);
+	size_t out_axis1_rank = get_dimensions(axis1_space, &out_axis1_dim, NULL);
+	H5Sclose(axis1_space);
+	if (out_axis1_rank != 1) {
+		std::stringstream error_msg;
+		error_msg << "Axis rank should be 1, dimension is " << out_axis1_rank;
+		throw std::runtime_error(error_msg.str());
+	}
+	if (out_group == H5I_INVALID_HID) {
+		throw std::runtime_error("Could not open group " + group_name + " in output file");
+	}
+	long out_block_count = get_block_count(out_group);
+	std::vector<std::vector<std::string>> out_block_columns;
+	std::vector<hid_t> out_block_values;
+	for (size_t i = 0; i < out_block_count; i ++) {
+		out_block_columns.push_back(get_columns_in_block(out_group, i));
+		out_block_values.push_back(get_block_dataset(out_group, i));
+	}
+	
+	/* open input file */
+	hid_t in_file = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+	if (in_file == H5I_INVALID_HID) {
+		throw std::runtime_error("Could not open input file: " + filename);
+	}
+	hid_t in_group = H5Gopen(in_file, group_name.c_str(), H5P_DEFAULT);
+	if (in_group == H5I_INVALID_HID) {
+		throw std::runtime_error("Could not open group " + group_name + " in input file: " + filename);
+	}
+	/* get the blocks from the input file */
+	std::vector<std::vector<std::string>> in_block_columns;
+	std::vector<hid_t> in_block_values;
+	long in_block_count = get_block_count(in_group);
+	if (in_block_count != out_block_count) {
+		std::stringstream error_message;
+		error_message << "Block counts don't match; count of input file" << in_block_count
+			<< "; count of output file: " << out_block_count;
+		throw std::runtime_error(error_message.str());
+	}
+	for (size_t i = 0; i < in_block_count; i ++) {
+		in_block_columns.push_back(get_columns_in_block(in_group, i));
+		in_block_values.push_back(get_block_dataset(in_group, i));
+	}
+	for (size_t i = 0; i < in_block_count; i ++) {
+		if (out_block_columns[i].size() != in_block_columns[i].size()) {
+			std::stringstream error_message;
+			error_message << "The columns in block " << i << " in file "
+				<< filename << " don't match the columns in the output file";
+			throw std::runtime_error(error_message.str());
+		}
+		for (size_t j = 0; j < in_block_columns[i].size(); j ++) {
+			if (in_block_columns[i][j] != out_block_columns[i][j]) {
+				std::stringstream error_message;
+				error_message << "column " << j << " in block " << i
+					<< " of file " << filename << ": " << in_block_columns[i][j]
+					<< ", expected " << out_block_columns[i][j];
+				throw std::runtime_error(error_message.str());
+			}
+		}
+		bool datasets_match = validate_dataset_shape(in_block_values[i], out_block_values[i], 0);
+		if (!datasets_match) {
+			std::stringstream error_message;
+			error_message << "Dimensionality does not fit between input and output of block "
+				<< i << " for input file: " << filename;
+			throw std::runtime_error(error_message.str());
+		}
+		size_t added_rows = transfer_data(in_block_values[i], out_block_values[i], 0);
+		extend_axis1(out_axis1, out_axis1_dim[0] + added_rows);
+	}
+	delete[] out_axis1_dim;
+	H5Gclose(in_group);
+	H5Gclose(out_group);
+	H5Fclose(in_file);
+	for (size_t i = 0; i < out_block_values.size(); i ++) {
+		H5Dclose(out_block_values[i]);
+	}
+	for (size_t i = 0; i < in_block_values.size(); i ++) {
+		H5Dclose(in_block_values[i]);
+	}
+}
+
+hid_t create_merge_output_file(std::string output_filename, std::string group_name, std::string input_filename) {
+	/* create the basic structure for the output file */
+	hid_t out_file_id = H5Fcreate(output_filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+	hid_t out_group_id = set_up_file(out_file_id, group_name.c_str());
+	hid_t out_axis0, out_axis1;
+	create_axes(out_group_id, &out_axis0, &out_axis1);
+	hid_t in_file = H5Fopen(input_filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+	hid_t in_group = H5Gopen(in_file, "data", H5P_DEFAULT);
+	long block_count = get_block_count(in_group);
+	/* for every block in the first input file create the block in the output file and copy the data over */
+	for ( size_t i = 0; i < block_count; i ++) {
+		std::vector<std::string> in_column_blocks = get_columns_in_block(in_group, i);
+		hid_t in_block_dataset = get_block_dataset(in_group, i);
+		hid_t in_block_data_type = H5Dget_type(in_block_dataset);
+		hid_t in_block_dataspace = H5Dget_space(in_block_dataset);
+		hsize_t *in_block_dim;
+		size_t in_block_rank = get_dimensions(in_block_dataspace, &(in_block_dim), NULL);
+		std::cout << "block_rank: " << in_block_rank << " block_dim: " << in_block_dim << std::endl;
+		hid_t out_block_datasets = add_block(out_group_id, in_block_data_type, out_axis0, in_column_blocks);
+		hid_t out_block_dataspace = H5Dget_space(out_block_datasets);
+		hsize_t element_count = 1;
+		for (int j = 0; j < in_block_rank; j ++) {
+			element_count *= in_block_dim[j];
+		}
+		void *buffer = malloc(element_count * H5Tget_size(in_block_data_type));
+		H5Dread(in_block_dataset, in_block_data_type, in_block_dataspace, in_block_dataspace, H5P_DEFAULT, buffer);
+		write_to_block(out_block_datasets, out_axis1, in_block_dim[0], buffer);
+		H5Dclose(in_block_dataset);
+		H5Sclose(in_block_dataspace);
+		H5Tclose(in_block_data_type);
+		H5Dclose(out_block_datasets);
+		H5Sclose(out_block_dataspace);
+		free(buffer);
+	}
+	H5Dclose(out_axis1);
+	H5Dclose(out_axis0);
+	H5Gclose(out_group_id);
+	H5Fclose(in_file);
+	H5Gclose(in_group);
+	return out_file_id;
 }

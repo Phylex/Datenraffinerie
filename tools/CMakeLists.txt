@@ -69,3 +69,7 @@ install( TARGETS fracker
 	CONFIGURATIONS Release
 	RUNTIME DESTINATION bin )
 
+add_executable( turbo-pump
+	turbo-pump.cc )
+target_link_libraries( turbo-pump
+	hdf-utils )

@@ -20,8 +20,12 @@ size_t get_dimensions(hid_t dataspace, hsize_t **dims, hsize_t **maxdims);
 std::vector<std::string> get_columns_in_block(hid_t group_id, int block_id);
 hid_t get_block_dataset(hid_t group, int block_id);
 bool validate_dataset_shape(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim);
+void append_file(hid_t dest_file, std::string group_name, std::string filename);
 size_t transfer_data(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim);
 void write_to_block(hid_t ds_block_id, hid_t axis0_id, size_t rows, void *data);
+long get_block_count(hid_t group_id);
+hid_t create_merge_output_file(std::string output_filename, std::string group_name, std::string input_filename);
+void append_file(hid_t dest_file_id, std::string group, std::string src_file_name);
 std::vector<char> make_h5_compat_string(std::vector<std::string> strings,
                                         size_t hdf_string_size);
 template <typename T>
