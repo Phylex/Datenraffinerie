@@ -32,6 +32,11 @@ int main(int argc, char **argv) {
 	}
 	hid_t output = create_merge_output_file(output_path, group_name, input_file_paths[0]);
 	for (size_t i = 1; i < input_file_paths.size(); i++) {
-		append_file(output, group_name, input_file_paths[i]);
+		try {
+			append_file(output, group_name, input_file_paths[i]);
+		} catch (std::runtime_error e) {
+			std::cout << "Runtime error appending file: " << input_file_paths[i] << std::endl << e.what() << std::endl;
+			exit(EXIT_FAILURE);
+		}
 	}
 }

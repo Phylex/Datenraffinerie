@@ -1,17 +1,69 @@
 #include "include/hdf-utils.h"
 #include "include/exceptions.h"
 
-long get_block_count(hid_t group_id) {
-	hid_t nblocks_attr;
-	long block_count = 0;
-	if (H5Aexists(group_id, "nblocks") > 0) {
-		nblocks_attr = H5Aopen(group_id, "nblocks", H5P_DEFAULT);
-		H5Aread(nblocks_attr, H5T_STD_I64LE, &block_count);
-		H5Aclose(nblocks_attr);
-	} else {
-		throw std::runtime_error("nblocks Attribute can not be found in group");
+void create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
+	hid_t attribute_space_id;
+	hid_t datatype_id;
+	hid_t attribute_id;
+	herr_t status;
+
+	// create attribute ID
+	attribute_space_id = H5Screate(H5S_SCALAR);
+	datatype_id = H5Tcopy(H5T_C_S1);
+	H5Tset_cset(datatype_id, H5T_CSET_UTF8);
+	if (value.size() > 0) {
+		H5Tset_size(datatype_id, value.size());
 	}
-	return block_count;
+	
+	// create actual attribute
+	attribute_id = H5Acreate(root_id, name.c_str(),
+							 datatype_id, attribute_space_id,
+							 H5P_DEFAULT, H5P_DEFAULT
+							);
+	if (value.size() > 0) {
+		H5Awrite(attribute_id, datatype_id, value.c_str());
+	}
+	H5Aclose(attribute_id);
+	H5Sclose(attribute_space_id);
+	H5Tclose(datatype_id);
+}
+
+void create_empty_utf8_attribute(hid_t root_id, std::string attr_name) {
+	create_utf8_attribute(root_id, attr_name, "");
+}
+
+hid_t create_dataset(hid_t root_id, std::string name, const hid_t datatype,
+                     const hsize_t drank, const hsize_t *dimensions,
+                     const hsize_t *maxdims, const hsize_t *chunk_dims,
+                     unsigned int deflate) {
+  hid_t dataspace = H5Screate_simple(drank, dimensions, maxdims);
+  hid_t properties = H5Pcreate(H5P_DATASET_CREATE);
+  if (chunk_dims != NULL) {
+    H5Pset_chunk(properties, drank, chunk_dims);
+    if (deflate > 0) {
+      H5Pset_deflate(properties, deflate);
+    }
+  }
+  hid_t dataset = H5Dcreate(root_id, name.c_str(), datatype, dataspace, H5P_DEFAULT,
+                      properties, H5P_DEFAULT);
+  H5Pclose(properties);
+  H5Sclose(dataspace);
+  return dataset;
+}
+
+// make an array that contains the strings at the right locations
+std::vector<char> make_h5_compat_string(std::vector<std::string> strings, size_t str_size) {
+	std::vector<char> c_strs;
+	for (auto &str: strings) {
+		for (size_t i=0; i < str.size(); i++) {
+			c_strs.push_back(str.c_str()[i]);
+		}
+		c_strs.push_back(0);
+		for (size_t i=0; i< str_size - str.size() - 1; i++) {
+			c_strs.push_back(0);
+		}
+	}
+	return c_strs;
 }
 
 size_t get_dimensions(hid_t dataspace, hsize_t **dims, hsize_t **maxdims) {
@@ -73,7 +125,7 @@ validate_dataspace_shape_cleanup:
 	return sizes_match;
 }
 
-size_t transfer_data(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim) {
+size_t append_data(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim) {
 	/* get the data contained in the source dataset and append it to the 
 	 * dest dataset. Extend the dest dataset as needed after checking that that is
 	 * possible firs
@@ -135,74 +187,94 @@ size_t transfer_data(hid_t src_dataset, hid_t dest_dataset, size_t extension_dim
 	return appended_rows;
 }
 
-herr_t create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
-	hid_t attribute_space_id;
-	hid_t datatype_id;
-	hid_t attribute_id;
-	herr_t status;
-
-	// create attribute ID
-	attribute_space_id = H5Screate(H5S_SCALAR);
-	datatype_id = H5Tcopy(H5T_C_S1);
-	H5Tset_cset(datatype_id, H5T_CSET_UTF8);
-	H5Tset_size(datatype_id, value.size());
-	
-	// create actual attribute
-	attribute_id = H5Acreate(root_id, name.c_str(),
-							 datatype_id, attribute_space_id,
-							 H5P_DEFAULT, H5P_DEFAULT
-							);
-	status = H5Awrite(attribute_id, datatype_id, value.c_str());
-
-	//close the attribute
-	if (status != 0) std::cout
-		<< "create_utf8_attribute error writing attribute"
-		<< status
-		<< std::endl;
-	status = H5Aclose(attribute_id);
-	if (status != 0)
-		std::cout
-		<< "create_utf8_attribute error closing attribute"
-		<< status
-		<< std::endl;
-	status = H5Sclose(attribute_space_id);
-	return status;
+void create_block_items(hid_t group_id, size_t block_number, std::vector<std::string> block_columns) {
+	hid_t datatype = H5Tcopy(H5T_C_S1);
+	H5Tset_size(datatype, 50);
+	H5Tset_cset(datatype, H5T_CSET_UTF8);
+	hsize_t block_item_dim[] = {block_columns.size()};
+	hid_t dataspace = H5Screate_simple(1, block_item_dim, NULL);
+	std::stringstream block_item_name;
+	block_item_name << "block" << block_number << "_items";
+	hid_t block_items = H5Dcreate(group_id, block_item_name.str().c_str(), datatype,
+								  dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	std::vector<char> col_string = make_h5_compat_string(block_columns, 50);
+	H5Dwrite(block_items, datatype, dataspace, dataspace, H5P_DEFAULT, col_string.data());
+	H5Sclose(dataspace);
+	H5Tclose(datatype);
+	create_utf8_attribute(block_items, "CLASS", "ARRAY");
+	create_utf8_attribute(block_items, "FLAVOUR", "numpy");
+	create_empty_utf8_attribute(block_items, "TITLE");
+	create_utf8_attribute(block_items, "VERSION", "2.4");
+	create_utf8_attribute(block_items, "kind", "string");
+	create_utf8_attribute(block_items, "name", "N.");
+	long transposed = 1;
+	create_numeric_attribute<long>(block_items, "transposed", H5T_STD_I64LE, &transposed);
+	H5Dclose(block_items);
 }
 
-
-herr_t create_empty_utf8_attribute(hid_t root_id, std::string attr_name) {
-	herr_t status;
-	hid_t datatype_id;
-	hid_t attribute_space_id;
-	hid_t attribute_id;
-	attribute_space_id = H5Screate(H5S_NULL);
-	datatype_id = H5Tcopy(H5T_C_S1);
-	H5Tset_cset(datatype_id, H5T_CSET_UTF8);
-	attribute_id = H5Acreate(root_id, attr_name.c_str(),
-							datatype_id, attribute_space_id,
-							H5P_DEFAULT, H5P_DEFAULT);
-	status = H5Aclose(attribute_id);
-	if (status != 0)
-		std::cout << "create_empty_utf8_attribute error closing attribute"
-		<< status
-		<< std::endl;
-	status = H5Sclose(attribute_space_id);
-	return status;
+hid_t create_block_dataset(hid_t group_id, hid_t value_datatype, size_t block_number, size_t chunk_rows, size_t column_count) {
+	std::stringstream block_val_name;
+	block_val_name << "block" << block_number << "_values";
+	const hsize_t val_rank = 2;
+	hsize_t val_dim[] = {0, column_count};
+	hsize_t max_dim[] = {H5S_UNLIMITED, column_count};
+	hsize_t chunk_dim[] = {chunk_rows, column_count};
+	hid_t val_dataset = create_dataset(group_id, block_val_name.str(), value_datatype, val_rank, val_dim, max_dim, chunk_dim, 0);
+	create_utf8_attribute(val_dataset, "CLASS", "ARRAY");
+	create_utf8_attribute(val_dataset, "FLAVOUR", "numpy");
+	create_empty_utf8_attribute(val_dataset, "TITLE");
+	create_utf8_attribute(val_dataset, "VERSION", "2.4");
+	create_utf8_attribute(val_dataset, "kind", "string");
+	create_utf8_attribute(val_dataset, "name", "N.");
+	long transposed = 1;
+	create_numeric_attribute<long>(val_dataset, "transposed", H5T_STD_I64LE, &transposed);
+	return val_dataset;
 }
 
-// make an array that contains the strings at the right locations
-std::vector<char> make_h5_compat_string(std::vector<std::string> strings, size_t str_size) {
-	std::vector<char> c_strs;
-	for (auto &str: strings) {
-		for (size_t i=0; i < str.size(); i++) {
-			c_strs.push_back(str.c_str()[i]);
-		}
-		c_strs.push_back(0);
-		for (size_t i=0; i< str_size - str.size() - 1; i++) {
-			c_strs.push_back(0);
-		}
-	}
-	return c_strs;
+hid_t add_block(hid_t group_id, hid_t value_datatype, std::vector<std::string> block_items) {
+	/* get the number of blocks already in the group and create the attributes for the
+	 * new block in the group */
+	hid_t nblocks;
+	long block_count;
+	nblocks = H5Aopen(group_id, "nblocks", H5P_DEFAULT);
+	H5Aread(nblocks, H5T_STD_I64LE, (void *)(&block_count));
+	std::stringstream block_name;
+	block_name << "block" << block_count << "_items_variety";
+	block_count ++;
+	H5Awrite(nblocks, H5T_STD_I64LE, &block_count);
+	H5Aclose(nblocks);
+	block_count --;
+	create_utf8_attribute(group_id, block_name.str(), "regular");
+	/* create the blockx_items dataset */
+	create_block_items(group_id, block_count, block_items);
+	/* extend the axis holding the column names */
+	extend_axis0(group_id, block_items);
+	/* create an empty extensible dataset for the block values */
+	hid_t val_dataset = create_block_dataset(group_id, value_datatype, block_count, 10000, block_items.size());
+	return val_dataset;
+}
+
+hid_t set_up_file(hid_t file_id, std::string group_name) {
+	/* set file wide attributes */
+	create_utf8_attribute(file_id, "CLASS", "GROUP");
+	create_utf8_attribute(file_id, "PYTABLES_FORMAT_VERSION", "2.1");
+	create_utf8_attribute(file_id, "VERSION", "1.0");
+	create_empty_utf8_attribute(file_id, "TITLE");
+
+	/* create the groud and the properties of the group */
+	hid_t group_id = H5Gcreate2(file_id, group_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	create_utf8_attribute(group_id, "CLASS", "GROUP");
+	create_utf8_attribute(group_id, "VERSION", "1.0");
+	create_empty_utf8_attribute(group_id, "TITLE");
+	create_utf8_attribute(group_id, "encoding", "UTF-8");
+	create_utf8_attribute(group_id, "errors", "strict");
+	long attr_data = 0;
+	create_numeric_attribute<long>(group_id, "nblocks", H5T_STD_I64LE, &attr_data);
+	attr_data = 2;
+	create_numeric_attribute<long>(group_id, "ndim", H5T_STD_I64LE, &attr_data);
+	create_utf8_attribute(group_id, "pandas_type", "frame");
+	create_utf8_attribute(group_id, "pandas_version", "0.15.2");
+	return group_id;
 }
 
 void create_axes(hid_t root_id, hid_t *axis0_id, hid_t *axis1_id) {
@@ -213,13 +285,12 @@ void create_axes(hid_t root_id, hid_t *axis0_id, hid_t *axis1_id) {
 	hsize_t chunk_dimensions[] = {5};
 	int exdim = 0;
 	long transposed = 1;
-	std::vector<char> dummy_data;
 
 	/* create the actual axis in the dataset */
 	create_utf8_attribute(root_id, "axis0_variety", "regular");
 	hid_t datatype = H5Tcopy(H5T_C_S1);
 	H5Tset_size(datatype, 50);
-	*axis0_id = create_dataset<char>(root_id, "axis0", datatype, ndims, dimensions, max_dimensions, chunk_dimensions, 0, dummy_data);
+	*axis0_id = create_dataset(root_id, "axis0", datatype, ndims, dimensions, max_dimensions, chunk_dimensions, 0);
 	create_utf8_attribute(*axis0_id, "CLASS", "EARRAY");
 	create_numeric_attribute<int>(*axis0_id, "EXTDIM", H5T_STD_I32LE, &exdim);
 	create_empty_utf8_attribute(*axis0_id, "TITLE");
@@ -231,11 +302,10 @@ void create_axes(hid_t root_id, hid_t *axis0_id, hid_t *axis1_id) {
 
 	//create an empty axis 1 so that it can be filled
 	create_utf8_attribute(root_id, "axis1_variety", "regular");
-	std::vector<int> axis1_data;
 	dimensions[0] = 0;
 	chunk_dimensions[0] = 200000;
 	datatype = H5Tcopy(H5T_STD_I32LE);
-	*axis1_id = create_dataset<int>(root_id, "axis1", datatype, ndims, dimensions, max_dimensions, chunk_dimensions, 0, axis1_data);
+	*axis1_id = create_dataset(root_id, "axis1", datatype, ndims, dimensions, max_dimensions, chunk_dimensions, 0);
 	create_utf8_attribute(*axis1_id, "CLASS", "EARRAY");
 	create_numeric_attribute<int>(*axis1_id, "EXTDIM", H5T_STD_I32LE, &exdim);
 	create_empty_utf8_attribute(*axis1_id, "TITLE");
@@ -243,6 +313,92 @@ void create_axes(hid_t root_id, hid_t *axis0_id, hid_t *axis1_id) {
 	create_utf8_attribute(*axis1_id, "kind", "string");
 	create_utf8_attribute(*axis1_id, "name", "values");
 	create_numeric_attribute<long>(*axis1_id, "transposed", H5T_STD_I64LE, &transposed);
+}
+
+void extend_axis0(hid_t group_id, std::vector<std::string> block_columns) {
+	hid_t axis = H5Dopen(group_id, "axis0", H5P_DEFAULT);
+	hid_t axis_type = H5Dget_type(axis);
+	hid_t axis_space = H5Dget_space(axis);
+	hsize_t *axis_dim;
+	size_t axis_string_size = H5Tget_size(axis_type);
+	size_t axis_rank = get_dimensions(axis_space, &axis_dim, NULL);
+	if (axis_rank != 1) {
+		delete[] axis_dim;
+		H5Tclose(axis_type);
+		H5Sclose(axis_space);
+		H5Dclose(axis);
+		throw std::runtime_error("Axis Rank is not 1");
+	}
+
+	/* extend the axis0 */
+	axis_dim[0] += block_columns.size();
+	H5Dextend(axis, axis_dim);
+	/* reload ax space */
+	H5Sclose(axis_space);
+	axis_space = H5Dget_space(axis);
+
+	/* copy the data from the vector of block_item names into the file */
+	hsize_t start[] = {axis_dim[0] - block_columns.size()};
+	hsize_t count[] = {block_columns.size()};
+	H5Sselect_hyperslab(axis_space, H5S_SELECT_SET, start, NULL, count, NULL);
+	hid_t mem_space = H5Screate_simple(1, count, NULL);
+	std::vector<char> block_item_str = make_h5_compat_string(block_columns, axis_string_size);
+	H5Dwrite(axis, axis_type, mem_space, axis_space, H5P_DEFAULT, block_item_str.data());
+	delete[] axis_dim;
+	H5Sclose(mem_space);
+	H5Tclose(axis_type);
+	H5Sclose(axis_space);
+	H5Dclose(axis);
+};
+
+
+void extend_axis1(hid_t axis1, hsize_t new_min_size) {
+	hsize_t *ax_dim, *ax_maxdim;
+	hid_t ax_type = 0;
+	hid_t ax_space = 0;
+	hid_t mem_space = 0;
+	hsize_t delta_entries;
+	int *buffer = NULL;
+	ax_space = H5Dget_space(axis1);
+	hsize_t ax_rank = get_dimensions(ax_space, &ax_dim, &ax_maxdim);
+	if (ax_rank != 1) {
+		H5Sclose(ax_space);
+		delete[] ax_dim;
+		delete[] ax_maxdim;
+		throw std::runtime_error("An axis has more than one dimension, aborting");
+	}
+
+	/* check if we need to extend and are able to */
+	if ( new_min_size <= ax_dim[0] ) {
+		goto extend_axis_cleanup;
+	}
+	if ( ax_maxdim[0] != H5S_UNLIMITED ) {
+		if ( new_min_size > ax_maxdim[0] ) {
+			goto extend_axis_cleanup;
+		}
+	}
+	/* extend the axis to the new size and select the hyperslab corresponding to the new elements*/
+	delta_entries = new_min_size - ax_dim[0];
+	H5Dextend(axis1, &new_min_size);
+	ax_type = H5Dget_type(axis1);
+	ax_space = H5Dget_space(axis1);
+	H5Sselect_hyperslab(ax_space, H5S_SELECT_SET, ax_dim, NULL, &delta_entries, NULL);
+	
+	/* create and initialize the buffer holding the elements to be added onto the axis1 */
+	buffer = new int[delta_entries];
+	for (int i = ax_dim[0]; i < new_min_size; i ++) {
+		buffer[i-ax_dim[0]] = i;
+	}
+	mem_space = H5Screate_simple(1, &delta_entries, NULL);
+	H5Dwrite(axis1, ax_type, mem_space, ax_space, H5P_DEFAULT, buffer);
+	H5Sclose(mem_space);
+	H5Tclose(ax_type);
+	delete[] buffer;
+extend_axis_cleanup:
+	H5Sclose(ax_space);
+	delete[] ax_dim;
+	delete[] ax_maxdim;
+	return;
 }
 
 std::vector<std::string> get_columns_in_block(hid_t group_id, int block_id) {
@@ -269,17 +425,22 @@ std::vector<std::string> get_columns_in_block(hid_t group_id, int block_id) {
 		exit(EXIT_FAILURE);
 	}
 	hid_t item_mem_space = H5Screate_simple(1, bi_dims, NULL);
-	char *buffer = new char[bi_dims[0] * block_item_str_size];
-	H5Dread(block_items, block_item_type, item_mem_space, block_item_space, H5P_DEFAULT, buffer);
+	char *complete_buffer = new char[bi_dims[0] * block_item_str_size];
+	char *col_buffer = new char[block_item_str_size + 1];
+	H5Dread(block_items, block_item_type, item_mem_space, block_item_space, H5P_DEFAULT, complete_buffer);
 	std::vector<std::string> columns;
 	for (size_t i = 0; i < bi_dims[0]; i++){
-		columns.push_back(buffer + i * block_item_str_size);
+		for (size_t j = 0; j < block_item_str_size; j++) {
+			col_buffer[j] = complete_buffer[i * block_item_str_size + j];
+		}
+		col_buffer[block_item_str_size] = 0;
+		columns.push_back(col_buffer);
 	}
 	H5Tclose(block_item_type);
 	H5Sclose(block_item_space);
 	H5Sclose(item_mem_space);
 	H5Dclose(block_items);
-	delete[] buffer;
+	delete[] complete_buffer;
 	delete[] bi_dims;
 	delete[] bi_max_dims;
 	return columns;
@@ -290,179 +451,26 @@ hid_t get_block_dataset(hid_t group_id, int block_number) {
 	block_values_name << "block" << block_number << "_values";
 	hid_t block_values = H5Dopen(group_id, block_values_name.str().c_str(), H5P_DEFAULT);
 	if ( block_values == H5I_INVALID_HID) {
-		std::cout << "Error no " << block_values_name.str() << "in group" << std::endl;
-		exit(EXIT_FAILURE);
+		std::stringstream error_message;
+		error_message << "Could not open " << block_values_name.str();
+		throw std::runtime_error(error_message.str());
 	}
 	return block_values;
 }
 
-hid_t add_block(hid_t group_id, hid_t value_datatype, hid_t axis0, std::vector<std::string> block_items) {
-	/* get the number of blocks already in the group and create the attributes for the
-	 * new block in the group */
-	long block_count;
-	hid_t nblocks;
-	nblocks = H5Aopen(group_id, "nblocks", H5P_DEFAULT);
-	H5Aread(nblocks, H5T_STD_I64LE, (void *)(&block_count));
-	std::stringstream block_name;
-	block_name << "block" << block_count << "_items_variety";
-	block_count ++;
-	H5Awrite(nblocks, H5T_STD_I64LE, &block_count);
-	block_count --;
-	H5Aclose(nblocks);
-	create_utf8_attribute(group_id, block_name.str(), "regular");
-	/* create the blockx_items dataset */
-	block_name.str("");
-	block_name << "block" << block_count << "_items";
-	hid_t item_datatype = H5Tcopy(H5T_C_S1);
-	H5Tset_size(item_datatype, 50);
-	const hsize_t drank = 1;
-	const hsize_t item_dim[] = {block_items.size()};
-	hid_t item_dataspace = H5Screate_simple(drank, item_dim, item_dim);
-	hid_t item_dataset = H5Dcreate(group_id, block_name.str().c_str(), item_datatype,
-								   item_dataspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-	hsize_t column_count = block_items.size();
-	hid_t mem_space = H5Screate_simple(1, &column_count, NULL);
-	std::vector<char> block_item_string = make_h5_compat_string(block_items, 50);
-	H5Dwrite(item_dataset, item_datatype, mem_space, item_dataspace, H5P_DEFAULT, block_item_string.data());
-	create_utf8_attribute(item_dataset, "CLASS", "ARRAY");
-	create_utf8_attribute(item_dataset, "FLAVOUR", "numpy");
-	create_empty_utf8_attribute(item_dataset, "TITLE");
-	create_utf8_attribute(item_dataset, "VERSION", "2.4");
-	create_utf8_attribute(item_dataset, "kind", "string");
-	create_utf8_attribute(item_dataset, "name", "N.");
-	long transposed = 1;
-	create_numeric_attribute<long>(item_dataset, "transposed", H5T_STD_I64LE, &transposed);
-	H5Dclose(item_dataset);
-	H5Sclose(item_dataspace);
-	H5Tclose(item_datatype);
-
-	/* create an empty extensible dataset for the block values */
-	block_name.str("");
-	block_name << "block" << block_count << "_values";
-	const hsize_t vdrank = 2;
-	hsize_t val_dim[] = {0, block_items.size()};
-	hsize_t max_dim[] = {H5S_UNLIMITED, block_items.size()};
-	hsize_t chunk_dim[] = {1000, block_items.size()};
-	hid_t val_dataset;
-	if (H5T_INTEGER == H5Tget_class(value_datatype)) {
-		std::vector<int> dummy_data;
-		val_dataset = create_dataset<int>(group_id, block_name.str(), value_datatype,
-										  vdrank, val_dim, max_dim, chunk_dim, 0, dummy_data);
-	} else if (H5T_FLOAT == H5Tget_class(value_datatype)) {
-		std::vector<float> dummy_data;
-		val_dataset = create_dataset<float>(group_id, block_name.str(), value_datatype,
-											vdrank, val_dim, max_dim, chunk_dim, 0, dummy_data);
+long get_block_count(hid_t group_id) {
+	hid_t nblocks_attr;
+	long block_count = 0;
+	if (H5Aexists(group_id, "nblocks") > 0) {
+		nblocks_attr = H5Aopen(group_id, "nblocks", H5P_DEFAULT);
+		H5Aread(nblocks_attr, H5T_STD_I64LE, &block_count);
+		H5Aclose(nblocks_attr);
 	} else {
-		std::cout << "The block is being created for an unsupported datatype" << std::endl;
-		exit(EXIT_FAILURE);
+		throw std::runtime_error("nblocks Attribute can not be found in group");
 	}
-	create_utf8_attribute(val_dataset, "CLASS", "ARRAY");
-	create_utf8_attribute(val_dataset, "FLAVOUR", "numpy");
-	create_empty_utf8_attribute(val_dataset, "TITLE");
-	create_utf8_attribute(val_dataset, "VERSION", "2.4");
-	create_utf8_attribute(val_dataset, "kind", "string");
-	create_utf8_attribute(val_dataset, "name", "N.");
-	create_numeric_attribute<long>(val_dataset, "transposed", H5T_STD_I64LE, &transposed);
-
-	/* extend the axis0 data (columns) */
-	/* figure out current extent */
-	hid_t ax0_dataspace = H5Dget_space(axis0);
-	hsize_t ax0rank = H5Sget_simple_extent_ndims(ax0_dataspace);
-	hsize_t *ax_dim = (hsize_t *)malloc(ax0rank * sizeof(hsize_t));
-	H5Sget_simple_extent_dims(ax0_dataspace, ax_dim, NULL);
-	hsize_t old_dim = ax_dim[0];
-
-	/* extend the axis0 */
-	ax_dim[0] += block_items.size();
-	herr_t status = H5Dextend(axis0, ax_dim);
-	if (status != 0) std::cout << "error extending axis0" << status << std::endl;
-	H5Sclose(ax0_dataspace);
-
-	/* copy the data from the vector of block_item names into the file */
-	ax0_dataspace = H5Dget_space(axis0);
-	hsize_t start[] = {old_dim};
-	hsize_t count[] = {ax_dim[0] - old_dim};
-	H5Sselect_hyperslab(ax0_dataspace, H5S_SELECT_SET, start, NULL, count, NULL);
-	hid_t axis0_type = H5Dget_type(axis0);
-	hsize_t string_length = H5Tget_size(axis0_type);
-	H5Dwrite(axis0, axis0_type, mem_space, ax0_dataspace, H5P_DEFAULT, block_item_string.data());
-	H5Sclose(ax0_dataspace);
-	H5Sclose(mem_space);
-	H5Tclose(axis0_type);
-	free(ax_dim);
-	return val_dataset;
+	return block_count;
 }
 
-void extend_axis1(hid_t axis1, hsize_t new_min_size) {
-	hsize_t *ax_dim, *ax_maxdim;
-	hid_t ax_type = 0;
-	hid_t ax_space = 0;
-	hid_t mem_space = 0;
-	hsize_t delta_entries;
-	int *buffer = NULL;
-	ax_space = H5Dget_space(axis1);
-	hsize_t ax_rank = get_dimensions(ax_space, &ax_dim, &ax_maxdim);
-	if (ax_rank != 1) {
-		std::cout << "An axis has more than one dimension, aborting" << std::endl;
-		exit(EXIT_FAILURE);
-	}
-
-	/* check if we need to extend and are able to */
-	if ( new_min_size <= ax_dim[0] ) {
-		goto extend_axis_cleanup;
-	}
-	if ( ax_maxdim[0] != H5S_UNLIMITED ) {
-		if ( new_min_size > ax_maxdim[0] ) {
-			goto extend_axis_cleanup;
-		}
-	}
-
-	/* extend the axis to the new size and select the hyperslab corresponding to the new elements*/
-	delta_entries = new_min_size - ax_dim[0];
-	H5Dextend(axis1, &new_min_size);
-	ax_type = H5Dget_type(axis1);
-	ax_space = H5Dget_space(axis1);
-	H5Sselect_hyperslab(ax_space, H5S_SELECT_SET, ax_dim, NULL, &delta_entries, NULL);
-	
-	/* create and initialize the buffer holding the elements to be added onto the axis1 */
-	buffer = (int *)malloc(delta_entries * sizeof(int));
-	for (int i = ax_dim[0]; i < new_min_size; i ++) {
-		buffer[i-ax_dim[0]] = i;
-	}
-	mem_space = H5Screate_simple(1, &delta_entries, NULL);
-	H5Dwrite(axis1, ax_type, mem_space, ax_space, H5P_DEFAULT, buffer);
-	H5Sclose(mem_space);
-	H5Sclose(ax_space);
-	H5Tclose(ax_type);
-	free(buffer);
-extend_axis_cleanup:
-	delete[] ax_dim;
-	delete[] ax_maxdim;
-	return;
-}
-
-hid_t set_up_file(hid_t file_id, std::string group_name) {
-	/* set file wide attributes */
-	create_utf8_attribute(file_id, "CLASS", "GROUP");
-	create_utf8_attribute(file_id, "PYTABLES_FORMAT_VERSION", "2.1");
-	create_utf8_attribute(file_id, "VERSION", "1.0");
-	create_empty_utf8_attribute(file_id, "TITLE");
-
-	/* create the groud and the properties of the group */
-	hid_t group_id = H5Gcreate2(file_id, "/data", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-	create_utf8_attribute(group_id, "CLASS", "GROUP");
-	create_utf8_attribute(group_id, "VERSION", "1.0");
-	create_empty_utf8_attribute(group_id, "TITLE");
-	create_utf8_attribute(group_id, "encoding", "UTF-8");
-	create_utf8_attribute(group_id, "errors", "strict");
-	long attr_data = 0;
-	create_numeric_attribute<long>(group_id, "nblocks", H5T_STD_I64LE, &attr_data);
-	attr_data = 2;
-	create_numeric_attribute<long>(group_id, "ndim", H5T_STD_I64LE, &attr_data);
-	create_utf8_attribute(group_id, "pandas_type", "frame");
-	create_utf8_attribute(group_id, "pandas_version", "0.15.2");
-	return group_id;
-}
 /* write a number of rows to the block indicated by ds_block_id from data */
 /* the caller must make sure that data is large enough to hold all the data indicated
  * by the number of columns of the block and the number of rows indicated */
@@ -471,24 +479,26 @@ void write_to_block(hid_t ds_block_id, hid_t axis1_id, size_t rows, void *data) 
 	
 	/* get the dimensions of the block */
 	hid_t block_dataspace = H5Dget_space(ds_block_id);
-	hsize_t ds_rank = H5Sget_simple_extent_ndims(block_dataspace);
-	hsize_t *ds_dims = (hsize_t *)malloc(ds_rank * sizeof(hsize_t));
-	hsize_t *max_ds_dims = (hsize_t *)malloc(ds_rank * sizeof(hsize_t));
-	ds_rank = H5Sget_simple_extent_dims(block_dataspace, ds_dims, max_ds_dims);
+	hsize_t *ds_dims;
+	hsize_t *max_ds_dims;
+	size_t ds_rank = get_dimensions(block_dataspace, &ds_dims, &max_ds_dims);
 	H5Sclose(block_dataspace);
 
 	/* exit if there is no space in the dataframe */
 	if (ds_dims[0] + rows > max_ds_dims[0]) {
 		std::cout << "Adding rows to dataset extends beyond the maximal dimensions" << std::endl;
-		free(ds_dims);
-		free(max_ds_dims);
+		delete[] ds_dims;
+		delete[] max_ds_dims;
 		H5Tclose(block_datatype);
-		exit(EXIT_FAILURE);
+		std::stringstream error_message;
+		error_message << "Adding rows would lead to a dataset with " << ds_dims[0] + rows
+			<< "but maximum dimension is: " << max_ds_dims[0];
+		throw std::runtime_error(error_message.str());
 	}
-	free(max_ds_dims);
+	delete[] max_ds_dims;
 
 	/* initialize the size of the region in memmory */
-	hsize_t *mem_ds_dims = (hsize_t *)malloc(ds_rank * sizeof(hsize_t));
+	hsize_t *mem_ds_dims = new hsize_t[ds_rank];
 	mem_ds_dims[0] = rows;
 	for (size_t i = 1; i < ds_rank; i++) {
 		mem_ds_dims[i] = ds_dims [i];
@@ -632,7 +642,7 @@ void append_file(hid_t dest_file, std::string group_name, std::string filename) 
 				<< i << " for input file: " << filename;
 			throw std::runtime_error(error_message.str());
 		}
-		size_t added_rows = transfer_data(in_block_values[i], out_block_values[i], 0);
+		size_t added_rows = append_data(in_block_values[i], out_block_values[i], 0);
 		extend_axis1(out_axis1, out_axis1_dim[0] + added_rows);
 	}
 	delete[] out_axis1_dim;
@@ -664,8 +674,7 @@ hid_t create_merge_output_file(std::string output_filename, std::string group_na
 		hid_t in_block_dataspace = H5Dget_space(in_block_dataset);
 		hsize_t *in_block_dim;
 		size_t in_block_rank = get_dimensions(in_block_dataspace, &(in_block_dim), NULL);
-		std::cout << "block_rank: " << in_block_rank << " block_dim: " << in_block_dim << std::endl;
-		hid_t out_block_datasets = add_block(out_group_id, in_block_data_type, out_axis0, in_column_blocks);
+		hid_t out_block_datasets = add_block(out_group_id, in_block_data_type, in_column_blocks);
 		hid_t out_block_dataspace = H5Dget_space(out_block_datasets);
 		hsize_t element_count = 1;
 		for (int j = 0; j < in_block_rank; j ++) {

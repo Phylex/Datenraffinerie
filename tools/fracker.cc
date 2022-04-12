@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
 	/* generate the columns that are going to be used to store the data in */
 	hid_t measurement_block = 0;
 	if ( data_columns.size() > 0 ) {
-		measurement_block = add_block(group_id, H5T_NATIVE_FLOAT, axis0, data_columns);
+		measurement_block = add_block(group_id, H5T_NATIVE_FLOAT, data_columns);
 	} else {
 		std::cout << "At least one Column of the measurement Data needs to be selected" << std::endl;
 		exit(EXIT_FAILURE);
@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 		channel_cache = true;
-		channel_config_block = add_block(group_id, H5T_STD_I32LE, axis0, channel_columns);
+		channel_config_block = add_block(group_id, H5T_STD_I32LE, channel_columns);
 	}
 	/* generate the half wise configuration cache */
 	std::vector<ConfigKey> half_wise_columns = filter_half_wise_columns(columns);
@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 		half_wise_cache = true;
-		half_wise_config_block = add_block(group_id, H5T_STD_I32LE, axis0, half_wise_column_names);
+		half_wise_config_block = add_block(group_id, H5T_STD_I32LE, half_wise_column_names);
 	}
 	/* generate the global config cache */
 	std::vector<ConfigKey> global_columns = filter_global_columns(columns);
@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 		global_cache = true;
-		global_config_block = add_block(group_id, H5T_STD_I32LE, axis0, global_column_names);
+		global_config_block = add_block(group_id, H5T_STD_I32LE, global_column_names);
 	}
 
 	/* set up the arrays to buffer the data between the root and hdf files */

@@ -14,8 +14,8 @@ int main() {
 	std::vector<std::string> columns = { "this", "that", "something"};
 	std::vector<std::string> additional_columns = { "other", "than", "else"};
 	create_axes(group_id, &axis0, &axis1);
-	hid_t blk0_ds = add_block(group_id, H5T_STD_I32LE, axis0, columns);
-	hid_t blk1_ds = add_block(group_id, H5T_STD_I32LE, axis0, additional_columns);
+	hid_t blk0_ds = add_block(group_id, H5T_STD_I32LE, columns);
+	hid_t blk1_ds = add_block(group_id, H5T_STD_I32LE, additional_columns);
 	size_t rows = 100;
 	std::vector<int> values;
 	values.reserve(rows * columns.size());
@@ -46,8 +46,8 @@ int main() {
 	file_id = H5Fcreate(MERGE_SRC_1, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 	group_id = set_up_file(file_id, "data");
 	create_axes(group_id, &axis0, &axis1);
-	blk0_ds = add_block(group_id, H5T_STD_I32LE, axis0, columns);
-	blk1_ds = add_block(group_id, H5T_STD_I32LE, axis0, additional_columns);
+	blk0_ds = add_block(group_id, H5T_STD_I32LE, columns);
+	blk1_ds = add_block(group_id, H5T_STD_I32LE, additional_columns);
 	for (size_t j=0; j < rows; j ++) {
 		for (size_t i=0; i < columns.size(); i ++) {
 			values[i + j * columns.size()] = j*10 + i;
@@ -68,8 +68,8 @@ int main() {
 	file_id = H5Fcreate(MERGE_SRC_2, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 	group_id = set_up_file(file_id, "data");
 	create_axes(group_id, &axis0, &axis1);
-	blk0_ds = add_block(group_id, H5T_STD_I32LE, axis0, columns);
-	blk1_ds = add_block(group_id, H5T_STD_I32LE, axis0, additional_columns);
+	blk0_ds = add_block(group_id, H5T_STD_I32LE, columns);
+	blk1_ds = add_block(group_id, H5T_STD_I32LE, additional_columns);
 	for (size_t j=0; j < rows; j ++) {
 		for (size_t i=0; i < columns.size(); i ++) {
 			values[j*columns.size() + i] = (rows - j)*10 + i;
