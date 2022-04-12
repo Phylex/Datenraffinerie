@@ -2,15 +2,15 @@ roc_s0:
   DigitalHalf:
     0:
       Adc_TH: 0
-      Bx_offset: 0
-      Bx_trigger: 0
+      Bx_offset: 1
+      Bx_trigger: 15
       CalibrationSC: 0
       ClrAdcTot_trig: 0
-      IdleFrame: 0
-      L1Offset: 0
-      MultFactor: 0
+      IdleFrame: 214748364
+      L1Offset: 8
+      MultFactor: 25
       SC_testRAM: 0
-      SelTC4: 0
+      SelTC4: 1
       Tot_P0: 0
       Tot_P1: 0
       Tot_P2: 0
@@ -20,18 +20,18 @@ roc_s0:
       Tot_TH1: 0
       Tot_TH2: 0
       Tot_TH3: 0
-      sc_testRAM: 0
+      sc_testRAM: 3435973836
     1:
       Adc_TH: 0
-      Bx_offset: 0
-      Bx_trigger: 0
+      Bx_offset: 1
+      Bx_trigger: 15
       CalibrationSC: 0
       ClrAdcTot_trig: 0
-      IdleFrame: 0
-      L1Offset: 0
-      MultFactor: 0
+      IdleFrame: 214748364
+      L1Offset: 8
+      MultFactor: 25
       SC_testRAM: 0
-      SelTC4: 0
+      SelTC4: 1
       Tot_P0: 0
       Tot_P1: 0
       Tot_P2: 0
@@ -41,96 +41,96 @@ roc_s0:
       Tot_TH1: 0
       Tot_TH2: 0
       Tot_TH3: 0
-      sc_testRAM: 0
+      sc_testRAM: 3435973836
   GlobalAnalog:
     0:
-      Cf: 0
-      Cf_comp: 0
-      Clr_ADC: 0
-      Clr_ShaperTail: 0
+      Cf: 4
+      Cf_comp: 2
+      Clr_ADC: 1
+      Clr_ShaperTail: 1
       Delay40: 0
       Delay65: 0
       Delay87: 0
       Delay9: 0
-      En_hyst_tot: 0
+      En_hyst_tot: 1
       Ibi_inv: 0
-      Ibi_inv_buf: 0
+      Ibi_inv_buf: 2
       Ibi_noinv: 0
-      Ibi_noinv_buf: 0
+      Ibi_noinv_buf: 2
       Ibi_sk: 0
-      Ibo_inv: 0
-      Ibo_inv_buf: 0
-      Ibo_noinv: 0
-      Ibo_noinv_buf: 0
-      Ibo_sk: 0
-      ON_pa: 0
-      ON_ref_adc: 0
-      ON_rtr: 0
-      ON_toa: 0
-      ON_tot: 0
-      Rc: 0
-      Rf: 0
-      S_inv: 0
-      S_inv_buf: 0
-      S_noinv: 0
-      S_noinv_buf: 0
-      S_sk: 0
+      Ibo_inv: 10
+      Ibo_inv_buf: 38
+      Ibo_noinv: 10
+      Ibo_noinv_buf: 38
+      Ibo_sk: 10
+      ON_pa: 1
+      ON_ref_adc: 1
+      ON_rtr: 1
+      ON_toa: 1
+      ON_tot: 1
+      Rc: 1
+      Rf: 5
+      S_inv: 2
+      S_inv_buf: 2
+      S_noinv: 2
+      S_noinv_buf: 2
+      S_sk: 2
       SelExtADC: 0
-      SelRisingEdge: 0
-      dac_pol: 0
-      gain_tot: 0
-      neg: 0
-      pol_trig_toa: 0
-      range_indac: 0
-      range_inv: 0
-      range_tot: 0
+      SelRisingEdge: 1
+      dac_pol: 1
+      gain_tot: 48
+      neg: 1
+      pol_trig_toa: 1
+      range_indac: 2
+      range_inv: 4
+      range_tot: 2
       ref_adc: 0
-      trim_vbi_pa: 0
-      trim_vbo_pa: 0
+      trim_vbi_pa: 7
+      trim_vbo_pa: 6
     1:
-      Cf: 0
-      Cf_comp: 0
-      Clr_ADC: 0
-      Clr_ShaperTail: 0
+      Cf: 4
+      Cf_comp: 2
+      Clr_ADC: 1
+      Clr_ShaperTail: 1
       Delay40: 0
       Delay65: 0
       Delay87: 0
       Delay9: 0
-      En_hyst_tot: 0
+      En_hyst_tot: 1
       Ibi_inv: 0
-      Ibi_inv_buf: 0
+      Ibi_inv_buf: 2
       Ibi_noinv: 0
-      Ibi_noinv_buf: 0
+      Ibi_noinv_buf: 2
       Ibi_sk: 0
-      Ibo_inv: 0
-      Ibo_inv_buf: 0
-      Ibo_noinv: 0
-      Ibo_noinv_buf: 0
-      Ibo_sk: 0
-      ON_pa: 0
-      ON_ref_adc: 0
-      ON_rtr: 0
-      ON_toa: 0
-      ON_tot: 0
-      Rc: 0
-      Rf: 0
-      S_inv: 0
-      S_inv_buf: 0
-      S_noinv: 0
-      S_noinv_buf: 0
-      S_sk: 0
+      Ibo_inv: 10
+      Ibo_inv_buf: 38
+      Ibo_noinv: 10
+      Ibo_noinv_buf: 38
+      Ibo_sk: 10
+      ON_pa: 1
+      ON_ref_adc: 1
+      ON_rtr: 1
+      ON_toa: 1
+      ON_tot: 1
+      Rc: 1
+      Rf: 5
+      S_inv: 2
+      S_inv_buf: 2
+      S_noinv: 2
+      S_noinv_buf: 2
+      S_sk: 2
       SelExtADC: 0
-      SelRisingEdge: 0
-      dac_pol: 0
-      gain_tot: 0
-      neg: 0
-      pol_trig_toa: 0
-      range_indac: 0
-      range_inv: 0
-      range_tot: 0
+      SelRisingEdge: 1
+      dac_pol: 1
+      gain_tot: 48
+      neg: 1
+      pol_trig_toa: 1
+      range_indac: 2
+      range_inv: 4
+      range_tot: 2
       ref_adc: 0
-      trim_vbi_pa: 0
-      trim_vbo_pa: 0
+      trim_vbi_pa: 7
+      trim_vbo_pa: 6
   HalfWise:
     0:
       Adc_pedestal: 0
@@ -200,10 +200,10 @@ roc_s0:
       BIAS_FOLLOWER_CAL_P_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_EN: 0
-      BIAS_I_CTDC_D: 0
-      BIAS_I_FTDC_D: 0
+      BIAS_I_CTDC_D: 24
+      BIAS_I_FTDC_D: 24
       CALIB_CHANNEL_DLL: 0
-      CTDC_CALIB_FREQUENCY: 0
+      CTDC_CALIB_FREQUENCY: 2
       CTRL_IN_REF_CTDC_P_D: 0
       CTRL_IN_REF_CTDC_P_EN: 0
       CTRL_IN_REF_FTDC_P_D: 0
@@ -212,14 +212,14 @@ roc_s0:
       CTRL_IN_SIG_CTDC_P_EN: 0
       CTRL_IN_SIG_FTDC_P_D: 0
       CTRL_IN_SIG_FTDC_P_EN: 0
-      EN_MASTER_CTDC_DLL: 0
+      EN_MASTER_CTDC_DLL: 1
       EN_MASTER_CTDC_VOUT_INIT: 0
-      EN_MASTER_FTDC_DLL: 0
+      EN_MASTER_FTDC_DLL: 1
       EN_MASTER_FTDC_VOUT_INIT: 0
-      EN_REF_BG: 0
-      FOLLOWER_CTDC_EN: 0
-      FOLLOWER_FTDC_EN: 0
-      FTDC_CALIB_FREQUENCY: 0
+      EN_REF_BG: 1
+      FOLLOWER_CTDC_EN: 1
+      FOLLOWER_FTDC_EN: 1
+      FTDC_CALIB_FREQUENCY: 2
       GLOBAL_DISABLE_TOT_LIMIT: 0
       GLOBAL_EN_BUFFER_CTDC: 0
       GLOBAL_EN_BUFFER_FTDC: 0
@@ -229,23 +229,23 @@ roc_s0:
       GLOBAL_FORCE_EN_OUTPUT_DATA: 0
       GLOBAL_FORCE_EN_TOT: 0
       GLOBAL_INIT_DAC_B_CTDC: 0
-      GLOBAL_LATENCY_TIME: 0
-      GLOBAL_MODE_FTDC_TOA: 0
+      GLOBAL_LATENCY_TIME: 10
+      GLOBAL_MODE_FTDC_TOA: 2
       GLOBAL_MODE_NO_TOT_SUB: 0
       GLOBAL_MODE_TOA_DIRECT_OUTPUT: 0
-      GLOBAL_SEU_TIME_OUT: 0
-      GLOBAL_TA_SELECT_GAIN_TOA: 0
-      GLOBAL_TA_SELECT_GAIN_TOT: 0
+      GLOBAL_SEU_TIME_OUT: 1
+      GLOBAL_TA_SELECT_GAIN_TOA: 7
+      GLOBAL_TA_SELECT_GAIN_TOT: 3
       INV_FRONT_40MHZ: 0
-      START_COUNTER: 0
+      START_COUNTER: 1
       VD_CTDC_N_D: 0
       VD_CTDC_N_DAC_EN: 0
-      VD_CTDC_N_FORCE_MAX: 0
+      VD_CTDC_N_FORCE_MAX: 1
       VD_CTDC_P_D: 0
       VD_CTDC_P_DAC_EN: 0
       VD_FTDC_N_D: 0
       VD_FTDC_N_DAC_EN: 0
-      VD_FTDC_N_FORCE_MAX: 0
+      VD_FTDC_N_FORCE_MAX: 1
       VD_FTDC_P_D: 0
       VD_FTDC_P_DAC_EN: 0
       sel_clk_rcg: 0
@@ -256,10 +256,10 @@ roc_s0:
       BIAS_FOLLOWER_CAL_P_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_EN: 0
-      BIAS_I_CTDC_D: 0
-      BIAS_I_FTDC_D: 0
+      BIAS_I_CTDC_D: 24
+      BIAS_I_FTDC_D: 24
       CALIB_CHANNEL_DLL: 0
-      CTDC_CALIB_FREQUENCY: 0
+      CTDC_CALIB_FREQUENCY: 2
       CTRL_IN_REF_CTDC_P_D: 0
       CTRL_IN_REF_CTDC_P_EN: 0
       CTRL_IN_REF_FTDC_P_D: 0
@@ -268,14 +268,14 @@ roc_s0:
       CTRL_IN_SIG_CTDC_P_EN: 0
       CTRL_IN_SIG_FTDC_P_D: 0
       CTRL_IN_SIG_FTDC_P_EN: 0
-      EN_MASTER_CTDC_DLL: 0
+      EN_MASTER_CTDC_DLL: 1
       EN_MASTER_CTDC_VOUT_INIT: 0
-      EN_MASTER_FTDC_DLL: 0
+      EN_MASTER_FTDC_DLL: 1
       EN_MASTER_FTDC_VOUT_INIT: 0
-      EN_REF_BG: 0
-      FOLLOWER_CTDC_EN: 0
-      FOLLOWER_FTDC_EN: 0
-      FTDC_CALIB_FREQUENCY: 0
+      EN_REF_BG: 1
+      FOLLOWER_CTDC_EN: 1
+      FOLLOWER_FTDC_EN: 1
+      FTDC_CALIB_FREQUENCY: 2
       GLOBAL_DISABLE_TOT_LIMIT: 0
       GLOBAL_EN_BUFFER_CTDC: 0
       GLOBAL_EN_BUFFER_FTDC: 0
@@ -285,23 +285,23 @@ roc_s0:
       GLOBAL_FORCE_EN_OUTPUT_DATA: 0
       GLOBAL_FORCE_EN_TOT: 0
       GLOBAL_INIT_DAC_B_CTDC: 0
-      GLOBAL_LATENCY_TIME: 0
-      GLOBAL_MODE_FTDC_TOA: 0
+      GLOBAL_LATENCY_TIME: 10
+      GLOBAL_MODE_FTDC_TOA: 2
       GLOBAL_MODE_NO_TOT_SUB: 0
       GLOBAL_MODE_TOA_DIRECT_OUTPUT: 0
-      GLOBAL_SEU_TIME_OUT: 0
-      GLOBAL_TA_SELECT_GAIN_TOA: 0
-      GLOBAL_TA_SELECT_GAIN_TOT: 0
+      GLOBAL_SEU_TIME_OUT: 1
+      GLOBAL_TA_SELECT_GAIN_TOA: 7
+      GLOBAL_TA_SELECT_GAIN_TOT: 3
       INV_FRONT_40MHZ: 0
-      START_COUNTER: 0
+      START_COUNTER: 1
       VD_CTDC_N_D: 0
       VD_CTDC_N_DAC_EN: 0
-      VD_CTDC_N_FORCE_MAX: 0
+      VD_CTDC_N_FORCE_MAX: 1
       VD_CTDC_P_D: 0
       VD_CTDC_P_DAC_EN: 0
       VD_FTDC_N_D: 0
       VD_FTDC_N_DAC_EN: 0
-      VD_FTDC_N_FORCE_MAX: 0
+      VD_FTDC_N_FORCE_MAX: 1
       VD_FTDC_P_D: 0
       VD_FTDC_P_DAC_EN: 0
       sel_clk_rcg: 0
@@ -310,13 +310,13 @@ roc_s0:
       Calib: 0
       ExtCtest: 0
       IntCtest: 0
-      Inv_vref: 0
-      Noinv_vref: 0
-      ON_dac: 0
+      Inv_vref: 572
+      Noinv_vref: 128
+      ON_dac: 1
       Refi: 0
-      Toa_vref: 0
-      Tot_vref: 0
-      Vbg_1v: 0
+      Toa_vref: 112
+      Tot_vref: 432
+      Vbg_1v: 4
       probe_dc: 0
       probe_dc1: 0
       probe_dc2: 0
@@ -324,32 +324,32 @@ roc_s0:
       Calib: 0
       ExtCtest: 0
       IntCtest: 0
-      Inv_vref: 0
-      Noinv_vref: 0
-      ON_dac: 0
+      Inv_vref: 572
+      Noinv_vref: 128
+      ON_dac: 1
       Refi: 0
-      Toa_vref: 0
-      Tot_vref: 0
-      Vbg_1v: 0
+      Toa_vref: 112
+      Tot_vref: 432
+      Vbg_1v: 4
       probe_dc: 0
       probe_dc1: 0
       probe_dc2: 0
   Top:
     0:
-      BIAS_I_PLL_D: 0
-      DIV_PLL: 0
-      EN: 0
-      EN_HIGH_CAPA: 0
-      EN_LOCK_CONTROL: 0
-      EN_PLL: 0
-      EN_PhaseShift: 0
+      BIAS_I_PLL_D: 24
+      DIV_PLL: 3
+      EN: 3
+      EN_HIGH_CAPA: 1
+      EN_LOCK_CONTROL: 1
+      EN_PLL: 1
+      EN_PhaseShift: 1
       EN_RCG: 0
-      EN_REF_BG: 0
+      EN_REF_BG: 1
       EN_probe_pll: 0
       ENpE: 0
-      ERROR_LIMIT_SC: 0
+      ERROR_LIMIT_SC: 2
       EdgeSel_T1: 0
-      FOLLOWER_PLL_EN: 0
+      FOLLOWER_PLL_EN: 1
       INIT_D: 0
       INIT_DAC_EN: 0
       Pll_Locked_sc: 0
@@ -367,8 +367,8 @@ roc_s0:
       err_countR: 0
       fc_error_count: 0
       in_inv_cmd_rx: 0
-      lock_count: 0
-      n_counter_rst: 0
+      lock_count: 1
+      n_counter_rst: 1
       phase_ck: 0
       phase_strobe: 0
       rcg_gain: 0
@@ -2726,15 +2726,15 @@ roc_s1:
   DigitalHalf:
     0:
       Adc_TH: 0
-      Bx_offset: 0
-      Bx_trigger: 0
+      Bx_offset: 1
+      Bx_trigger: 15
       CalibrationSC: 0
       ClrAdcTot_trig: 0
-      IdleFrame: 0
-      L1Offset: 0
-      MultFactor: 0
+      IdleFrame: 214748364
+      L1Offset: 8
+      MultFactor: 25
       SC_testRAM: 0
-      SelTC4: 0
+      SelTC4: 1
       Tot_P0: 0
       Tot_P1: 0
       Tot_P2: 0
@@ -2744,18 +2744,18 @@ roc_s1:
       Tot_TH1: 0
       Tot_TH2: 0
       Tot_TH3: 0
-      sc_testRAM: 0
+      sc_testRAM: 3435973836
     1:
       Adc_TH: 0
-      Bx_offset: 0
-      Bx_trigger: 0
+      Bx_offset: 1
+      Bx_trigger: 15
       CalibrationSC: 0
       ClrAdcTot_trig: 0
-      IdleFrame: 0
-      L1Offset: 0
-      MultFactor: 0
+      IdleFrame: 214748364
+      L1Offset: 8
+      MultFactor: 25
       SC_testRAM: 0
-      SelTC4: 0
+      SelTC4: 1
       Tot_P0: 0
       Tot_P1: 0
       Tot_P2: 0
@@ -2765,96 +2765,96 @@ roc_s1:
       Tot_TH1: 0
       Tot_TH2: 0
       Tot_TH3: 0
-      sc_testRAM: 0
+      sc_testRAM: 3435973836
   GlobalAnalog:
     0:
-      Cf: 0
-      Cf_comp: 0
-      Clr_ADC: 0
-      Clr_ShaperTail: 0
+      Cf: 4
+      Cf_comp: 2
+      Clr_ADC: 1
+      Clr_ShaperTail: 1
       Delay40: 0
       Delay65: 0
       Delay87: 0
       Delay9: 0
-      En_hyst_tot: 0
+      En_hyst_tot: 1
       Ibi_inv: 0
-      Ibi_inv_buf: 0
+      Ibi_inv_buf: 2
       Ibi_noinv: 0
-      Ibi_noinv_buf: 0
+      Ibi_noinv_buf: 2
       Ibi_sk: 0
-      Ibo_inv: 0
-      Ibo_inv_buf: 0
-      Ibo_noinv: 0
-      Ibo_noinv_buf: 0
-      Ibo_sk: 0
-      ON_pa: 0
-      ON_ref_adc: 0
-      ON_rtr: 0
-      ON_toa: 0
-      ON_tot: 0
-      Rc: 0
-      Rf: 0
-      S_inv: 0
-      S_inv_buf: 0
-      S_noinv: 0
-      S_noinv_buf: 0
-      S_sk: 0
+      Ibo_inv: 10
+      Ibo_inv_buf: 38
+      Ibo_noinv: 10
+      Ibo_noinv_buf: 38
+      Ibo_sk: 10
+      ON_pa: 1
+      ON_ref_adc: 1
+      ON_rtr: 1
+      ON_toa: 1
+      ON_tot: 1
+      Rc: 1
+      Rf: 5
+      S_inv: 2
+      S_inv_buf: 2
+      S_noinv: 2
+      S_noinv_buf: 2
+      S_sk: 2
       SelExtADC: 0
-      SelRisingEdge: 0
-      dac_pol: 0
-      gain_tot: 0
-      neg: 0
-      pol_trig_toa: 0
-      range_indac: 0
-      range_inv: 0
-      range_tot: 0
+      SelRisingEdge: 1
+      dac_pol: 1
+      gain_tot: 48
+      neg: 1
+      pol_trig_toa: 1
+      range_indac: 2
+      range_inv: 4
+      range_tot: 2
       ref_adc: 0
-      trim_vbi_pa: 0
-      trim_vbo_pa: 0
+      trim_vbi_pa: 7
+      trim_vbo_pa: 6
     1:
-      Cf: 0
-      Cf_comp: 0
-      Clr_ADC: 0
-      Clr_ShaperTail: 0
+      Cf: 4
+      Cf_comp: 2
+      Clr_ADC: 1
+      Clr_ShaperTail: 1
       Delay40: 0
       Delay65: 0
       Delay87: 0
       Delay9: 0
-      En_hyst_tot: 0
+      En_hyst_tot: 1
       Ibi_inv: 0
-      Ibi_inv_buf: 0
+      Ibi_inv_buf: 2
       Ibi_noinv: 0
-      Ibi_noinv_buf: 0
+      Ibi_noinv_buf: 2
       Ibi_sk: 0
-      Ibo_inv: 0
-      Ibo_inv_buf: 0
-      Ibo_noinv: 0
-      Ibo_noinv_buf: 0
-      Ibo_sk: 0
-      ON_pa: 0
-      ON_ref_adc: 0
-      ON_rtr: 0
-      ON_toa: 0
-      ON_tot: 0
-      Rc: 0
-      Rf: 0
-      S_inv: 0
-      S_inv_buf: 0
-      S_noinv: 0
-      S_noinv_buf: 0
-      S_sk: 0
+      Ibo_inv: 10
+      Ibo_inv_buf: 38
+      Ibo_noinv: 10
+      Ibo_noinv_buf: 38
+      Ibo_sk: 10
+      ON_pa: 1
+      ON_ref_adc: 1
+      ON_rtr: 1
+      ON_toa: 1
+      ON_tot: 1
+      Rc: 1
+      Rf: 5
+      S_inv: 2
+      S_inv_buf: 2
+      S_noinv: 2
+      S_noinv_buf: 2
+      S_sk: 2
       SelExtADC: 0
-      SelRisingEdge: 0
-      dac_pol: 0
-      gain_tot: 0
-      neg: 0
-      pol_trig_toa: 0
-      range_indac: 0
-      range_inv: 0
-      range_tot: 0
+      SelRisingEdge: 1
+      dac_pol: 1
+      gain_tot: 48
+      neg: 1
+      pol_trig_toa: 1
+      range_indac: 2
+      range_inv: 4
+      range_tot: 2
       ref_adc: 0
-      trim_vbi_pa: 0
-      trim_vbo_pa: 0
+      trim_vbi_pa: 7
+      trim_vbo_pa: 6
   HalfWise:
     0:
       Adc_pedestal: 0
@@ -2924,10 +2924,10 @@ roc_s1:
       BIAS_FOLLOWER_CAL_P_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_EN: 0
-      BIAS_I_CTDC_D: 0
-      BIAS_I_FTDC_D: 0
+      BIAS_I_CTDC_D: 24
+      BIAS_I_FTDC_D: 24
       CALIB_CHANNEL_DLL: 0
-      CTDC_CALIB_FREQUENCY: 0
+      CTDC_CALIB_FREQUENCY: 2
       CTRL_IN_REF_CTDC_P_D: 0
       CTRL_IN_REF_CTDC_P_EN: 0
       CTRL_IN_REF_FTDC_P_D: 0
@@ -2936,14 +2936,14 @@ roc_s1:
       CTRL_IN_SIG_CTDC_P_EN: 0
       CTRL_IN_SIG_FTDC_P_D: 0
       CTRL_IN_SIG_FTDC_P_EN: 0
-      EN_MASTER_CTDC_DLL: 0
+      EN_MASTER_CTDC_DLL: 1
       EN_MASTER_CTDC_VOUT_INIT: 0
-      EN_MASTER_FTDC_DLL: 0
+      EN_MASTER_FTDC_DLL: 1
       EN_MASTER_FTDC_VOUT_INIT: 0
-      EN_REF_BG: 0
-      FOLLOWER_CTDC_EN: 0
-      FOLLOWER_FTDC_EN: 0
-      FTDC_CALIB_FREQUENCY: 0
+      EN_REF_BG: 1
+      FOLLOWER_CTDC_EN: 1
+      FOLLOWER_FTDC_EN: 1
+      FTDC_CALIB_FREQUENCY: 2
       GLOBAL_DISABLE_TOT_LIMIT: 0
       GLOBAL_EN_BUFFER_CTDC: 0
       GLOBAL_EN_BUFFER_FTDC: 0
@@ -2953,23 +2953,23 @@ roc_s1:
       GLOBAL_FORCE_EN_OUTPUT_DATA: 0
       GLOBAL_FORCE_EN_TOT: 0
       GLOBAL_INIT_DAC_B_CTDC: 0
-      GLOBAL_LATENCY_TIME: 0
-      GLOBAL_MODE_FTDC_TOA: 0
+      GLOBAL_LATENCY_TIME: 10
+      GLOBAL_MODE_FTDC_TOA: 2
       GLOBAL_MODE_NO_TOT_SUB: 0
       GLOBAL_MODE_TOA_DIRECT_OUTPUT: 0
-      GLOBAL_SEU_TIME_OUT: 0
-      GLOBAL_TA_SELECT_GAIN_TOA: 0
-      GLOBAL_TA_SELECT_GAIN_TOT: 0
+      GLOBAL_SEU_TIME_OUT: 1
+      GLOBAL_TA_SELECT_GAIN_TOA: 7
+      GLOBAL_TA_SELECT_GAIN_TOT: 3
       INV_FRONT_40MHZ: 0
-      START_COUNTER: 0
+      START_COUNTER: 1
       VD_CTDC_N_D: 0
       VD_CTDC_N_DAC_EN: 0
-      VD_CTDC_N_FORCE_MAX: 0
+      VD_CTDC_N_FORCE_MAX: 1
       VD_CTDC_P_D: 0
       VD_CTDC_P_DAC_EN: 0
       VD_FTDC_N_D: 0
       VD_FTDC_N_DAC_EN: 0
-      VD_FTDC_N_FORCE_MAX: 0
+      VD_FTDC_N_FORCE_MAX: 1
       VD_FTDC_P_D: 0
       VD_FTDC_P_DAC_EN: 0
       sel_clk_rcg: 0
@@ -2980,10 +2980,10 @@ roc_s1:
       BIAS_FOLLOWER_CAL_P_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_EN: 0
-      BIAS_I_CTDC_D: 0
-      BIAS_I_FTDC_D: 0
+      BIAS_I_CTDC_D: 24
+      BIAS_I_FTDC_D: 24
       CALIB_CHANNEL_DLL: 0
-      CTDC_CALIB_FREQUENCY: 0
+      CTDC_CALIB_FREQUENCY: 2
       CTRL_IN_REF_CTDC_P_D: 0
       CTRL_IN_REF_CTDC_P_EN: 0
       CTRL_IN_REF_FTDC_P_D: 0
@@ -2992,14 +2992,14 @@ roc_s1:
       CTRL_IN_SIG_CTDC_P_EN: 0
       CTRL_IN_SIG_FTDC_P_D: 0
       CTRL_IN_SIG_FTDC_P_EN: 0
-      EN_MASTER_CTDC_DLL: 0
+      EN_MASTER_CTDC_DLL: 1
       EN_MASTER_CTDC_VOUT_INIT: 0
-      EN_MASTER_FTDC_DLL: 0
+      EN_MASTER_FTDC_DLL: 1
       EN_MASTER_FTDC_VOUT_INIT: 0
-      EN_REF_BG: 0
-      FOLLOWER_CTDC_EN: 0
-      FOLLOWER_FTDC_EN: 0
-      FTDC_CALIB_FREQUENCY: 0
+      EN_REF_BG: 1
+      FOLLOWER_CTDC_EN: 1
+      FOLLOWER_FTDC_EN: 1
+      FTDC_CALIB_FREQUENCY: 2
       GLOBAL_DISABLE_TOT_LIMIT: 0
       GLOBAL_EN_BUFFER_CTDC: 0
       GLOBAL_EN_BUFFER_FTDC: 0
@@ -3009,23 +3009,23 @@ roc_s1:
       GLOBAL_FORCE_EN_OUTPUT_DATA: 0
       GLOBAL_FORCE_EN_TOT: 0
       GLOBAL_INIT_DAC_B_CTDC: 0
-      GLOBAL_LATENCY_TIME: 0
-      GLOBAL_MODE_FTDC_TOA: 0
+      GLOBAL_LATENCY_TIME: 10
+      GLOBAL_MODE_FTDC_TOA: 2
       GLOBAL_MODE_NO_TOT_SUB: 0
       GLOBAL_MODE_TOA_DIRECT_OUTPUT: 0
-      GLOBAL_SEU_TIME_OUT: 0
-      GLOBAL_TA_SELECT_GAIN_TOA: 0
-      GLOBAL_TA_SELECT_GAIN_TOT: 0
+      GLOBAL_SEU_TIME_OUT: 1
+      GLOBAL_TA_SELECT_GAIN_TOA: 7
+      GLOBAL_TA_SELECT_GAIN_TOT: 3
       INV_FRONT_40MHZ: 0
-      START_COUNTER: 0
+      START_COUNTER: 1
       VD_CTDC_N_D: 0
       VD_CTDC_N_DAC_EN: 0
-      VD_CTDC_N_FORCE_MAX: 0
+      VD_CTDC_N_FORCE_MAX: 1
       VD_CTDC_P_D: 0
       VD_CTDC_P_DAC_EN: 0
       VD_FTDC_N_D: 0
       VD_FTDC_N_DAC_EN: 0
-      VD_FTDC_N_FORCE_MAX: 0
+      VD_FTDC_N_FORCE_MAX: 1
       VD_FTDC_P_D: 0
       VD_FTDC_P_DAC_EN: 0
       sel_clk_rcg: 0
@@ -3034,13 +3034,13 @@ roc_s1:
       Calib: 0
       ExtCtest: 0
       IntCtest: 0
-      Inv_vref: 0
-      Noinv_vref: 0
-      ON_dac: 0
+      Inv_vref: 572
+      Noinv_vref: 128
+      ON_dac: 1
       Refi: 0
-      Toa_vref: 0
-      Tot_vref: 0
-      Vbg_1v: 0
+      Toa_vref: 112
+      Tot_vref: 432
+      Vbg_1v: 4
       probe_dc: 0
       probe_dc1: 0
       probe_dc2: 0
@@ -3048,32 +3048,32 @@ roc_s1:
       Calib: 0
       ExtCtest: 0
       IntCtest: 0
-      Inv_vref: 0
-      Noinv_vref: 0
-      ON_dac: 0
+      Inv_vref: 572
+      Noinv_vref: 128
+      ON_dac: 1
       Refi: 0
-      Toa_vref: 0
-      Tot_vref: 0
-      Vbg_1v: 0
+      Toa_vref: 112
+      Tot_vref: 432
+      Vbg_1v: 4
       probe_dc: 0
       probe_dc1: 0
       probe_dc2: 0
   Top:
     0:
-      BIAS_I_PLL_D: 0
-      DIV_PLL: 0
-      EN: 0
-      EN_HIGH_CAPA: 0
-      EN_LOCK_CONTROL: 0
-      EN_PLL: 0
-      EN_PhaseShift: 0
+      BIAS_I_PLL_D: 24
+      DIV_PLL: 3
+      EN: 3
+      EN_HIGH_CAPA: 1
+      EN_LOCK_CONTROL: 1
+      EN_PLL: 1
+      EN_PhaseShift: 1
       EN_RCG: 0
-      EN_REF_BG: 0
+      EN_REF_BG: 1
       EN_probe_pll: 0
       ENpE: 0
-      ERROR_LIMIT_SC: 0
+      ERROR_LIMIT_SC: 2
       EdgeSel_T1: 0
-      FOLLOWER_PLL_EN: 0
+      FOLLOWER_PLL_EN: 1
       INIT_D: 0
       INIT_DAC_EN: 0
       Pll_Locked_sc: 0
@@ -3091,8 +3091,8 @@ roc_s1:
       err_countR: 0
       fc_error_count: 0
       in_inv_cmd_rx: 0
-      lock_count: 0
-      n_counter_rst: 0
+      lock_count: 1
+      n_counter_rst: 1
       phase_ck: 0
       phase_strobe: 0
       rcg_gain: 0
@@ -5450,15 +5450,15 @@ roc_s2:
   DigitalHalf:
     0:
       Adc_TH: 0
-      Bx_offset: 0
-      Bx_trigger: 0
+      Bx_offset: 1
+      Bx_trigger: 15
       CalibrationSC: 0
       ClrAdcTot_trig: 0
-      IdleFrame: 0
-      L1Offset: 0
-      MultFactor: 0
+      IdleFrame: 214748364
+      L1Offset: 8
+      MultFactor: 25
       SC_testRAM: 0
-      SelTC4: 0
+      SelTC4: 1
       Tot_P0: 0
       Tot_P1: 0
       Tot_P2: 0
@@ -5468,18 +5468,18 @@ roc_s2:
       Tot_TH1: 0
       Tot_TH2: 0
       Tot_TH3: 0
-      sc_testRAM: 0
+      sc_testRAM: 3435973836
     1:
       Adc_TH: 0
-      Bx_offset: 0
-      Bx_trigger: 0
+      Bx_offset: 1
+      Bx_trigger: 15
       CalibrationSC: 0
       ClrAdcTot_trig: 0
-      IdleFrame: 0
-      L1Offset: 0
-      MultFactor: 0
+      IdleFrame: 214748364
+      L1Offset: 8
+      MultFactor: 25
       SC_testRAM: 0
-      SelTC4: 0
+      SelTC4: 1
       Tot_P0: 0
       Tot_P1: 0
       Tot_P2: 0
@@ -5489,96 +5489,96 @@ roc_s2:
       Tot_TH1: 0
       Tot_TH2: 0
       Tot_TH3: 0
-      sc_testRAM: 0
+      sc_testRAM: 3435973836
   GlobalAnalog:
     0:
-      Cf: 0
-      Cf_comp: 0
-      Clr_ADC: 0
-      Clr_ShaperTail: 0
+      Cf: 4
+      Cf_comp: 2
+      Clr_ADC: 1
+      Clr_ShaperTail: 1
       Delay40: 0
       Delay65: 0
       Delay87: 0
       Delay9: 0
-      En_hyst_tot: 0
+      En_hyst_tot: 1
       Ibi_inv: 0
-      Ibi_inv_buf: 0
+      Ibi_inv_buf: 2
       Ibi_noinv: 0
-      Ibi_noinv_buf: 0
+      Ibi_noinv_buf: 2
       Ibi_sk: 0
-      Ibo_inv: 0
-      Ibo_inv_buf: 0
-      Ibo_noinv: 0
-      Ibo_noinv_buf: 0
-      Ibo_sk: 0
-      ON_pa: 0
-      ON_ref_adc: 0
-      ON_rtr: 0
-      ON_toa: 0
-      ON_tot: 0
-      Rc: 0
-      Rf: 0
-      S_inv: 0
-      S_inv_buf: 0
-      S_noinv: 0
-      S_noinv_buf: 0
-      S_sk: 0
+      Ibo_inv: 10
+      Ibo_inv_buf: 38
+      Ibo_noinv: 10
+      Ibo_noinv_buf: 38
+      Ibo_sk: 10
+      ON_pa: 1
+      ON_ref_adc: 1
+      ON_rtr: 1
+      ON_toa: 1
+      ON_tot: 1
+      Rc: 1
+      Rf: 5
+      S_inv: 2
+      S_inv_buf: 2
+      S_noinv: 2
+      S_noinv_buf: 2
+      S_sk: 2
       SelExtADC: 0
-      SelRisingEdge: 0
-      dac_pol: 0
-      gain_tot: 0
-      neg: 0
-      pol_trig_toa: 0
-      range_indac: 0
-      range_inv: 0
-      range_tot: 0
+      SelRisingEdge: 1
+      dac_pol: 1
+      gain_tot: 48
+      neg: 1
+      pol_trig_toa: 1
+      range_indac: 2
+      range_inv: 4
+      range_tot: 2
       ref_adc: 0
-      trim_vbi_pa: 0
-      trim_vbo_pa: 0
+      trim_vbi_pa: 7
+      trim_vbo_pa: 6
     1:
-      Cf: 0
-      Cf_comp: 0
-      Clr_ADC: 0
-      Clr_ShaperTail: 0
+      Cf: 4
+      Cf_comp: 2
+      Clr_ADC: 1
+      Clr_ShaperTail: 1
       Delay40: 0
       Delay65: 0
       Delay87: 0
       Delay9: 0
-      En_hyst_tot: 0
+      En_hyst_tot: 1
       Ibi_inv: 0
-      Ibi_inv_buf: 0
+      Ibi_inv_buf: 2
       Ibi_noinv: 0
-      Ibi_noinv_buf: 0
+      Ibi_noinv_buf: 2
       Ibi_sk: 0
-      Ibo_inv: 0
-      Ibo_inv_buf: 0
-      Ibo_noinv: 0
-      Ibo_noinv_buf: 0
-      Ibo_sk: 0
-      ON_pa: 0
-      ON_ref_adc: 0
-      ON_rtr: 0
-      ON_toa: 0
-      ON_tot: 0
-      Rc: 0
-      Rf: 0
-      S_inv: 0
-      S_inv_buf: 0
-      S_noinv: 0
-      S_noinv_buf: 0
-      S_sk: 0
+      Ibo_inv: 10
+      Ibo_inv_buf: 38
+      Ibo_noinv: 10
+      Ibo_noinv_buf: 38
+      Ibo_sk: 10
+      ON_pa: 1
+      ON_ref_adc: 1
+      ON_rtr: 1
+      ON_toa: 1
+      ON_tot: 1
+      Rc: 1
+      Rf: 5
+      S_inv: 2
+      S_inv_buf: 2
+      S_noinv: 2
+      S_noinv_buf: 2
+      S_sk: 2
       SelExtADC: 0
-      SelRisingEdge: 0
-      dac_pol: 0
-      gain_tot: 0
-      neg: 0
-      pol_trig_toa: 0
-      range_indac: 0
-      range_inv: 0
-      range_tot: 0
+      SelRisingEdge: 1
+      dac_pol: 1
+      gain_tot: 48
+      neg: 1
+      pol_trig_toa: 1
+      range_indac: 2
+      range_inv: 4
+      range_tot: 2
       ref_adc: 0
-      trim_vbi_pa: 0
-      trim_vbo_pa: 0
+      trim_vbi_pa: 7
+      trim_vbo_pa: 6
   HalfWise:
     0:
       Adc_pedestal: 0
@@ -5648,10 +5648,10 @@ roc_s2:
       BIAS_FOLLOWER_CAL_P_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_EN: 0
-      BIAS_I_CTDC_D: 0
-      BIAS_I_FTDC_D: 0
+      BIAS_I_CTDC_D: 24
+      BIAS_I_FTDC_D: 24
       CALIB_CHANNEL_DLL: 0
-      CTDC_CALIB_FREQUENCY: 0
+      CTDC_CALIB_FREQUENCY: 2
       CTRL_IN_REF_CTDC_P_D: 0
       CTRL_IN_REF_CTDC_P_EN: 0
       CTRL_IN_REF_FTDC_P_D: 0
@@ -5660,14 +5660,14 @@ roc_s2:
       CTRL_IN_SIG_CTDC_P_EN: 0
       CTRL_IN_SIG_FTDC_P_D: 0
       CTRL_IN_SIG_FTDC_P_EN: 0
-      EN_MASTER_CTDC_DLL: 0
+      EN_MASTER_CTDC_DLL: 1
       EN_MASTER_CTDC_VOUT_INIT: 0
-      EN_MASTER_FTDC_DLL: 0
+      EN_MASTER_FTDC_DLL: 1
       EN_MASTER_FTDC_VOUT_INIT: 0
-      EN_REF_BG: 0
-      FOLLOWER_CTDC_EN: 0
-      FOLLOWER_FTDC_EN: 0
-      FTDC_CALIB_FREQUENCY: 0
+      EN_REF_BG: 1
+      FOLLOWER_CTDC_EN: 1
+      FOLLOWER_FTDC_EN: 1
+      FTDC_CALIB_FREQUENCY: 2
       GLOBAL_DISABLE_TOT_LIMIT: 0
       GLOBAL_EN_BUFFER_CTDC: 0
       GLOBAL_EN_BUFFER_FTDC: 0
@@ -5677,23 +5677,23 @@ roc_s2:
       GLOBAL_FORCE_EN_OUTPUT_DATA: 0
       GLOBAL_FORCE_EN_TOT: 0
       GLOBAL_INIT_DAC_B_CTDC: 0
-      GLOBAL_LATENCY_TIME: 0
-      GLOBAL_MODE_FTDC_TOA: 0
+      GLOBAL_LATENCY_TIME: 10
+      GLOBAL_MODE_FTDC_TOA: 2
       GLOBAL_MODE_NO_TOT_SUB: 0
       GLOBAL_MODE_TOA_DIRECT_OUTPUT: 0
-      GLOBAL_SEU_TIME_OUT: 0
-      GLOBAL_TA_SELECT_GAIN_TOA: 0
-      GLOBAL_TA_SELECT_GAIN_TOT: 0
+      GLOBAL_SEU_TIME_OUT: 1
+      GLOBAL_TA_SELECT_GAIN_TOA: 7
+      GLOBAL_TA_SELECT_GAIN_TOT: 3
       INV_FRONT_40MHZ: 0
-      START_COUNTER: 0
+      START_COUNTER: 1
       VD_CTDC_N_D: 0
       VD_CTDC_N_DAC_EN: 0
-      VD_CTDC_N_FORCE_MAX: 0
+      VD_CTDC_N_FORCE_MAX: 1
       VD_CTDC_P_D: 0
       VD_CTDC_P_DAC_EN: 0
       VD_FTDC_N_D: 0
       VD_FTDC_N_DAC_EN: 0
-      VD_FTDC_N_FORCE_MAX: 0
+      VD_FTDC_N_FORCE_MAX: 1
       VD_FTDC_P_D: 0
       VD_FTDC_P_DAC_EN: 0
       sel_clk_rcg: 0
@@ -5704,10 +5704,10 @@ roc_s2:
       BIAS_FOLLOWER_CAL_P_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_D: 0
       BIAS_FOLLOWER_CAL_P_FTDC_EN: 0
-      BIAS_I_CTDC_D: 0
-      BIAS_I_FTDC_D: 0
+      BIAS_I_CTDC_D: 24
+      BIAS_I_FTDC_D: 24
       CALIB_CHANNEL_DLL: 0
-      CTDC_CALIB_FREQUENCY: 0
+      CTDC_CALIB_FREQUENCY: 2
       CTRL_IN_REF_CTDC_P_D: 0
       CTRL_IN_REF_CTDC_P_EN: 0
       CTRL_IN_REF_FTDC_P_D: 0
@@ -5716,14 +5716,14 @@ roc_s2:
       CTRL_IN_SIG_CTDC_P_EN: 0
       CTRL_IN_SIG_FTDC_P_D: 0
       CTRL_IN_SIG_FTDC_P_EN: 0
-      EN_MASTER_CTDC_DLL: 0
+      EN_MASTER_CTDC_DLL: 1
       EN_MASTER_CTDC_VOUT_INIT: 0
-      EN_MASTER_FTDC_DLL: 0
+      EN_MASTER_FTDC_DLL: 1
       EN_MASTER_FTDC_VOUT_INIT: 0
-      EN_REF_BG: 0
-      FOLLOWER_CTDC_EN: 0
-      FOLLOWER_FTDC_EN: 0
-      FTDC_CALIB_FREQUENCY: 0
+      EN_REF_BG: 1
+      FOLLOWER_CTDC_EN: 1
+      FOLLOWER_FTDC_EN: 1
+      FTDC_CALIB_FREQUENCY: 2
       GLOBAL_DISABLE_TOT_LIMIT: 0
       GLOBAL_EN_BUFFER_CTDC: 0
       GLOBAL_EN_BUFFER_FTDC: 0
@@ -5733,23 +5733,23 @@ roc_s2:
       GLOBAL_FORCE_EN_OUTPUT_DATA: 0
       GLOBAL_FORCE_EN_TOT: 0
       GLOBAL_INIT_DAC_B_CTDC: 0
-      GLOBAL_LATENCY_TIME: 0
-      GLOBAL_MODE_FTDC_TOA: 0
+      GLOBAL_LATENCY_TIME: 10
+      GLOBAL_MODE_FTDC_TOA: 2
       GLOBAL_MODE_NO_TOT_SUB: 0
       GLOBAL_MODE_TOA_DIRECT_OUTPUT: 0
-      GLOBAL_SEU_TIME_OUT: 0
-      GLOBAL_TA_SELECT_GAIN_TOA: 0
-      GLOBAL_TA_SELECT_GAIN_TOT: 0
+      GLOBAL_SEU_TIME_OUT: 1
+      GLOBAL_TA_SELECT_GAIN_TOA: 7
+      GLOBAL_TA_SELECT_GAIN_TOT: 3
       INV_FRONT_40MHZ: 0
-      START_COUNTER: 0
+      START_COUNTER: 1
       VD_CTDC_N_D: 0
       VD_CTDC_N_DAC_EN: 0
-      VD_CTDC_N_FORCE_MAX: 0
+      VD_CTDC_N_FORCE_MAX: 1
       VD_CTDC_P_D: 0
       VD_CTDC_P_DAC_EN: 0
       VD_FTDC_N_D: 0
       VD_FTDC_N_DAC_EN: 0
-      VD_FTDC_N_FORCE_MAX: 0
+      VD_FTDC_N_FORCE_MAX: 1
       VD_FTDC_P_D: 0
       VD_FTDC_P_DAC_EN: 0
       sel_clk_rcg: 0
@@ -5758,13 +5758,13 @@ roc_s2:
       Calib: 0
       ExtCtest: 0
       IntCtest: 0
-      Inv_vref: 0
-      Noinv_vref: 0
-      ON_dac: 0
+      Inv_vref: 572
+      Noinv_vref: 128
+      ON_dac: 1
       Refi: 0
-      Toa_vref: 0
-      Tot_vref: 0
-      Vbg_1v: 0
+      Toa_vref: 112
+      Tot_vref: 432
+      Vbg_1v: 4
       probe_dc: 0
       probe_dc1: 0
       probe_dc2: 0
@@ -5772,32 +5772,32 @@ roc_s2:
       Calib: 0
       ExtCtest: 0
       IntCtest: 0
-      Inv_vref: 0
-      Noinv_vref: 0
-      ON_dac: 0
+      Inv_vref: 572
+      Noinv_vref: 128
+      ON_dac: 1
       Refi: 0
-      Toa_vref: 0
-      Tot_vref: 0
-      Vbg_1v: 0
+      Toa_vref: 112
+      Tot_vref: 432
+      Vbg_1v: 4
       probe_dc: 0
       probe_dc1: 0
       probe_dc2: 0
   Top:
     0:
-      BIAS_I_PLL_D: 0
-      DIV_PLL: 0
-      EN: 0
-      EN_HIGH_CAPA: 0
-      EN_LOCK_CONTROL: 0
-      EN_PLL: 0
-      EN_PhaseShift: 0
+      BIAS_I_PLL_D: 24
+      DIV_PLL: 3
+      EN: 3
+      EN_HIGH_CAPA: 1
+      EN_LOCK_CONTROL: 1
+      EN_PLL: 1
+      EN_PhaseShift: 1
       EN_RCG: 0
-      EN_REF_BG: 0
+      EN_REF_BG: 1
       EN_probe_pll: 0
       ENpE: 0
-      ERROR_LIMIT_SC: 0
+      ERROR_LIMIT_SC: 2
       EdgeSel_T1: 0
-      FOLLOWER_PLL_EN: 0
+      FOLLOWER_PLL_EN: 1
       INIT_D: 0
       INIT_DAC_EN: 0
       Pll_Locked_sc: 0
@@ -5815,8 +5815,8 @@ roc_s2:
       err_countR: 0
       fc_error_count: 0
       in_inv_cmd_rx: 0
-      lock_count: 0
-      n_counter_rst: 0
+      lock_count: 1
+      n_counter_rst: 1
       phase_ck: 0
       phase_strobe: 0
       rcg_gain: 0
