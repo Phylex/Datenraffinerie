@@ -256,12 +256,6 @@ class DataField(luigi.Task):
                 if resp != b'defaults loaded':
                     raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
 
-
-            resp = socket.recv()
-
-            if resp != b'defaults loaded':
-                raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
-
             self.initialized_to_default=True
 
         
