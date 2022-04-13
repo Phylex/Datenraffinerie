@@ -381,7 +381,7 @@ class DataField(luigi.Task):
                 raw_files.append(luigi.LocalTarget(raw_file_path,
                                                    format=luigi.format.Nop))
             output_files['raw_data'] = raw_files
-            return raw_files
+            return output_files
 
         # this task is not required by the fracker so we do the usual merge job
         elif self.output_format in self.supported_formats:
