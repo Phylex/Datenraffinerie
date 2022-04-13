@@ -467,8 +467,8 @@ class DataField(luigi.Task):
             in_files = [data_file.path for data_file in self.input()]
             # run the compiled turbo pump if available
             if shutil.which('turbo-pump') is not None:
-                if len(expected_files) == 1:
-                    shutil.copy(expected_files[0], self.output().path)
+                if len(in_files) == 1:
+                    shutil.copy(in_files[0], self.output().path)
                     return
                 result = anu.run_turbo_pump(self.output().path, in_files)
                 if result != 0:
