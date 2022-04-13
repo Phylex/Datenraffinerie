@@ -574,6 +574,10 @@ class Fracker(luigi.Task):
             formatted_data_path = Path(data_file_base_name + '.hdf5')
             expected_files.append(formatted_data_path)
 
+            # check if the formatted file allready exists
+            if formatted_data_path.exists():
+                continue
+
             # attempt to unpack the files into root files using the unpack
             # command
             result = anu.unpack_raw_data_into_root(
