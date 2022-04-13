@@ -627,6 +627,9 @@ class Fracker(luigi.Task):
 
         # run the compiled turbo pump if available
         if shutil.which('turbo-pump') is not None:
+            if len(expected_files) == 1:
+                shutil.copy(expected_files[0], self.output().path)
+                return
             anu.run_turbo_pump(self.output().path, expected_files)
         # otherwise run the python version
         else:
