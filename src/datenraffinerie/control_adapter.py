@@ -18,18 +18,9 @@ import uuid
 import zmq
 import yaml
 from .config_utilities import diff_dict, update_dict
+from .errors import DAQError, DAQConfigError
 
 module_logger = logging.getLogger(__name__)
-
-class DAQError(Exception):
-    def __init__(self, message):
-        self.message = message
-
-
-class DAQConfigError(Exception):
-    def __init__(self, message):
-        self.message = message
-
 
 class ControlAdapter:
     """

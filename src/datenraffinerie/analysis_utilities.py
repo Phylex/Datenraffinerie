@@ -164,7 +164,7 @@ def run_turbo_pump(output_file: str, input_files: list):
     for inp in input_files:
         tp_input += " " + str(inp)
     full_turbo_p_command = turbo_pump_path + tp_output + tp_input
-    os.system(full_turbo_p_command)
+    return os.system(full_turbo_p_command)
 
 
 def reformat_data(rootfile: str,

@@ -17,6 +17,7 @@ import zmq
 from uproot.exceptions import KeyInFileError
 from . import config_utilities as cfu
 from . import analysis_utilities as anu
+from .errors import DAQConfigError, DAQError
 
 
 class Calibration(luigi.Task):
@@ -255,11 +256,9 @@ class DataField(luigi.Task):
                                    "and that your network configuration is correct") from e
             else:
                 if resp != b'defaults loaded':
-                    raise ctrl.DAQConfigError('Default config could not be loaded into the backend')
+                    raise DAQConfigError('Default config could not be loaded into the backend')
 
             self.initialized_to_default=True
-
-        
         # if there are more than one entry in the parameter list the scan still
         # has more than one dimension. So spawn more scan tasks for the lower
         # dimension
@@ -364,10 +363,11 @@ class DataField(luigi.Task):
         """
         # we are being called by the fracker, so only produce the raw output files
         if len(self.scan_parameters) == 1 and self.loop:
-            raw_files = []
+            output_files = {}
             # pass the calibrated default config to the fracker
-            raw_files.append(self.input())
+            output_files['calibration'] = self.input()
             values = self.scan_parameters[0][1]
+            raw_files = []
             for i, value in enumerate(values):
                 base_file_name = f'{self.label}_{self.identifier + i}'
                 raw_file_name = f'{base_file_name}.raw'
@@ -380,10 +380,11 @@ class DataField(luigi.Task):
                 raw_file_path = Path(self.output_dir) / raw_file_name
                 raw_files.append(luigi.LocalTarget(raw_file_path,
                                                    format=luigi.format.Nop))
+            output_files['raw_data'] = raw_files
             return raw_files
 
         # this task is not required by the fracker so we do the usual merge job
-        if self.output_format in self.supported_formats:
+        elif self.output_format in self.supported_formats:
             out_file = f'{self.label}_{self.identifier}_merged.{self.output_format}'
             raw_file_path = Path(self.output_dir) / out_file
             return luigi.LocalTarget(raw_file_path)
@@ -429,7 +430,7 @@ class DataField(luigi.Task):
             # perform the scan
             values = self.scan_parameters[0][1]
             parameter = list(self.scan_parameters[0][0])
-            output_files = self.output()[1:]
+            output_files = self.output()['raw_data']
             output_configs = [os.path.splitext(of.path)[0] + '.yaml'
                               for of in output_files]
             for raw_file, output_config, value in\
@@ -467,8 +468,14 @@ class DataField(luigi.Task):
         # the single merged file
         else:
             in_files = [data_file.path for data_file in self.input()]
-            # merge the data together
-            anu.merge_files(in_files, self.output().path, self.raw)
+            # run the compiled turbo pump if available
+            if shutil.which('turbo-pump') is not None:
+                result = anu.run_turbo_pump(self.output().path, in_files)
+                if result != 0:
+                    raise DAQError("turbo-pump crashed");
+            # otherwise run the python version
+            else:
+                anu.merge_files(in_files, self.output().path, self.raw)
 
 
 class Fracker(luigi.Task):
@@ -545,7 +552,7 @@ class Fracker(luigi.Task):
         power_on_default = cfu.unfreeze(self.target_default_config)
         # load the calibration
         if self.calibration is not None:
-            with self.input()[0].open('r') as calibration_file:
+            with self.input()['calibration'].open('r') as calibration_file:
                 calibration = yaml.safe_load(
                     calibration_file.read())
             # calculate the configuration to send to the backend
@@ -560,7 +567,7 @@ class Fracker(luigi.Task):
         values = self.scan_parameters[0][1]
         parameter = list(self.scan_parameters[0][0])
         expected_files = []
-        for i, (raw_file, value) in enumerate(zip(self.input()[1:], values)):
+        for i, (raw_file, value) in enumerate(zip(self.input()['raw_data'], values)):
             # compute the paths of the different files produced by the fracker
             data_file_base_name = os.path.splitext(raw_file.path)[0]
             unpacked_file_path = Path(data_file_base_name + '.root')
@@ -626,4 +633,4 @@ class Fracker(luigi.Task):
             anu.run_turbo_pump(self.output().path, expected_files)
         # otherwise run the python version
         else:
-            anu.merge_files(expected_files, self.output().path)
+            anu.merge_files(expected_files, self.output().path, self.raw)
