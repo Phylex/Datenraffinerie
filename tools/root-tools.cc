@@ -38,6 +38,7 @@ static std::vector<std::string> trig_mode_data_columns = {
 	"event", "trigtime", "channelsumid", "rawsum", "decompresssum"
 };
 
+
 std::vector<std::string> filter_measurement_columns(bool event_mode, std::vector<std::string> columns) {
 	std::vector<std::string> filtered_columns;
 	std::vector<std::string> expected_columns;

@@ -167,10 +167,8 @@ int main(int argc, char **argv) {
 	}
 
 	/* set up the arrays to buffer the data between the root and hdf files */
-	float *m_data = (float *)malloc(data_columns.size() * sizeof(float));
-	for (size_t i = 0; i < data_columns.size(); i++) {
-		m_data[i] = 0;
-	}
+	hgcroc_data<float> d_buffer;
+	hgcroc_summary_data<float> summary_buffer;
 	float *m_block_buffer= (float *)malloc(block_size * data_columns.size() * sizeof(float));
 	for (size_t i = 0; i < block_size *data_columns.size(); i++) {
 		m_block_buffer[i] = 0;
@@ -225,8 +223,19 @@ int main(int argc, char **argv) {
 		measurement_tree->SetBranchAddress("channel", &channel);
 	}
 	/* link the elements of the root tree to the small local buffer */
+
 	for (size_t i = 0; i < data_columns.size(); i++) {
-		measurement_tree->SetBranchAddress(data_columns[i].c_str(), m_data + i);
+		void *entry_pointer;
+		if (event_mode) {
+			entry_pointer = d_buffer.get_pointer_to_entry(data_columns[i]);
+		} else {
+			entry_pointer = summary_buffer.get_pointer_to_entry(data_columns[i]);
+		}
+		if (entry_pointer == NULL) {
+			std::cout << "Invalid data column passed to fracker" << std::endl;
+			exit(EXIT_FAILURE);
+		}
+		measurement_tree->SetBranchAddress(data_columns[i].c_str(), entry_pointer);
 	}
 
 	/* run through the root file, retrieve the config from the cache entries and write the output */
@@ -237,7 +246,11 @@ int main(int argc, char **argv) {
 			measurement_tree->GetEntry(row);
 			/* copy the data from the row buffer into the block buffer */
 			for ( size_t i = 0; i < data_columns.size(); i ++) {
-				m_block_buffer[i + (row % block_size) * data_columns.size()] = m_data[i];
+				if (event_mode) {
+					m_block_buffer[i + (row % block_size) * data_columns.size()] = d_buffer.get_value(data_columns[i]);
+				} else {
+					m_block_buffer[i + (row % block_size) * data_columns.size()] = summary_buffer.get_value(data_columns[i]);
+				}
 			}
 			/* generate the cache key from the entries */
 			CacheKey row_cache_key;
@@ -288,7 +301,6 @@ int main(int argc, char **argv) {
 	H5Dclose(axis1);
 	H5Dclose(measurement_block);
 	free(m_block_buffer);
-	free(m_data);
 	if (channel_cache) {
 		H5Dclose(channel_config_block);
 		free(c_config_data);
