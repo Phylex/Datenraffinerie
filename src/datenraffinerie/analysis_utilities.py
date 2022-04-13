@@ -177,14 +177,6 @@ def reformat_data(rootfile: str,
     Also add in the configuration from the run.
     """
 
-    # if the fracker is a command that can be run, then we run the fracker
-    # instead running the python code that does the same thing just a LOT
-    # slower
-    compiled_fracker_path = shutil.which('fracker')
-    if compiled_fracker_path is not None:
-        retval = run_compiled_fracker(rootfile, hdf_file, complete_config,
-                                      raw_data, columns)
-
     # execute the native code if the fracker is not found
     hd_file = create_empty_hdf_file(hdf_file, 1000000)
 
@@ -324,10 +316,6 @@ def merge_files(in_files: list, out_file: str, group_name: str='data'):
     Merge the files of the different runs into a single file containing all
     the data
     """
-    # run the compiled turbo pump if available
-    if shutil.which('turbo-pump') is not None:
-        run_turbo_pump(out_file, in_files)
-        return
 
     start_file = in_files[0]
     in_files = [tables.open_file(in_f, 'r') for in_f in in_files[1:]]

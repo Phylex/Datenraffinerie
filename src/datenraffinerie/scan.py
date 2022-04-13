@@ -7,6 +7,7 @@ from pathlib import Path
 from functools import reduce
 import os
 import operator
+import shutil
 import pandas as pd
 import luigi
 from luigi.parameter import ParameterVisibility
@@ -556,52 +557,70 @@ class Fracker(luigi.Task):
         complete_config = {'daq': daq_config,
                            'target': target_config}
 
-        for i, raw_file in enumerate(self.input()[1:]):
-            data_file_base_name = os.path.splitext(raw_file.path)[0]
-            unpacked_file_path = data_file_base_name + '.root'
-
-            result = anu.unpack_raw_data_into_root(
-                    raw_file.path,
-                    unpacked_file_path,
-                    raw_data=self.raw)
-            if result != 0 and os.path.exists(unpacked_file_path):
-                os.remove(unpacked_file_path)
-
-        # get the parameters to build the patch from
         values = self.scan_parameters[0][1]
         parameter = list(self.scan_parameters[0][0])
         expected_files = []
-        for raw_file, value in zip(self.input()[1:], values):
+        for i, (raw_file, value) in enumerate(zip(self.input()[1:], values)):
+            # compute the paths of the different files produced by the fracker
             data_file_base_name = os.path.splitext(raw_file.path)[0]
             unpacked_file_path = Path(data_file_base_name + '.root')
             formatted_data_path = Path(data_file_base_name + '.hdf5')
             expected_files.append(formatted_data_path)
-            # check that the unpacker was able to convert the data into root
-            # format
-            if not unpacked_file_path.exists():
+
+            # attempt to unpack the files into root files using the unpack
+            # command
+            result = anu.unpack_raw_data_into_root(
+                    raw_file.path,
+                    unpacked_file_path,
+                    raw_data=self.raw)
+            # if the unpaack command failed remove the raw file to
+            # trigger the Datafield to rerun the data taking
+            if result != 0 and unpacked_file_path.exists() or not unpacked_file_path.exists():
+                os.remove(unpacked_file_path)
                 os.remove(raw_file.path)
                 continue
 
-            # load the data from the unpacked root file and merge in the
-            # data from the configuration for that run with the data
-            try:
-                # calculate the patch that needs to be applied
-                patch = cfu.generate_patch(parameter, value)
-                complete_config = cfu.update_dict(complete_config, patch)
-                anu.reformat_data(unpacked_file_path,
-                                  formatted_data_path,
-                                  complete_config,
-                                  self.raw,
-                                  columns=self.data_columns)
-            except KeyInFileError:
-                os.remove(unpacked_file_path.as_posix())
-                continue
-            except FileNotFoundError:
-                continue
-            os.remove(unpacked_file_path.as_posix())
+            # compute the configuration of the run
+            patch = cfu.generate_patch(parameter, value)
+            complete_config = cfu.update_dict(complete_config, patch)
+            # merge in the configuration into the raw data
+            # if the fracker can be found run it
+            if shutil.which('fracker') is not None:
+                retval = anu.run_compiled_fracker(
+                        str(unpacked_file_path.absolute()),
+                        str(formatted_data_path.absolute()),
+                        complete_config,
+                        self.raw,
+                        self.data_columns)
+                if retval != 0:
+                    print("The fracker failed!!!")
+                    if formatted_data_path.exists():
+                        os.remove(formatted_data_path)
+            # otherwise fall back to the python code
+            else:
+                try:
+                    anu.reformat_data(unpacked_file_path,
+                                      formatted_data_path,
+                                      complete_config,
+                                      self.raw,
+                                      columns=self.data_columns)
+                except KeyInFileError:
+                    os.remove(unpacked_file_path)
+                    os.remove(raw_file.path)
+                    continue
+                except FileNotFoundError:
+                    continue
+            os.remove(unpacked_file_path)
 
+        # check if the unpacker or fracker have failed
         for formatted_file_path in expected_files:
             if not formatted_file_path.exists():
                 raise ValueError('An unpacker failed, '
                                  'the datenraffinerie needs to be rerun')
-        anu.merge_files(expected_files, self.output().path)
+
+        # run the compiled turbo pump if available
+        if shutil.which('turbo-pump') is not None:
+            anu.run_turbo_pump(self.output().path, expected_files)
+        # otherwise run the python version
+        else:
+            anu.merge_files(expected_files, self.output().path)
