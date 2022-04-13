@@ -185,7 +185,6 @@ int main(int argc, char **argv) {
 	int e_channel;
 
 	/* if there is any channel_config info set up it's buffer and block storage */
-	unsigned int* c_data_buffer = NULL;
 	unsigned int* c_config_data = NULL;
 	if ( channel_cache ) {
 		c_config_data = (unsigned int *)malloc(block_size * channel_columns.size() * sizeof(unsigned int));
@@ -224,6 +223,10 @@ int main(int argc, char **argv) {
 		measurement_tree->SetBranchAddress("chip", &chip);
 		measurement_tree->SetBranchAddress("channeltype", &channeltype);
 		measurement_tree->SetBranchAddress("channel", &channel);
+	}
+	/* link the elements of the root tree to the small local buffer */
+	for (size_t i = 0; i < data_columns.size(); i++) {
+		measurement_tree->SetBranchAddress(data_columns[i].c_str(), m_data + i);
 	}
 
 	/* run through the root file, retrieve the config from the cache entries and write the output */
