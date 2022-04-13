@@ -371,12 +371,8 @@ class DataField(luigi.Task):
             for i, value in enumerate(values):
                 base_file_name = f'{self.label}_{self.identifier + i}'
                 raw_file_name = f'{base_file_name}.raw'
-                fracked_file_name = f'{base_file_name}.hdf5'
-                fracked_file_path = Path(self.output_dir) / fracked_file_name
                 # if there already is a converted file we do not need to
                 # acquire the data again
-                if fracked_file_path.exists():
-                    continue
                 raw_file_path = Path(self.output_dir) / raw_file_name
                 raw_files.append(luigi.LocalTarget(raw_file_path,
                                                    format=luigi.format.Nop))
@@ -433,8 +429,9 @@ class DataField(luigi.Task):
             output_files = self.output()['raw_data']
             output_configs = [os.path.splitext(of.path)[0] + '.yaml'
                               for of in output_files]
-            for raw_file, output_config, value in\
-                    zip(output_files, output_configs, values):
+            for raw_file, output_config, value in zip(output_files, output_configs, values):
+                # if the file exists then simply skip it as we are in
+                # a rerun as the unpacker/fracker failed
                 if Path(raw_file.path).exists():
                     continue
                 # patch the target config with the key for the current run
