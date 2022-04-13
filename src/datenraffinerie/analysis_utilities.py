@@ -159,10 +159,10 @@ def run_turbo_pump(output_file: str, input_files: list):
     run the compiled turbo pump to merge files
     """
     turbo_pump_path = shutil.which('turbo-pump')
-    tp_output = " -o " + output_file
+    tp_output = " -o " + str(output_file)
     tp_input = " -i"
     for inp in input_files:
-        tp_input += " " + inp
+        tp_input += " " + str(inp)
     full_turbo_p_command = turbo_pump_path + tp_output + tp_input
     os.system(full_turbo_p_command)
 
