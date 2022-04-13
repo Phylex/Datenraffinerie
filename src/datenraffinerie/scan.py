@@ -575,8 +575,11 @@ class Fracker(luigi.Task):
                     raw_data=self.raw)
             # if the unpaack command failed remove the raw file to
             # trigger the Datafield to rerun the data taking
-            if result != 0 and unpacked_file_path.exists() or not unpacked_file_path.exists():
+            if result != 0 and unpacked_file_path.exists():
                 os.remove(unpacked_file_path)
+                os.remove(raw_file.path)
+                continue
+            if not unpacked_file_path.exists():
                 os.remove(raw_file.path)
                 continue
 
