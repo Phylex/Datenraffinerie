@@ -145,28 +145,53 @@ class DrillingRig(luigi.Task):
         data = socket.recv()
         socket.close()
         context.term()
-        raw_data_file_path = os.path.splitext(self.output().path)[0] + '.raw'
-
+        base_path = os.path.splitext(self.output().path)[0]
+        raw_data_file_path = base_path + '.raw'
+        unpacked_file_path = base_path + '.root'
         # save the data in a file so that the unpacker can work with it
         with open(raw_data_file_path, 'wb') as raw_data_file:
             raw_data_file.write(data)
 
-        data_file_path = os.path.splitext(self.output().path)[0] + '.root'
+        # merge in the configuration into the raw data
+        # if the fracker can be found run it
 
         result = anu.unpack_raw_data_into_root(raw_data_file_path,
-                                  data_file_path,
-                                  raw_data=self.raw)
+                                               unpacked_file_path,
+                                               raw_data=self.raw)
         if result != 0:
             os.remove(raw_data_file_path)
-            os.remove(data_file_path)
+            os.remove(unpacked_file_path)
             raise ValueError(f"The unpacker failed for {raw_data_file_path}")
 
         # load the data from the unpacked root file and merge in the
         # data from the configuration for that run with the data
-        output_path = Path(self.output().path)
-        anu.reformat_data(data_file_path, output_path, complete_config, self.raw,
-                          columns=self.data_columns)
-        os.remove(data_file_path)
+        formatted_data_path = Path(self.output().path)
+        if shutil.which('fracker') is not None:
+            retval = anu.run_compiled_fracker(
+                    str(unpacked_file_path.absolute()),
+                    str(formatted_data_path.absolute()),
+                    complete_config,
+                    self.raw,
+                    self.data_columns)
+            if retval != 0:
+                print("The fracker failed!!!")
+                if formatted_data_path.exists():
+                    os.remove(formatted_data_path)
+        # otherwise fall back to the python code
+        else:
+            try:
+                anu.reformat_data(unpacked_file_path,
+                                  formatted_data_path,
+                                  complete_config,
+                                  self.raw,
+                                  columns=self.data_columns)
+            except KeyInFileError:
+                os.remove(unpacked_file_path)
+                os.remove(raw_data_file_path.path)
+                return
+            except FileNotFoundError:
+                return
+        os.remove(unpacked_file_path)
 
 
 class DataField(luigi.Task):
