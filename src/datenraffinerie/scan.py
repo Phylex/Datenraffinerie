@@ -160,7 +160,8 @@ class DrillingRig(luigi.Task):
                                                raw_data=self.raw)
         if result != 0:
             os.remove(raw_data_file_path)
-            os.remove(unpacked_file_path)
+            if os.path.exists(unpacked_file_path):
+                os.remove(unpacked_file_path)
             raise ValueError(f"The unpacker failed for {raw_data_file_path}")
 
         # load the data from the unpacked root file and merge in the
