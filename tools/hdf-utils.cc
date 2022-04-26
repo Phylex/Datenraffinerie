@@ -219,7 +219,7 @@ hid_t create_block_dataset(hid_t group_id, hid_t value_datatype, size_t block_nu
 	hsize_t val_dim[] = {0, column_count};
 	hsize_t max_dim[] = {H5S_UNLIMITED, column_count};
 	hsize_t chunk_dim[] = {chunk_rows, column_count};
-	hid_t val_dataset = create_dataset(group_id, block_val_name.str(), value_datatype, val_rank, val_dim, max_dim, chunk_dim, 0);
+	hid_t val_dataset = create_dataset(group_id, block_val_name.str(), value_datatype, val_rank, val_dim, max_dim, chunk_dim, 3);
 	create_utf8_attribute(val_dataset, "CLASS", "ARRAY");
 	create_utf8_attribute(val_dataset, "FLAVOUR", "numpy");
 	create_empty_utf8_attribute(val_dataset, "TITLE");
@@ -305,7 +305,7 @@ void create_axes(hid_t root_id, hid_t *axis0_id, hid_t *axis1_id) {
 	dimensions[0] = 0;
 	chunk_dimensions[0] = 200000;
 	datatype = H5Tcopy(H5T_STD_I32LE);
-	*axis1_id = create_dataset(root_id, "axis1", datatype, ndims, dimensions, max_dimensions, chunk_dimensions, 0);
+	*axis1_id = create_dataset(root_id, "axis1", datatype, ndims, dimensions, max_dimensions, chunk_dimensions, 3);
 	create_utf8_attribute(*axis1_id, "CLASS", "EARRAY");
 	create_numeric_attribute<int>(*axis1_id, "EXTDIM", H5T_STD_I32LE, &exdim);
 	create_empty_utf8_attribute(*axis1_id, "TITLE");
