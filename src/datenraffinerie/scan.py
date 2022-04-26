@@ -168,8 +168,8 @@ class DrillingRig(luigi.Task):
         formatted_data_path = Path(self.output().path)
         if shutil.which('fracker') is not None:
             retval = anu.run_compiled_fracker(
-                    str(unpacked_file_path.absolute()),
-                    str(formatted_data_path.absolute()),
+                    unpacked_file_path,
+                    formatted_data_path,
                     complete_config,
                     self.raw,
                     self.data_columns)
