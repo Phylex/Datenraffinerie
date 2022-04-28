@@ -4,5 +4,5 @@ libraries:
 
 workflows:
   - name: production_test
-    analyses:
+    tasks:
     - timewalk_analysis

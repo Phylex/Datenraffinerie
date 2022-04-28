@@ -8,10 +8,7 @@ from functools import reduce
 import os
 import operator
 import shutil
-import pandas as pd
 import luigi
-from luigi.parameter import ParameterVisibility
-import subprocess
 import yaml
 import zmq
 from uproot.exceptions import KeyInFileError
@@ -39,7 +36,8 @@ class Calibration(luigi.Task):
         if self.calibration is not None:
             return ValveYard(self.root_config_path,
                              self.calibration,
-                             os.path.dirname(str(Path(self.output_dir).resolve())),
+                             os.path.dirname(
+                                 str(Path(self.output_dir).resolve())),
                              str(Path(self.analysis_module_path).resolve()),
                              self.loop)
 
@@ -49,7 +47,8 @@ class Calibration(luigi.Task):
 
     def run(self):
         # figure out if there is a calibration that we need and if so create a
-        # local copy so that we don't end up calling the valve yard multiple times
+        # local copy so that we don't end up calling the valve yard multiple
+        # times
         if self.calibration is not None:
             with self.input()['calibration'].open('r') as calibration_file:
                 with self.output().open('w') as local_calib_copy:
@@ -139,8 +138,8 @@ class DrillingRig(luigi.Task):
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
         socket.connect(
-                f"tcp://{self.network_config['daq_coordinator']['hostname']}:" +
-                f"{self.network_config['daq_coordinator']['port']}")
+                f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
+                f" {self.network_config['daq_coordinator']['port']}")
         socket.send_string('measure;' + config_string)
         data = socket.recv()
         socket.close()
@@ -502,6 +501,8 @@ class DataField(luigi.Task):
             # otherwise run the python version
             else:
                 anu.merge_files(in_files, self.output().path, self.raw)
+            for file in in_files:
+                os.remove(file)
 
 
 class Fracker(luigi.Task):
@@ -667,3 +668,6 @@ class Fracker(luigi.Task):
         # otherwise run the python version
         else:
             anu.merge_files(expected_files, self.output().path, self.raw)
+        # assuming the merge worked, remove the partial files
+        for file in expected_files:
+            os.remove(file)

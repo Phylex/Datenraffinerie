@@ -494,6 +494,23 @@ def parse_config_entry(entry: dict, path: str):
                      " either daq or analysis")
 
 
+def validate_wokflow_config(wflows, config_path):
+    validated = []
+    if not isinstance(wflows, list):
+        raise ValueError(f"The workflows field in {config_path} "
+                         "must be a list")
+    for wf in wflows:
+        if not isinstance(wf, dict):
+            raise ValueError(f"A workflow in {config_path} is malformed")
+        if 'name' not in wf:
+            raise ValueError(f"A workflow in {config_path} is malformed")
+        if 'tasks' not in wf:
+            raise ValueError(f"The workflow {wf['name']} in "
+                             f"{config_path} needs a name attribute")
+        validated.append(wf)
+    return validated
+
+
 def parse_config_file(config_path: str):
     """
     Parse the root config file and return a list of workflows and
@@ -521,12 +538,11 @@ def parse_config_file(config_path: str):
                     resolved_lib_path = Path(lib_path).resolve()
                 other_procedures, other_workflows = parse_config_file(
                         resolved_lib_path)
-                for procedure in other_procedures:
-                    procedures.append(procedure)
-                for workflow in other_workflows:
-                    workflows.append(workflow)
+                procedures = procedures + other_procedures
+                workflows = workflows + other_workflows
         if 'workflows' in config.keys():
-            pass
+            raw_workflows = config['workflows']
+            workflows = workflows + validate_wokflow_config(raw_workflows, config_path)
         # The root configuration file can also specify new
         # procedures, similar to libraries
         if 'procedures' in config.keys():
@@ -548,7 +564,6 @@ def parse_config_file(config_path: str):
     return procedures, workflows
 
 
-#### TESTS ####
 def test_load_config():
     test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
     config = load_configuration(test_fpath)
