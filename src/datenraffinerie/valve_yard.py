@@ -34,7 +34,9 @@ class ValveYard(luigi.Task):
         if not isinstance(self.input(), list):
             return self.input()
         else:
-            return Path(self.output_dir) / f"{self.procedure_label}_merged.h5"
+            out = Path(self.output_dir) / self.procedure_label \
+                    / f"{self.procedure_label}_merged.h5"
+            return luigi.LocalTarget(out)
 
     def requires(self):
         """ A wrapper that parses the configuration and starts the procedure
@@ -149,18 +151,20 @@ class ValveYard(luigi.Task):
             raise cfu.ConfigFormatError("The type of an entry must be either "
                                         "'daq' or 'analysis'")
 
-        def run(self):
-            if not isinstance(self.input(), list):
+    def run(self):
+        if not isinstance(self.input(), list):
+            return
+        in_files = [data_file.path for data_file in self.input()]
+        # run the compiled turbo pump if available
+        if shutil.which('turbo-pump') is not None:
+            if len(in_files) == 1:
+                shutil.copy(in_files[0], self.output().path)
                 return
-            in_files = [data_file.path for data_file in self.input()]
-            # run the compiled turbo pump if available
-            if shutil.which('turbo-pump') is not None:
-                if len(in_files) == 1:
-                    shutil.copy(in_files[0], self.output().path)
-                    return
-                result = anu.run_turbo_pump(self.output().path, in_files)
-                if result != 0:
-                    raise RuntimeError("turbo-pump crashed")
-            # otherwise run the python version
-            else:
-                anu.merge_files(in_files, self.output().path, self.raw)
+            result = anu.run_turbo_pump(self.output().path, in_files)
+            if result != 0:
+                raise RuntimeError("turbo-pump crashed")
+        # otherwise run the python version
+        else:
+            anu.merge_files(in_files, self.output().path, self.raw)
+        for file in in_files:
+            os.remove(file)
