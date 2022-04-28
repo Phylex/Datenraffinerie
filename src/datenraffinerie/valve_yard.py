@@ -20,6 +20,7 @@ from . import analysis_utilities as anu
 
 module_logger = logging.getLogger(__name__)
 
+
 class ValveYard(luigi.Task):
     root_config_file = luigi.Parameter(significant=True)
     procedure_label = luigi.Parameter(significant=True)
