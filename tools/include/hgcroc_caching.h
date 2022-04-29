@@ -6,6 +6,7 @@
 #include <tuple>
 #include <vector>
 #include <array>
+#include <hdf5.h>
 
 #define ROC_CHAN_COUNT 72
 #define ROC_CHAN_TYPE 0
@@ -41,7 +42,18 @@ static std::map<unsigned int, std::string> chip_num_to_name = {
 	{5, "roc_s5"}
 };
 
-static std::array<std::tuple<std::string, std::string>, 160> roc_half_config = {
+static std::array<std::string, 4> half_wise_blocks = {
+	"ReferenceVoltage",
+	"MasterTdc",
+	"GlobalAnalog",
+	"DigitalHalf",
+};
+
+static std::array<std::string, 1> chip_wide_blocks = {
+	"Top"
+};
+
+static std::array<std::tuple<std::string, std::string, hid_t>, 160> roc_half_config = {
 	std::make_tuple("ReferenceVoltage", "Calib"),
 	std::make_tuple("ReferenceVoltage", "ExtCtest"),
 	std::make_tuple("ReferenceVoltage", "IntCtest"),

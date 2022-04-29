@@ -28,7 +28,7 @@ struct hgcroc_data {
 	int channelsumid;
 	int rawsum;
 	float decompresssum;
-	void *get_pointer_to_entry(char *column_name) {
+	void *get_pointer_to_entry(const char *column_name) {
 		if (strcmp(column_name, "event")) return (void *)&event;
 		if (strcmp(column_name, "chip")) return (void *)&chip;
 		if (strcmp(column_name, "half")) return (void *)&half;
@@ -50,7 +50,7 @@ struct hgcroc_data {
 		if (strcmp(column_name, "decompresssum")) return (void *)&decompresssum;
 		return NULL;
 	};
-	T get_value(char *column_name) {
+	T get_value(const char *column_name) {
 		if (strcmp(column_name, "event")) return (T)event;
 		if (strcmp(column_name, "chip")) return (T)chip;
 		if (strcmp(column_name, "half")) return (T)half;
@@ -72,7 +72,7 @@ struct hgcroc_data {
 		if (strcmp(column_name, "decompresssum")) return (T)decompresssum;
 		return (T) 0;
 	};
-	hid_t get_hdf_type(char *column_name) {
+	hid_t get_hdf_type(const char *column_name) {
 		if (strcmp(column_name, "event")) return H5T_NATIVE_UINT;
 		if (strcmp(column_name, "chip")) return H5T_NATIVE_UINT;
 		if (strcmp(column_name, "half")) return H5T_NATIVE_UINT;
@@ -117,7 +117,7 @@ struct hgcroc_summary_data {
 	float toa_stdd;
 	float toa_efficiency;
 	float toa_efficiency_error;
-	void *get_pointer_to_entry(char *column_name) {
+	void *get_pointer_to_entry(const char *column_name) {
 		if (strcmp(column_name, "chip")) return (void *)&chip;
 		if (strcmp(column_name, "channel")) return (void *)&channel;
 		if (strcmp(column_name, "channeltype")) return (void *)&channeltype;
@@ -139,7 +139,7 @@ struct hgcroc_summary_data {
 		if (strcmp(column_name, "toa_efficiency_error")) return (void *)&toa_efficiency_error;
 		return NULL;
 	};
-	T get_value(char *column_name){
+	T get_value(const char *column_name){
 		if (strcmp(column_name, "chip")) return (T) chip;
 		if (strcmp(column_name, "channel")) return (T) channel;
 		if (strcmp(column_name, "channeltype")) return (T) channeltype;
@@ -161,7 +161,7 @@ struct hgcroc_summary_data {
 		if (strcmp(column_name, "toa_efficiency_error")) return (T) toa_efficiency_error;
 		return (T) 0;
 	};
-	hid_t get_hdf_type(char *column_name){
+	hid_t get_hdf_type(const char *column_name){
 		if (strcmp(column_name, "chip")) return H5T_NATIVE_INT;
 		if (strcmp(column_name, "channel")) return H5T_NATIVE_SHORT; 
 		if (strcmp(column_name, "channeltype")) return H5T_NATIVE_SHORT;

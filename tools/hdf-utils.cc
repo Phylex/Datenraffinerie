@@ -1,5 +1,6 @@
 #include "include/hdf-utils.h"
 #include "include/exceptions.h"
+#include "include/root-tools.h"
 
 void create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
 	hid_t attribute_space_id;
@@ -30,6 +31,31 @@ void create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
 
 void create_empty_utf8_attribute(hid_t root_id, std::string attr_name) {
 	create_utf8_attribute(root_id, attr_name, "");
+}
+
+hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns) {
+	size_t data_type_size = 0;
+	std::vector<size_t> offsets;
+	std::vector<std::string> names;
+	std::vector<std
+	hgcroc_data<int> data;
+	hgcroc_config<int> config;
+	for (std::string column: data_columns) {
+		hid_t elem = data.get_hdf_type(column.c_str());
+		offsets.push_back(data_type_size);
+		names.push_back(column);
+		data_type_size += H5Tget_size(elem);
+	} 
+	for (std::string column: config_columns) {
+		hid_t elem = data.get_hdf_type(column.c_str());
+		offsets.push_back(data_type_size);
+		names.push_back(column);
+		data_type_size += H5Tget_size(elem);
+	} 
+	hid_t compound_datatype = H5Tcreate(H5T_COMPOUND, data_type_size);
+	for (size_t i=0; i<names.size(); i++) {
+		H5Tinsert()
+	}
 }
 
 hid_t create_dataset(hid_t root_id, std::string name, const hid_t datatype,
