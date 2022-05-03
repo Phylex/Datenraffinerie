@@ -4,6 +4,7 @@
 #define MERGE_SRC_1 "merge_input_1.h5"
 #define MERGE_SRC_2 "merge_input_2.h5"
 #define MERGE_OUT "merge_output_3.h5"
+#define TABLES_OUT "tables_test.h5"
 
 int main() {
 	std::cout << "Create pandas test file" << std::endl;
@@ -89,5 +90,10 @@ int main() {
 	hid_t out_file_id = create_merge_output_file(MERGE_OUT, "data", MERGE_SRC_1);
 	append_file(out_file_id, "data", MERGE_SRC_2);
 	H5Fclose(out_file_id);
+	
+	hid_t tables_file = create_pytables_file(TABLES_OUT);
+	hid_t tables_group = create_pytables_group(tables_file, "test_data", "test the pytables interface");
+	H5Gclose(tables_group);
+	H5Fclose(tables_file);
 	return 0;
 }
