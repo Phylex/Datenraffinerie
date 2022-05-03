@@ -17,12 +17,10 @@ hid_t create_dataset(hid_t root_id, std::string name, const hid_t datatype,
                      const hsize_t *maxdims, const hsize_t *chunk_dims,
                      unsigned int deflate);
 template <typename T>
-herr_t create_numeric_attribute(hid_t root_id, std::string name, hid_t datatype,
-                                const T *data) {
+herr_t create_numeric_attribute(hid_t root_id, std::string name, hid_t datatype, const T *data) {
   herr_t status;
   hid_t attribute_space_id;
   hid_t attribute_id;
-
   attribute_space_id = H5Screate(H5S_SCALAR);
   attribute_id = H5Acreate(root_id, name.c_str(), datatype, attribute_space_id,
                            H5P_DEFAULT, H5P_DEFAULT);
@@ -58,9 +56,14 @@ hid_t get_block_dataset(hid_t group, int block_id);
 long get_block_count(hid_t group_id);
 void write_to_block(hid_t ds_block_id, hid_t axis0_id, size_t rows, void *data);
 
-
+/* more expansive pandas routines */
 void append_file(hid_t dest_file, std::string group_name, std::string filename);
 hid_t create_merge_output_file(std::string output_filename, std::string group_name, std::string input_filename);
 
+/* pytables functions */
+hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns);
+hid_t create_pytables_file(std::string filename);
+hid_t create_pytables_group(hid_t parent, std::string name, std::string description);
+hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsize_t chunk_rows);
 
-#endif /* end of include guard: HDF_UTILS_H_ */
+#endif

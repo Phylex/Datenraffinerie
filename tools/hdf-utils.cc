@@ -3,6 +3,7 @@
 #include "include/root-tools.h"
 #include "include/roc_param_description.hpp"
 
+
 void create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
 	hid_t attribute_space_id;
 	hid_t datatype_id;
@@ -78,6 +79,53 @@ hid_t create_dataset(hid_t root_id, std::string name, const hid_t datatype,
   H5Pclose(properties);
   H5Sclose(dataspace);
   return dataset;
+}
+
+hid_t create_pytables_file(std::string filename) {
+	hid_t hdf_file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+	create_utf8_attribute(hdf_file, "CLASS", "GROUP");
+	create_utf8_attribute(hdf_file, "PYTABLES_FORMAT_VERSION", "2.1");
+	create_utf8_attribute(hdf_file, "VERSION", "1.0");
+	create_utf8_attribute(hdf_file, "TITLE", filename.c_str());
+	return hdf_file;
+}
+
+hid_t create_pytables_group(hid_t parent, std::string name, std::string description) {
+	hid_t group = H5Gcreate2(parent, name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	create_utf8_attribute(group, "CLASS", "GROUP");
+	create_utf8_attribute(group, "VERSION", "1.0");
+	create_utf8_attribute(group, "TITLE", description.c_str());
+	return group;
+}
+
+hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsize_t chunk_rows) {
+	hsize_t maxdims[] = {H5S_UNLIMITED};
+	hsize_t chunk_dims[] = {chunk_rows};
+	hsize_t start_dims[] = {0};
+	const hsize_t drank = 1;
+  hid_t dataspace = H5Screate_simple(1, start_dims, maxdims);
+  hid_t properties = H5Pcreate(H5P_DATASET_CREATE);
+  if (chunk_rows > 0) {
+    H5Pset_chunk(properties, drank, chunk_dims);
+    H5Pset_deflate(properties, 3);
+  }
+  hid_t dataset = H5Dcreate(parent, name.c_str(), datatype, dataspace, H5P_DEFAULT,
+                      properties, H5P_DEFAULT);
+  H5Pclose(properties);
+  H5Sclose(dataspace);
+	create_utf8_attribute(dataset, "CLASS", "TABLE");
+	create_utf8_attribute(dataset, "TITLE", name.c_str());
+	create_utf8_attribute(dataset, "VERSION", "2.7");
+	int nmembers = H5Tget_nmembers(datatype);
+	for (int i=0; i<nmembers; i++) {
+		std::stringstream name;
+		name << "FIELD_" << i << "_NAME";
+		create_utf8_attribute(dataset, name.str().c_str(), H5Tget_member_name(datatype, i));
+		name.clear();
+		name << "FIELD_" << i << "_FILL";
+		create_numeric_attribute<short>(dataset, name.str().c_str(), H5Tget_member_type(datatype, i), 0);
+	}
+	return dataset;
 }
 
 // make an array that contains the strings at the right locations
@@ -685,6 +733,7 @@ void append_file(hid_t dest_file, std::string group_name, std::string filename) 
 		H5Dclose(in_block_values[i]);
 	}
 }
+
 
 hid_t create_merge_output_file(std::string output_filename, std::string group_name, std::string input_filename) {
 	/* create the basic structure for the output file */
