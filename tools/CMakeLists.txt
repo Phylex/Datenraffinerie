@@ -35,13 +35,16 @@ add_executable(hdf-test
 	test-hdf-utils.cc)
 target_link_libraries(hdf-test
 	HDF5::HDF5
-	hdf-utils)
+	hdf-utils
+	ROOT::Core
+	ROOT::Tree)
 
 add_executable(config-cache-test
 	config-cache-test.cc )
 target_link_libraries(config-cache-test
 	yaml-cpp
-	hgcroc-caching)
+	hgcroc-caching
+	HDF5::HDF5)
 
 # compile the applications used to get familiar with the
 # libraries used
