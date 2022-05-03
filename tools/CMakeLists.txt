@@ -4,14 +4,14 @@ project(datenraffinerie-tools LANGUAGES CXX C)
 include_directories(include)
 
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_EXPORT_COMPILE_COMMANDS=ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 
 find_library (zmq NAMES zmq REQUIRED)
 find_package (yaml-cpp REQUIRED)
 find_package (HDF5 REQUIRED COMPONENTS CXX C HL)
-find_package (ROOT REQUIRED )
+find_package (ROOT REQUIRED)
 
 # compile the main libraries
 add_library(hgcroc-caching
@@ -20,13 +20,15 @@ add_library(hgcroc-caching
 add_library(hdf-utils
 	hdf-utils.cc)
 target_link_libraries(hdf-utils
-	PUBLIC HDF5::HDF5 )
+	PUBLIC HDF5::HDF5 
+	root-tools)
 
 add_library(root-tools
 	root-tools.cc )
 target_link_libraries(root-tools
 	ROOT::Core
-	ROOT::Tree )
+	ROOT::Tree 
+	ROOT::RIO)
 
 # compile the main thest executables
 add_executable(hdf-test
@@ -55,6 +57,11 @@ target_link_libraries(hdf-hyperslab
 add_executable(hdf-extended-dataset
 	hdf5-extended-dataset-experiments.cc )
 target_link_libraries(hdf-extended-dataset
+	HDF5::HDF5)
+
+add_executable(test_datastruct
+	test_roc_datastructures.cpp )
+target_link_libraries(test_datastruct
 	HDF5::HDF5)
 
 add_executable( fracker
