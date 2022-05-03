@@ -36,7 +36,7 @@ std::vector<CacheKey> generate_cache_key(int roc, std::string block_name, int bl
 					CacheKey key(roc, i, chan_type);
 					cache_keys.push_back(key);
 				}
-			} else {
+			} else if (block_number == 1){
 				for (int i=channel_count[chan_type]/2; i<channel_count[chan_type]; i++) {
 					CacheKey key(roc, i, chan_type);
 					cache_keys.push_back(key);

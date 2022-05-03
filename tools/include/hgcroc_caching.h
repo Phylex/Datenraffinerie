@@ -47,10 +47,10 @@ static std::map<unsigned int, std::string> chip_num_to_name = {
 	{5, "roc_s5"}
 };
 
-// roc.half.channel
 using CacheKey = std::tuple<unsigned int, unsigned int, unsigned int>;
 
 std::vector<CacheKey> generate_cache_key(int roc, std::string block_name, int block_number);
+CacheKey transform_event_row_to_cache_key(CacheKey row_key);
 
 template<typename T>
 std::map<CacheKey, std::vector<T>> generate_hgcroc_config_cache(YAML::Node config, std::vector<std::string> columns){
@@ -74,9 +74,9 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_config_cache(YAML::Node confi
 	}
 
 	for (std::string column: filtered_columns) {
-		for(auto entry: roc_config_key[column]) {
+		for(auto yaml_key: roc_config_key[column]) {
 			for (int i=0; i<roc_config.size(); i++) {
-				std::vector<CacheKey> cache_keys = generate_cache_key(i, std::get<0>(entry), std::get<1>(entry));
+				std::vector<CacheKey> cache_keys = generate_cache_key(i, std::get<0>(yaml_key), std::get<1>(yaml_key));
 				for (auto key: cache_keys) {
 					std::vector<T> entry;
 					if(cache.find(key) != cache.end()) {
@@ -84,7 +84,7 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_config_cache(YAML::Node confi
 					} else {
 						entry.clear();
 					}
-					entry.push_back(config[chip_num_to_name[std::get<0>(key)]][std::get<0>(entry)][std::get<1>(entry)][std::get<2>(entry)]);
+					entry.push_back(config[chip_num_to_name[std::get<0>(key)]][std::get<0>(yaml_key)][std::get<1>(yaml_key)][std::get<2>(yaml_key)].as<T>());
 					cache[key] = entry;
 				}
 			}
@@ -92,7 +92,4 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_config_cache(YAML::Node confi
 	}
 	return cache;
 }
-
-
-CacheKey transform_event_row_to_cache_key(CacheKey row_key);
 #endif
