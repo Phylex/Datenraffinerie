@@ -5,7 +5,6 @@
 #include <string>
 #include <iostream>
 #include "include/hgcroc_caching.h"
-#include "include/roc_param_description.hpp"
 
 
 int main() {
