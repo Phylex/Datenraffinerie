@@ -82,7 +82,7 @@ class ValveYard(luigi.WrapperTask):
                                loop=self.loop,
                                raw=procedure['raw'],
                                data_columns=procedure['data_columns'], # indicate if to produce event by event data data
-                               initialized_to_default=False) 
+                               ) 
             return DataField(identifier=0,
                              label=self.procedure_label,
                              output_dir=str(output_dir.resolve()),
@@ -100,6 +100,6 @@ class ValveYard(luigi.WrapperTask):
                              loop=self.loop,
                              raw=procedure['raw'],
                              data_columns=procedure['data_columns'], # indicate if to produce event by event data data
-                             initialized_to_default=False) 
+                             ) 
         raise cfu.ConfigFormatError("The type of an entry must be either "
                                     "'daq' or 'analysis'")
