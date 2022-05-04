@@ -1,7 +1,6 @@
 #include "include/hdf-utils.h"
 #include "include/exceptions.h"
 #include "include/root-tools.h"
-#include "include/roc_param_description.hpp"
 
 
 void create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
