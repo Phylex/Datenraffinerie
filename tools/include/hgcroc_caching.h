@@ -7,8 +7,7 @@
 #include <vector>
 #include <array>
 #include <algorithm>
-#include <hdf5.h>
-#include "roc_param_description.hpp"
+#include "../build/roc_param_description.hpp"
 
 #define ROC_CHAN_TYPE 0
 #define ROC_CALIB_CHAN_TYPE 1

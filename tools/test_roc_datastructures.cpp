@@ -1,4 +1,4 @@
-#include "../include/roc_param_description.hpp"
+#include "build/roc_param_description.hpp"
 #include <iostream>
 
 int main() {

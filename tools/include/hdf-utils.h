@@ -1,6 +1,7 @@
 #ifndef HDF_UTILS_H_
 #define HDF_UTILS_H_
-#include "hdf5.h"
+#include <hdf5.h>
+#include "../build/roc_param_description.hpp"
 #include <iostream>
 #include <sstream>
 #include <string>
