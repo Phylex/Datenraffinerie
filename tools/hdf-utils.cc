@@ -1,8 +1,18 @@
+/**
+ * @file hdf-utils.cc
+ * utility functions to create the hdf structures to store the data/config in
+ */
 #include "include/hdf-utils.h"
 #include "include/exceptions.h"
 #include "include/root-tools.h"
 
-
+/**
+ * Create an attribute with a UTF-8 string as content attached to the node
+ * referenced with 'root_id'
+ * @param[in] root_id
+ * @param[in] name
+ * @param[in] value
+ */
 void create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
 	hid_t attribute_space_id;
 	hid_t datatype_id;
@@ -34,14 +44,24 @@ void create_empty_utf8_attribute(hid_t root_id, std::string attr_name) {
 	create_utf8_attribute(root_id, attr_name, "");
 }
 
-hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns) {
+/** 
+ * generate the datatype that contains both the relevant measurement and configuration information
+ * given the column names of the 
+ **/
+hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns, bool event_mode) {
 	size_t data_type_size = 0;
 	std::vector<size_t> offsets;
 	std::vector<std::string> names;
-	hgcroc_data<int> data;
+	hgcroc_data data;
+	hgcroc_summary_data summary;
 	std::vector<hid_t> dtypes; 
 	for (std::string column: data_columns) {
-		hid_t elem = data.get_hdf_type(column.c_str());
+		hid_t elem;
+		if (event_mode) {
+			elem = data.get_hdf_type(column.c_str());
+		} else {
+			elem = summary.get_hdf_type(column.c_str());
+		}
 		dtypes.push_back(elem);
 		offsets.push_back(data_type_size);
 		names.push_back(column);
@@ -59,25 +79,6 @@ hid_t create_compound_datatype_form_columns(std::vector<std::string> data_column
 		H5Tinsert(compound_datatype, names[i].c_str(), offsets[i], dtypes[i]);
 	}
 	return compound_datatype;
-}
-
-hid_t create_dataset(hid_t root_id, std::string name, const hid_t datatype,
-                     const hsize_t drank, const hsize_t *dimensions,
-                     const hsize_t *maxdims, const hsize_t *chunk_dims,
-                     unsigned int deflate) {
-  hid_t dataspace = H5Screate_simple(drank, dimensions, maxdims);
-  hid_t properties = H5Pcreate(H5P_DATASET_CREATE);
-  if (chunk_dims != NULL) {
-    H5Pset_chunk(properties, drank, chunk_dims);
-    if (deflate > 0) {
-      H5Pset_deflate(properties, deflate);
-    }
-  }
-  hid_t dataset = H5Dcreate(root_id, name.c_str(), datatype, dataspace, H5P_DEFAULT,
-                      properties, H5P_DEFAULT);
-  H5Pclose(properties);
-  H5Sclose(dataspace);
-  return dataset;
 }
 
 hid_t create_pytables_file(std::string filename) {
@@ -125,6 +126,25 @@ hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsiz
 		create_numeric_attribute<short>(dataset, name.str().c_str(), H5Tget_member_type(datatype, i), 0);
 	}
 	return dataset;
+}
+
+hid_t create_dataset(hid_t root_id, std::string name, const hid_t datatype,
+                     const hsize_t drank, const hsize_t *dimensions,
+                     const hsize_t *maxdims, const hsize_t *chunk_dims,
+                     unsigned int deflate) {
+  hid_t dataspace = H5Screate_simple(drank, dimensions, maxdims);
+  hid_t properties = H5Pcreate(H5P_DATASET_CREATE);
+  if (chunk_dims != NULL) {
+    H5Pset_chunk(properties, drank, chunk_dims);
+    if (deflate > 0) {
+      H5Pset_deflate(properties, deflate);
+    }
+  }
+  hid_t dataset = H5Dcreate(root_id, name.c_str(), datatype, dataspace, H5P_DEFAULT,
+                      properties, H5P_DEFAULT);
+  H5Pclose(properties);
+  H5Sclose(dataspace);
+  return dataset;
 }
 
 // make an array that contains the strings at the right locations

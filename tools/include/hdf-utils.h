@@ -62,7 +62,7 @@ void append_file(hid_t dest_file, std::string group_name, std::string filename);
 hid_t create_merge_output_file(std::string output_filename, std::string group_name, std::string input_filename);
 
 /* pytables functions */
-hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns);
+hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns, bool event_mode);
 hid_t create_pytables_file(std::string filename);
 hid_t create_pytables_group(hid_t parent, std::string name, std::string description);
 hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsize_t chunk_rows);
