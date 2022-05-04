@@ -7,7 +7,6 @@
 #include <string>
 #include <string.h>
 #include <hdf5.h>
-template<typename T>
 struct hgcroc_data {
 	int event;
 	int chip;
@@ -50,27 +49,27 @@ struct hgcroc_data {
 		if (strcmp(column_name, "decompresssum")) return (void *)&decompresssum;
 		return NULL;
 	};
-	T get_value(const char *column_name) {
-		if (strcmp(column_name, "event")) return (T)event;
-		if (strcmp(column_name, "chip")) return (T)chip;
-		if (strcmp(column_name, "half")) return (T)half;
-		if (strcmp(column_name, "channel")) return (T)channel;
-		if (strcmp(column_name, "adc")) return (T)adc;
-		if (strcmp(column_name, "adcm")) return (T)adcm;
-		if (strcmp(column_name, "toa")) return (T)toa;
-		if (strcmp(column_name, "tot")) return (T)tot;
-		if (strcmp(column_name, "totflag")) return (T)totflag;
-		if (strcmp(column_name, "trigtime")) return (T)trigtime;
-		if (strcmp(column_name, "trigwidth")) return (T)trigwidth;
-		if (strcmp(column_name, "corruption")) return (T)corruption;
-		if (strcmp(column_name, "bxcounter")) return (T)bxcounter;
-		if (strcmp(column_name, "eventcounter")) return (T)eventcounter;
-		if (strcmp(column_name, "orbitcounter")) return (T)orbitcounter;
-		if (strcmp(column_name, "errorbit")) return (T)errorbit;
-		if (strcmp(column_name, "channelsumid")) return (T)channelsumid;
-		if (strcmp(column_name, "rawsum")) return (T)rawsum;
-		if (strcmp(column_name, "decompresssum")) return (T)decompresssum;
-		return (T) 0;
+	size_t get_size(const char *column_name) {
+		if (strcmp(column_name, "event")) return sizeof(event);
+		if (strcmp(column_name, "chip")) return sizeof(chip);
+		if (strcmp(column_name, "half")) return sizeof(half);
+		if (strcmp(column_name, "channel")) return sizeof(channel);
+		if (strcmp(column_name, "adc")) return sizeof(adc);
+		if (strcmp(column_name, "adcm")) return sizeof(adcm);
+		if (strcmp(column_name, "toa")) return sizeof(toa);
+		if (strcmp(column_name, "tot")) return sizeof(tot);
+		if (strcmp(column_name, "totflag")) return sizeof(totflag);
+		if (strcmp(column_name, "trigtime")) return sizeof(trigtime);
+		if (strcmp(column_name, "trigwidth")) return sizeof(trigwidth);
+		if (strcmp(column_name, "corruption")) return sizeof(corruption);
+		if (strcmp(column_name, "bxcounter")) return sizeof(bxcounter);
+		if (strcmp(column_name, "eventcounter")) return sizeof(eventcounter);
+		if (strcmp(column_name, "orbitcounter")) return sizeof(orbitcounter);
+		if (strcmp(column_name, "errorbit")) return sizeof(errorbit);
+		if (strcmp(column_name, "channelsumid")) return sizeof(channelsumid);
+		if (strcmp(column_name, "rawsum")) return sizeof(rawsum);
+		if (strcmp(column_name, "decompresssum")) return sizeof(decompresssum);
+		return 0;
 	};
 	hid_t get_hdf_type(const char *column_name) {
 		if (strcmp(column_name, "event")) return H5T_NATIVE_UINT;
@@ -96,7 +95,6 @@ struct hgcroc_data {
 	}
 };
 
-template<typename T>
 struct hgcroc_summary_data {
 	int chip;
 	short channel;
@@ -139,27 +137,27 @@ struct hgcroc_summary_data {
 		if (strcmp(column_name, "toa_efficiency_error")) return (void *)&toa_efficiency_error;
 		return NULL;
 	};
-	T get_value(const char *column_name){
-		if (strcmp(column_name, "chip")) return (T) chip;
-		if (strcmp(column_name, "channel")) return (T) channel;
-		if (strcmp(column_name, "channeltype")) return (T) channeltype;
-		if (strcmp(column_name, "adc_median")) return (T) adc_median;
-		if (strcmp(column_name, "adc_iqr")) return (T) adc_irq;
-		if (strcmp(column_name, "tot_median")) return (T) tot_median;
-		if (strcmp(column_name, "tot_iqr")) return (T) tot_irq;
-		if (strcmp(column_name, "toa_median")) return (T) toa_median;
-		if (strcmp(column_name, "toa_iqr")) return (T) toa_irq;
-		if (strcmp(column_name, "toa_mean")) return (T) toa_mean;
-		if (strcmp(column_name, "tot_mean")) return (T) tot_mean;
-		if (strcmp(column_name, "adc_mean")) return (T) adc_mean;
-		if (strcmp(column_name, "adc_stdd")) return (T) adc_stdd;
-		if (strcmp(column_name, "toa_stdd")) return (T) toa_stdd;
-		if (strcmp(column_name, "tot_stdd")) return (T) tot_stdd;
-		if (strcmp(column_name, "tot_efficiency")) return (T) tot_efficiency;
-		if (strcmp(column_name, "tot_efficiency_error")) return (T) tot_efficiency_error;
-		if (strcmp(column_name, "toa_efficiency")) return (T) toa_efficiency;
-		if (strcmp(column_name, "toa_efficiency_error")) return (T) toa_efficiency_error;
-		return (T) 0;
+	size_t get_size(const char *column_name){
+		if (strcmp(column_name, "chip")) return sizeof(chip);
+		if (strcmp(column_name, "channel")) return sizeof(channel);
+		if (strcmp(column_name, "channeltype")) return sizeof(channeltype);
+		if (strcmp(column_name, "adc_median")) return sizeof(adc_median);
+		if (strcmp(column_name, "adc_iqr")) return sizeof(adc_irq);
+		if (strcmp(column_name, "tot_median")) return sizeof(tot_median);
+		if (strcmp(column_name, "tot_iqr")) return sizeof(tot_irq);
+		if (strcmp(column_name, "toa_median")) return sizeof(toa_median);
+		if (strcmp(column_name, "toa_iqr")) return sizeof(toa_irq);
+		if (strcmp(column_name, "toa_mean")) return sizeof(toa_mean);
+		if (strcmp(column_name, "tot_mean")) return sizeof(tot_mean);
+		if (strcmp(column_name, "adc_mean")) return sizeof(adc_mean);
+		if (strcmp(column_name, "adc_stdd")) return sizeof(adc_stdd);
+		if (strcmp(column_name, "toa_stdd")) return sizeof(toa_stdd);
+		if (strcmp(column_name, "tot_stdd")) return sizeof(tot_stdd);
+		if (strcmp(column_name, "tot_efficiency")) return sizeof(tot_efficiency);
+		if (strcmp(column_name, "tot_efficiency_error")) return sizeof(tot_efficiency_error);
+		if (strcmp(column_name, "toa_efficiency")) return sizeof(toa_efficiency);
+		if (strcmp(column_name, "toa_efficiency_error")) return sizeof(toa_efficiency_error);
+		return 0;
 	};
 	hid_t get_hdf_type(const char *column_name){
 		if (strcmp(column_name, "chip")) return H5T_NATIVE_INT;
