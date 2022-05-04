@@ -33,11 +33,12 @@ def parse_block_types(data):
 
 
 def get_bits(data, block: str, param: str):
-    regs = data.loc[data['SubBlock'] == block].loc[data['parameter'] == param]
+    regs = data.loc[data['SubBlock'] == block].loc[
+            data['BlockID'] == 0].loc[data['parameter'] == param]
     bits = 0
     for reg in regs.iterrows():
         reg = reg[1]
-        bits = count_bits(reg['reg_mask'])
+        bits += count_bits(reg['reg_mask'])
     return translate_to_hdf_data_type(bits)
 
 
