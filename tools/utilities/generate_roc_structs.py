@@ -86,12 +86,13 @@ def translate_to_hdf_data_type(bit_length):
 
 @click.command()
 @click.argument('register_description', type=click.Path(exists=True))
+@click.argument('code_template', type=click.Path(exists=True))
 @click.argument('output', type=click.Path(exists=False))
-def convert_to_code(register_description, output):
+def convert_to_code(register_description, code_template, output):
     env = Environment(
-            loader=FileSystemLoader(searchpath="."),
+            loader=FileSystemLoader(searchpath="/"),
             )
-    code_template = env.get_template("code_struct_template.cpp")
+    code_template = env.get_template(code_template)
     register_description = pd.read_csv(register_description)
     yaml_lookup_data = generate_yaml_lookup_key(register_description)
     column_data_type = generate_column_data_type(register_description)
@@ -99,7 +100,7 @@ def convert_to_code(register_description, output):
     rendered_template = code_template.render(lookup_table=yaml_lookup_data,
                                              coltype=column_data_type,
                                              block_types=block_types)
-    with open(output, 'w') as f:
+    with open(output, 'w+') as f:
         f.write(rendered_template)
 
 

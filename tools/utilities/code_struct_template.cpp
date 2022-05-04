@@ -26,5 +26,5 @@ static const std::map<std::string, std::vector<std::tuple<std::string, int, std:
 {% endfor %}  return key_lookup;
 };
 
-static const std::map<std::string, std::vector<std::tuple<std::string, int, std::string>>> roc_config_key = generate_roc_config_key_lookup();
+static std::map<std::string, std::vector<std::tuple<std::string, int, std::string>>> roc_config_key = generate_roc_config_key_lookup();
 #endif
