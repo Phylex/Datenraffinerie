@@ -4,7 +4,10 @@
 #define MERGE_SRC_1 "merge_input_1.h5"
 #define MERGE_SRC_2 "merge_input_2.h5"
 #define MERGE_OUT "merge_output_3.h5"
-#define TABLES_OUT "tables_test.h5"
+#define TABLES_OUT1 "tables_test_1.h5"
+#define TABLES_OUT2 "tables_test_2.h5"
+#define MERGED_TABLES_OUT "tables_test_merged.h5"
+
 
 int main() {
 	std::cout << "Create pandas test file" << std::endl;
@@ -91,9 +94,48 @@ int main() {
 	append_file(out_file_id, "data", MERGE_SRC_2);
 	H5Fclose(out_file_id);
 	
-	hid_t tables_file = create_pytables_file(TABLES_OUT);
-	hid_t tables_group = create_pytables_group(tables_file, "test_data", "test the pytables interface");
-	H5Gclose(tables_group);
-	H5Fclose(tables_file);
+	std::cout << "Test pytables functions" << std::endl;
+	/* prepare data and type for the merge */
+	std::vector<hid_t> col_types = {H5T_NATIVE_INT, H5T_NATIVE_INT, H5T_NATIVE_INT, H5T_NATIVE_FLOAT, H5T_NATIVE_FLOAT};
+	std::vector<std::string> col_names = {"this", "that", "something", "else", "other"};
+	hid_t table_type = create_compund_datatype(col_names, col_types);
+	void *buffer = malloc(100 * H5Tget_size(table_type));
+	for (size_t i = 0; i < 100; i++) {
+		char *row = (char *)(buffer) + i * H5Tget_size(table_type);
+		((int *)(row))[0] = i;
+		((int *)(row))[1] = 100 -i;
+		((int *)(row))[2] = i;
+		((float *)((int *)(row) + 3))[0] = 1./100. * i;
+		((float *)((int *)(row) + 3))[1] = 1./100. * (100 - i);
+	}
+
+	hid_t t1_file = create_pytables_file(TABLES_OUT1);
+	hid_t t1_group = create_pytables_group(t1_file, "data", "test the pytables interface");
+	hid_t t1 = create_pytables_table(t1_group, "measurements", table_type, 100);
+	write_buffer_to_pytable(t1, table_type, 100, buffer);
+	write_buffer_to_pytable(t1, table_type, 60, buffer);
+	
+	hid_t t2_file = create_pytables_file(TABLES_OUT2);
+	hid_t t2_group = create_pytables_group(t2_file, "data", "test the pytables interface");
+	hid_t t2 = create_pytables_table(t2_group, "measurements", table_type, 100);
+	write_buffer_to_pytable(t2, table_type, 50, buffer);
+	
+	hid_t tm_file = create_pytables_file(MERGED_TABLES_OUT);
+	hid_t tm_group = create_pytables_group(tm_file, "data", "test the pytables interface");
+	hid_t tm = create_pytables_table(tm_group, "measurements", table_type, 100);
+
+	merge_tables(tm_file, t1_file, "data", "measurements", 10);
+	merge_tables(tm_file, t2_file, "data", "measurements", 12);
+	free(buffer);
+	H5Tclose(table_type);
+	H5Dclose(t1);
+	H5Dclose(t2);
+	H5Dclose(tm);
+	H5Gclose(t1_group);
+	H5Gclose(t2_group);
+	H5Gclose(tm_group);
+	H5Fclose(t1_file);
+	H5Fclose(t2_file);
+	H5Fclose(tm_file);
 	return 0;
 }

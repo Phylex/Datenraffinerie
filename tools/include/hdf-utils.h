@@ -17,6 +17,7 @@ hid_t create_dataset(hid_t root_id, std::string name, const hid_t datatype,
                      const hsize_t drank, const hsize_t *dimensions,
                      const hsize_t *maxdims, const hsize_t *chunk_dims,
                      unsigned int deflate);
+hid_t create_compund_datatype(std::vector<std::string> column_names, std::vector<hid_t> column_types);
 template <typename T>
 herr_t create_numeric_attribute(hid_t root_id, std::string name, hid_t datatype, const T *data) {
   herr_t status;
@@ -62,9 +63,11 @@ void append_file(hid_t dest_file, std::string group_name, std::string filename);
 hid_t create_merge_output_file(std::string output_filename, std::string group_name, std::string input_filename);
 
 /* pytables functions */
+void merge_tables(hid_t merge_file, hid_t input_file, std::string group_name, std::string table_name, hsize_t block_length);
 hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns, bool event_mode);
 hid_t create_pytables_file(std::string filename);
 hid_t create_pytables_group(hid_t parent, std::string name, std::string description);
 hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsize_t chunk_rows);
-
+void write_buffer_to_pytable(hid_t table, hid_t buffer_datatype, hsize_t buffer_size, void* buffer);
+hid_t get_pytable_type(std::string filepath, std::string group_name, std::string table_name);
 #endif

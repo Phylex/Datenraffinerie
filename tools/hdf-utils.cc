@@ -5,6 +5,10 @@
 #include "include/hdf-utils.h"
 #include "include/exceptions.h"
 #include "include/root-tools.h"
+#include <H5Dpublic.h>
+#include <H5Ppublic.h>
+#include <H5Spublic.h>
+#include <string.h>
 
 /**
  * Create an attribute with a UTF-8 string as content attached to the node
@@ -40,8 +44,51 @@ void create_utf8_attribute(hid_t root_id, std::string name, std::string value) {
 	H5Tclose(datatype_id);
 }
 
+bool compare_compound_data_types(hid_t t1, hid_t t2) {
+	int m1 = H5Tget_nmembers(t1);
+	int m2 = H5Tget_nmembers(t2);
+	if (m1 != m2) return false;
+	for (int i = 0; i < m1; i ++) {
+		char *n1 = H5Tget_member_name(t1, i);
+		char *n2 = H5Tget_member_name(t2, i);
+		if (strcmp(n1, n2)) return false;
+		hid_t st1 = H5Tget_member_type(t1, i);
+		hid_t st2 = H5Tget_member_type(t2, i);
+		if (H5Tget_class(st1) != H5Tget_class(st2)) return false;
+		if (H5Tget_class(st1) == H5T_COMPOUND) {
+			if (!compare_compound_data_types(st1, st2)) return false;
+		}
+		if (H5Tget_size(t1) != H5Tget_size(t2)) return false;
+		H5Tclose(st1);
+		H5Tclose(st2);
+	}
+	return true;
+}
+
+
 void create_empty_utf8_attribute(hid_t root_id, std::string attr_name) {
 	create_utf8_attribute(root_id, attr_name, "");
+}
+
+hid_t create_compund_datatype(std::vector<std::string> column_names, std::vector<hid_t> column_types) {
+	hsize_t total_size = 0;
+	std::vector<hsize_t> offsets;
+	for (hid_t type: column_types) {
+		offsets.push_back(total_size);
+		total_size += H5Tget_size(type);
+	}
+	hid_t compound_datatype = H5Tcreate(H5T_COMPOUND, total_size);
+	for (size_t column_idx = 0; column_idx < column_names.size(); column_idx++) {
+		H5Tinsert(compound_datatype, column_names[column_idx].c_str(), offsets[column_idx], column_types[column_idx]);
+	}
+	return compound_datatype;
+}
+
+hid_t get_pytable_type(std::string filepath, std::string group_name, std::string table_name) {
+	hid_t hdf_file = H5Fopen(filepath.c_str(), H5P_DEFAULT, H5P_DEFAULT);
+	hid_t group = H5Gopen(hdf_file, group_name.c_str(), H5P_DEFAULT);
+	hid_t table = H5Dopen(group, table_name.c_str(), H5P_DEFAULT);
+	return H5Dget_type(table);
 }
 
 /** 
@@ -49,12 +96,10 @@ void create_empty_utf8_attribute(hid_t root_id, std::string attr_name) {
  * given the column names of the 
  **/
 hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns, bool event_mode) {
-	size_t data_type_size = 0;
-	std::vector<size_t> offsets;
 	std::vector<std::string> names;
+	std::vector<hid_t> dtypes; 
 	hgcroc_data data;
 	hgcroc_summary_data summary;
-	std::vector<hid_t> dtypes; 
 	for (std::string column: data_columns) {
 		hid_t elem;
 		if (event_mode) {
@@ -63,22 +108,14 @@ hid_t create_compound_datatype_form_columns(std::vector<std::string> data_column
 			elem = summary.get_hdf_type(column.c_str());
 		}
 		dtypes.push_back(elem);
-		offsets.push_back(data_type_size);
 		names.push_back(column);
-		data_type_size += H5Tget_size(elem);
 	} 
 	for (std::string column: config_columns) {
 		hid_t elem = column_type[column];
 		dtypes.push_back(elem);
-		offsets.push_back(data_type_size);
 		names.push_back(column);
-		data_type_size += H5Tget_size(elem);
 	} 
-	hid_t compound_datatype = H5Tcreate(H5T_COMPOUND, data_type_size);
-	for (size_t i=0; i<names.size(); i++) {
-		H5Tinsert(compound_datatype, names[i].c_str(), offsets[i], dtypes[i]);
-	}
-	return compound_datatype;
+	return create_compund_datatype(names, dtypes);
 }
 
 hid_t create_pytables_file(std::string filename) {
@@ -121,11 +158,116 @@ hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsiz
 		std::stringstream name;
 		name << "FIELD_" << i << "_NAME";
 		create_utf8_attribute(dataset, name.str().c_str(), H5Tget_member_name(datatype, i));
-		name.clear();
+		name.str("");
 		name << "FIELD_" << i << "_FILL";
-		create_numeric_attribute<short>(dataset, name.str().c_str(), H5Tget_member_type(datatype, i), 0);
+		short fill_val = 0;
+		create_numeric_attribute<short>(dataset, name.str().c_str(), H5Tget_member_type(datatype, i), &fill_val);
 	}
 	return dataset;
+}
+
+void write_buffer_to_pytable(hid_t table, hid_t buffer_datatype, hsize_t buffer_size, void* buffer){
+	hid_t buffer_dspace = H5Screate_simple(1, &buffer_size, &buffer_size);
+	hid_t table_dspace = H5Dget_space(table);
+	hsize_t *dims;
+	hsize_t *maxdims;
+	hsize_t rank = get_dimensions(table_dspace, &dims, &maxdims);
+	if (rank != 1) {
+		std::cout << "Rank of table is not 1" << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	H5Sclose(table_dspace);
+	dims[0] += buffer_size; 
+	H5Dextend(table, dims);
+	table_dspace = H5Dget_space(table);
+	rank = get_dimensions(table_dspace, &dims, &maxdims);
+	hsize_t new_data_offset = *dims - buffer_size;
+	H5Sselect_hyperslab(table_dspace, H5S_SELECT_SET, &new_data_offset, NULL, &buffer_size, NULL);
+	H5Dwrite(table, buffer_datatype, buffer_dspace, table_dspace, H5P_DEFAULT, buffer);
+	delete[] dims;
+	delete[] maxdims;
+	H5Sclose(table_dspace);
+	H5Sclose(buffer_dspace);
+}
+
+void merge_tables(hid_t merge_file, hid_t input_file, std::string group_name, std::string table_name, hsize_t block_length) {
+	/* open the groups and tables in the output file */
+	hid_t out_group = H5Gopen(merge_file, group_name.c_str(), H5P_DEFAULT);
+	if (out_group == H5I_INVALID_HID) {
+		throw std::runtime_error("Could not open group " + group_name + " in output file");
+	}
+	hid_t out_table = H5Dopen(out_group, table_name.c_str(), H5P_DEFAULT);
+	if (out_table == H5I_INVALID_HID) {
+		throw std::runtime_error("Could not open group " + table_name + " in output file");
+	}
+	hid_t out_dspace = H5Dget_space(out_table);
+	hsize_t *out_dspace_dim;
+	size_t out_trank = get_dimensions(out_dspace, &out_dspace_dim, NULL);
+	H5Sclose(out_dspace);
+	if (out_trank != 1) {
+		std::stringstream error_msg;
+		error_msg << "Table dimension should be 1, dimension is " << out_trank;
+		throw std::runtime_error(error_msg.str());
+	}
+	hid_t merge_type = H5Dget_type(out_table);
+	
+	/* open input file */
+	hid_t in_group = H5Gopen(input_file, group_name.c_str(), H5P_DEFAULT);
+	if (in_group == H5I_INVALID_HID) {
+		throw std::runtime_error("Could not open group " + group_name + " in input file");
+	}
+	hid_t in_table = H5Dopen(in_group, table_name.c_str(), H5P_DEFAULT);
+	if (in_group == H5I_INVALID_HID) {
+		throw std::runtime_error("Could not open table " + table_name + " in input file");
+	}
+	hid_t in_dspace = H5Dget_space(in_table);
+	hsize_t *in_dspace_dim;
+	size_t in_dspace_rank = get_dimensions(in_dspace, &in_dspace_dim, NULL);
+	H5Sclose(in_dspace);
+	if (in_dspace_rank != 1) {
+		std::stringstream error_msg;
+		error_msg << "Table dimension should be 1, dimension is " << in_dspace_rank;
+		throw std::runtime_error(error_msg.str());
+	}
+	hid_t in_type = H5Dget_type(in_table);
+	if (!compare_compound_data_types(merge_type, in_type)) {
+		throw std::runtime_error("Types do not match/are incompatible");
+	}
+
+	/* after having done all the loads and checks, actually copy the data */
+	void *buffer = malloc(block_length * H5Tget_size(in_type));
+	hid_t memspace = H5Screate_simple(1, &block_length, &block_length);
+	hsize_t block_count = in_dspace_dim[0] / block_length;
+	for (hsize_t i = 0; i<block_count; i++) {
+		hid_t block_dspace = H5Dget_space(in_table);
+		hsize_t start = block_length * i;
+		H5Sselect_hyperslab(block_dspace, H5S_SELECT_SET, &start, NULL, &block_length, NULL);
+	  H5Dread(in_table, in_type, memspace, block_dspace, H5P_DEFAULT, buffer);
+		H5Sclose(block_dspace);
+    write_buffer_to_pytable(out_table, in_type, block_length, buffer);
+	}
+	H5Sclose(memspace);
+	hid_t block_dspace = H5Dget_space(in_table);
+	hsize_t start = block_length * block_count;
+	hsize_t last_block_length = in_dspace_dim[0] % block_length; 
+	memspace = H5Screate_simple(1, &last_block_length, &last_block_length);
+	if (last_block_length != 0) {
+		H5Sselect_hyperslab(block_dspace, H5S_SELECT_SET, &start, NULL, &last_block_length, NULL);
+		H5Dread(in_table, in_type, memspace, block_dspace, H5P_DEFAULT, buffer);
+		H5Sclose(block_dspace);
+  	write_buffer_to_pytable(out_table, in_type, last_block_length, buffer);
+	}
+	/* clean up */ 
+	free(buffer);
+	free(in_dspace_dim);
+	free(out_dspace_dim);
+	H5Sclose(memspace);
+	H5Tclose(in_type);
+	H5Tclose(merge_type);
+	H5Gclose(out_group);
+	H5Dclose(out_table);
+	H5Gclose(in_group);
+	H5Dclose(in_table);
 }
 
 hid_t create_dataset(hid_t root_id, std::string name, const hid_t datatype,
@@ -446,7 +588,6 @@ void extend_axis0(hid_t group_id, std::vector<std::string> block_columns) {
 	H5Sclose(axis_space);
 	H5Dclose(axis);
 };
-
 
 void extend_axis1(hid_t axis1, hsize_t new_min_size) {
 	hsize_t *ax_dim, *ax_maxdim;
