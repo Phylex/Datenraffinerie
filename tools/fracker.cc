@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
 	hid_t data_file = create_pytables_file(output_path);
 	hid_t data_group = create_pytables_group(data_file, "data", "");
 	hid_t table_type = create_compound_datatype_form_columns(data_columns, config_columns, event_mode);
-	hid_t table = create_pytables_table(data_group, "events", table_type, 100000);
+	hid_t table = create_pytables_table(data_group, "measurements", table_type, 100000);
 
 	/* create the cache from the rows of the table */
 	std::map<CacheKey, std::vector<long long>> cache = generate_hgcroc_config_cache<long long>(run_config, columns);
@@ -148,33 +148,34 @@ int main(int argc, char **argv) {
 			measurement_tree->GetEntry(row);
 			CacheKey key;
 			if (event_mode) {
-				key = CacheKey(chip, channel, half);
+				key = CacheKey(e_chip, e_channel, half);
 				key = transform_event_row_to_cache_key(key);
 			} else {
 				key = CacheKey(chip, channel, channeltype);
 			}
-			std::vector<long long> row_config = cache[key];
-			long long row_config_elem;
+			//std::cout << "key: chip=" << std::get<0>(key) << " channel=" << std::get<1>(key) << " channeltype=" << std::get<2>(key) << std::endl;
 			/* copy the data from the root file and the config into the m_block_buffer */
 			for ( size_t i = 0; i < H5Tget_nmembers(table_type);  i ++) {
 				hid_t member_type = H5Tget_member_type(table_type, i);
 				size_t member_size = H5Tget_size(member_type);
+				char * member_name = H5Tget_member_name(table_type, i);
+				H5Tclose(member_type);
 				char *elem;
 				if (i < data_columns.size()) {
 					if (event_mode) {
-						elem = (char *)d_buffer.get_pointer_to_entry(H5Tget_member_name(table_type, i));
+						elem = (char *)d_buffer.get_pointer_to_entry(member_name);
 					} else {
-						elem = (char *)summary_buffer.get_pointer_to_entry(H5Tget_member_name(table_type, i));
+						elem = (char *)summary_buffer.get_pointer_to_entry(member_name);
 					}
 				} else {
-					row_config_elem = row_config[i - data_columns.size()];
-					elem = (char *)&row_config_elem;
+					elem = (char *)&(cache[key].data()[i - data_columns.size()]);
 				}
 				for (int byteno = 0; byteno < member_size; byteno++) {
 					// this is the actual copy step
 					// the use of pointers is necessary to avoid lots of code to cast the members into the correct sizes
 					*((char *)(m_block_buffer) + (row % block_size) * H5Tget_size(table_type) + H5Tget_member_offset(table_type, i) + byteno) = *(elem+byteno);
 				}
+				free(member_name);
 			}
 		}
 		/* this value is needed to determine how much of the buffer needs to be written into the hdf file */
