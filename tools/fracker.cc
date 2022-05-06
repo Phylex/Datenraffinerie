@@ -109,6 +109,9 @@ int main(int argc, char **argv) {
 	int e_chip;
 	int half;
 	int e_channel;
+	void *key_chip_source = NULL;
+	void *key_channel_source = NULL;
+	void *key_half_source = NULL;
 	/* get the size of the data in the root file */
 	size_t total_rows = measurement_tree->GetEntries();
 	size_t blocks = total_rows / block_size + 1;
@@ -117,10 +120,16 @@ int main(int argc, char **argv) {
 		measurement_tree->SetBranchAddress("chip", &e_chip);
 		measurement_tree->SetBranchAddress("half", &half);
 		measurement_tree->SetBranchAddress("channel", &e_channel);
+		key_channel_source = &e_channel;
+		key_chip_source = &e_chip;
+		key_half_source = &half;
 	} else {
 		measurement_tree->SetBranchAddress("chip", &chip);
 		measurement_tree->SetBranchAddress("channeltype", &channeltype);
 		measurement_tree->SetBranchAddress("channel", &channel);
+		key_channel_source = &channel;
+		key_chip_source = &chip;
+		key_half_source = &channeltype;
 	}
 
 	/* link the elements of the root tree to the small local buffer */
@@ -135,6 +144,10 @@ int main(int argc, char **argv) {
 			std::cout << "Invalid data column passed to fracker" << std::endl;
 			exit(EXIT_FAILURE);
 		}
+		if (data_columns[i] == "chip") key_chip_source = data_member_pointer;
+		else if (data_columns[i] == "channel") key_channel_source = data_member_pointer;
+		else if (data_columns[i] == "half") key_half_source = data_member_pointer;
+		else if (data_columns[i] == "channeltype") key_half_source = data_member_pointer;
 		measurement_tree->SetBranchAddress(data_columns[i].c_str(), data_member_pointer);
 	}
 
@@ -148,12 +161,15 @@ int main(int argc, char **argv) {
 			measurement_tree->GetEntry(row);
 			CacheKey key;
 			if (event_mode) {
-				key = CacheKey(e_chip, e_channel, half);
+				key = CacheKey(*((int *)key_chip_source), *((int *)key_channel_source), *((int *)key_half_source));
 				key = transform_event_row_to_cache_key(key);
 			} else {
-				key = CacheKey(chip, channel, channeltype);
+				key = CacheKey(*((int *)key_chip_source), *((short *)key_channel_source), *((short *)key_half_source));
 			}
-			//std::cout << "key: chip=" << std::get<0>(key) << " channel=" << std::get<1>(key) << " channeltype=" << std::get<2>(key) << std::endl;
+			if (!validate_key(key)) {
+				std::cout << "Key is invalid. Chip=" << std::get<0>(key) << " Channel=" << std::get<1>(key) << " Type=" << std::get<2>(key) << std::endl;
+				exit(EXIT_FAILURE);
+			}
 			/* copy the data from the root file and the config into the m_block_buffer */
 			for ( size_t i = 0; i < H5Tget_nmembers(table_type);  i ++) {
 				hid_t member_type = H5Tget_member_type(table_type, i);

@@ -1,5 +1,13 @@
 #include "include/hgcroc_caching.h"
 
+bool validate_key(CacheKey key) {
+	if (std::get<0>(key) > 6 || std::get<0>(key) < 0) return false;
+	if (std::get<1>(key) > 71 || std::get<1>(key) < 0) return false;
+	if (std::get<2>(key) != 1 && std::get<2>(key) != 0 && std::get<2>(key) != 100) return false;
+	return true;
+}
+
+
 CacheKey transform_event_row_to_cache_key(CacheKey row_key) {
 	unsigned int chip = std::get<0>(row_key);
 	unsigned int channel = std::get<1>(row_key);

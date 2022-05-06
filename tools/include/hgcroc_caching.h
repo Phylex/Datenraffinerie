@@ -50,6 +50,8 @@ using CacheKey = std::tuple<unsigned int, unsigned int, unsigned int>;
 
 std::vector<CacheKey> generate_cache_key(int roc, std::string block_name, int block_number);
 CacheKey transform_event_row_to_cache_key(CacheKey row_key);
+bool validate_key(CacheKey key);
+
 
 template<typename T>
 std::map<CacheKey, std::vector<T>> generate_hgcroc_config_cache(YAML::Node config, std::vector<std::string> columns){
