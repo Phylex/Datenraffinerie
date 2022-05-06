@@ -7,7 +7,7 @@ CacheKey transform_event_row_to_cache_key(CacheKey row_key) {
 	unsigned int out_channel;
 	unsigned int out_type;
 	if (channel <= 35) {
-		out_channel = channel * (half + 1);
+		out_channel = channel + (half * 36);
 		out_type = 0;
 	} else if (channel == 36) {
 		out_channel = half;
