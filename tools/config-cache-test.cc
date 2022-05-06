@@ -34,7 +34,7 @@ int main() {
 	}
 	std::cout << std::endl;
 
-	std::map<CacheKey, std::vector<int>> cache = generate_hgcroc_config_cache<int>(config, columns);
+	std::map<CacheKey, std::vector<long>> cache = generate_hgcroc_config_cache<long>(config, columns);
 	unsigned int channel_types[] = {0, 1, 100};
 	for (unsigned int i = 0; i < 3; i++) {
 		for (auto &type: channel_types) {
@@ -49,5 +49,10 @@ int main() {
 				std::cout << "]" << std::endl;
 			}
 		}
+	}
+	for (size_t i = 0; i < 10000000; i++) {
+		int channel = i % 72;
+		CacheKey key(1, i, 0);
+		std::vector<long> cache_row = cache[key];
 	}
 }
