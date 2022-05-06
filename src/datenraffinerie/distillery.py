@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 import pandas as pd
+from analysis_utilities import read_dataframe_chunked
 from .config_utilities import unfreeze
 from .errors import OutputError
 
@@ -73,16 +74,13 @@ class Distillery(luigi.Task):
         """
         # import the class definition
         analysis = self.import_analysis(self.analysis_module_path,
-                                            self.python_module)
+                                        self.python_module)
         # instantiate an analysis object from the imported analysis class
         analysis = analysis(unfreeze(self.parameters))
 
         # open and read the data
-        if not self.event_mode:
-            data = pd.read_hdf(self.input().path)
-        else:
-            data = pd.HDFStore(self.input().path, mode='r')
-        analysis.run(data, self.output_dir)
+        data_iter = read_dataframe_chunked(self.input().path, 1000000)
+        analysis.run(data_iter, self.output_dir)
 
     @staticmethod
     def import_analysis(distillery_path: str, name: str):
