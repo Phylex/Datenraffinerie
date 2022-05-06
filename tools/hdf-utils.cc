@@ -61,6 +61,8 @@ bool compare_compound_data_types(hid_t t1, hid_t t2) {
 		if (H5Tget_size(t1) != H5Tget_size(t2)) return false;
 		H5Tclose(st1);
 		H5Tclose(st2);
+		free(n1);
+		free(n2);
 	}
 	return true;
 }
@@ -184,8 +186,8 @@ void write_buffer_to_pytable(hid_t table, hid_t buffer_datatype, hsize_t buffer_
 	hsize_t new_data_offset = *dims - buffer_size;
 	H5Sselect_hyperslab(table_dspace, H5S_SELECT_SET, &new_data_offset, NULL, &buffer_size, NULL);
 	H5Dwrite(table, buffer_datatype, buffer_dspace, table_dspace, H5P_DEFAULT, buffer);
-	delete[] dims;
-	delete[] maxdims;
+	free(dims);
+  free(maxdims);
 	H5Sclose(table_dspace);
 	H5Sclose(buffer_dspace);
 }
