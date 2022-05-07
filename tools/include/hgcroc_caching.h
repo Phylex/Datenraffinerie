@@ -73,11 +73,16 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_config_cache(YAML::Node confi
 	} else {
 		roc_config = config;
 	}
+	// the older versions of the datenraffinerie encode network info
+	// in the target configuration so it needs to be removed
+	int roc_count = roc_config.size();
+	if (roc_config["hostname"]) roc_count --;
+	if (roc_config["port"]) roc_count --;
 
 	for (std::string column: filtered_columns) {
 		for(auto yaml_key: roc_config_key[column]) {
-			for (int i=0; i<roc_config.size(); i++) {
-				std::vector<CacheKey> cache_keys = generate_cache_key(i, std::get<0>(yaml_key), std::get<1>(yaml_key));
+			for (int roc=0; roc<roc_count; roc++) {
+				std::vector<CacheKey> cache_keys = generate_cache_key(roc, std::get<0>(yaml_key), std::get<1>(yaml_key));
 				for (auto key: cache_keys) {
 					std::vector<T> entry;
 					if(cache.find(key) != cache.end()) {
