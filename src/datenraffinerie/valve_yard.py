@@ -109,7 +109,8 @@ class ValveYard(luigi.Task):
                                   analysis_module_path=self.analysis_module_path,
                                   network_config=self.network_config,
                                   loop=self.loop,
-                                  event_mode=procedure['event_mode'])
+                                  event_mode=procedure['event_mode'],
+                                  sort_by=procedure['iteration_columns'])
             if procedure['type'] == 'daq':
                 if len(procedure['parameters']) == 1 and self.loop:
                     return Fracker(identifier=0,

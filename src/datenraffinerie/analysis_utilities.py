@@ -43,6 +43,14 @@ def cartesian(arrays, dtype=np.float32):
     return out
 
 
+def read_whole_dataframe(pytables_filepath):
+    dfile = tables.open_file(pytables_filepath, 'r')
+    table = dfile.root.data.measurements
+    df = pd.DataFrame.from_records(table.read())
+    dfile.close()
+    return df
+
+
 def read_dataframe_chunked(pytables_filepath,
                            iterateion_column: Union[str, Sequence[str]],
                            logger: logging.Logger):

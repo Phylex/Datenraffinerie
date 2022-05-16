@@ -462,9 +462,15 @@ def parse_analysis_config(config: dict) -> tuple:
         raise ConfigFormatError("The analysis configuration needs"
                                 " a python_module_name field") from err
     # parse the daq that is required for the analysis
-    if 'daq' not in config.keys():
-        raise ConfigFormatError("an analysis must specify a daq task")
-    daq = config['daq']
+    try:
+        daq = config['daq']
+    except KeyError as err:
+        raise ConfigFormatError("an analysis must specify a daq task") from err
+
+    try:
+        iteration_columns = config['sort_by_column']
+    except KeyError:
+        iteration_columns = None
 
     analysis_parameters = {}
     if 'parameters' in config.keys():
@@ -472,7 +478,8 @@ def parse_analysis_config(config: dict) -> tuple:
             raise ConfigFormatError("The parameters of an analysis must be"
                                     " a dictionary")
         analysis_parameters = config['parameters']
-    return {'parameters': analysis_parameters,
+    return {'iteration_columns': iteration_columns,
+            'parameters': analysis_parameters,
             'event_mode': event_mode,
             'daq': daq,
             'python_module': analysis_object_name,
