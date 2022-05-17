@@ -20,6 +20,7 @@ int main(int argc, char **argv) {
 	std::vector<std::string> columns;
 	bool iterable;
 	unsigned int block_size;
+	unsigned int compression;
 
 	/* set up the options of the command */
 	app.add_option("-d", default_config_path, "default config of the target")
@@ -35,6 +36,8 @@ int main(int argc, char **argv) {
 	app.add_option("-s", columns, "The selection of columns that should appear in the output data");
 	app.add_option("-o", output_path, "path to the output containing the data and config specified");
 	app.add_option("-t", iterable, "specify if the output file should be iterable");
+	app.add_option("-p", compression, "specify how tightly to pack (compress) the data. 0 = no compression 9 = max compression")
+		->default_val(0);
 
 	/* parse the options */
 	try {
@@ -87,7 +90,7 @@ int main(int argc, char **argv) {
 	hid_t data_file = create_pytables_file(output_path);
 	hid_t data_group = create_pytables_group(data_file, "data", "");
 	hid_t table_type = create_compound_datatype_form_columns(data_columns, config_columns, event_mode);
-	hid_t table = create_pytables_table(data_group, "measurements", table_type, 100000);
+	hid_t table = create_pytables_table(data_group, "measurements", table_type, block_size, compression);
 
 	/* create the cache from the rows of the table */
 	std::map<CacheKey, std::vector<long long>> cache = generate_hgcroc_config_cache<long long>(run_config, columns);

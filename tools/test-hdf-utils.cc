@@ -111,18 +111,18 @@ int main() {
 
 	hid_t t1_file = create_pytables_file(TABLES_OUT1);
 	hid_t t1_group = create_pytables_group(t1_file, "data", "test the pytables interface");
-	hid_t t1 = create_pytables_table(t1_group, "measurements", table_type, 100);
+	hid_t t1 = create_pytables_table(t1_group, "measurements", table_type, 100, 0);
 	write_buffer_to_pytable(t1, table_type, 100, buffer);
 	write_buffer_to_pytable(t1, table_type, 60, buffer);
 	
 	hid_t t2_file = create_pytables_file(TABLES_OUT2);
 	hid_t t2_group = create_pytables_group(t2_file, "data", "test the pytables interface");
-	hid_t t2 = create_pytables_table(t2_group, "measurements", table_type, 100);
+	hid_t t2 = create_pytables_table(t2_group, "measurements", table_type, 100, 0);
 	write_buffer_to_pytable(t2, table_type, 50, buffer);
 	
 	hid_t tm_file = create_pytables_file(MERGED_TABLES_OUT);
 	hid_t tm_group = create_pytables_group(tm_file, "data", "test the pytables interface");
-	hid_t tm = create_pytables_table(tm_group, "measurements", table_type, 100);
+	hid_t tm = create_pytables_table(tm_group, "measurements", table_type, 100, 0);
 
 	merge_tables(tm_file, t1_file, "data", "measurements", 10);
 	merge_tables(tm_file, t2_file, "data", "measurements", 12);
