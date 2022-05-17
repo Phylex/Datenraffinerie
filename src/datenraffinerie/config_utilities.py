@@ -468,7 +468,7 @@ def parse_analysis_config(config: dict) -> tuple:
         raise ConfigFormatError("an analysis must specify a daq task") from err
 
     try:
-        iteration_columns = config['sort_by_column']
+        iteration_columns = config['iteration_columns']
     except KeyError:
         iteration_columns = None
 

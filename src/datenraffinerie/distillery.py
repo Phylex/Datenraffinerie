@@ -3,8 +3,8 @@ import importlib
 import os
 import sys
 from pathlib import Path
-from analysis_utilities import read_dataframe_chunked
-from analysis_utilities import read_whole_dataframe
+from .analysis_utilities import read_dataframe_chunked
+from .analysis_utilities import read_whole_dataframe
 from .config_utilities import unfreeze
 from .errors import OutputError
 
