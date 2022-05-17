@@ -60,7 +60,7 @@ def read_dataframe_chunked(pytables_filepath,
         iteration_elements = []
         for ic in iterateion_column:
             try:
-                iteration_elements.append(set(getattr(table.cols, ic)))
+                iteration_elements.append(list(set(getattr(table.cols, ic))))
             except AttributeError as e:
                 columns = ', '.join([col for col in dir(table.cols)
                                      if not col.startswith('_')])
@@ -70,7 +70,7 @@ def read_dataframe_chunked(pytables_filepath,
                 raise e
     else:
         try:
-            iteration_elements = [set(getattr(table.cols, iterateion_column))]
+            iteration_elements = [list(set(getattr(table.cols, iterateion_column)))]
             iterateion_column = [iterateion_column]
         except AttributeError as e:
             columns = ', '.join([col for col in dir(table.cols)
