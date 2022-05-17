@@ -82,11 +82,11 @@ class Distillery(luigi.Task):
         analysis = analysis(unfreeze(self.parameters))
 
         # open and read the data
-        if self.sort_by is None:
+        if not self.raw:
             analysis.run(read_whole_dataframe(self.input().path),
                          self.output_dir)
         else:
-            data_iter = read_dataframe_chunked(self.input().path, self.sort_by)
+            data_iter = read_dataframe_chunked([i.path for i in self.input()])
             analysis.run(data_iter, self.output_dir)
 
     @staticmethod

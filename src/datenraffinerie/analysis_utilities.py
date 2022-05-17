@@ -51,41 +51,12 @@ def read_whole_dataframe(pytables_filepath):
     return df
 
 
-def read_dataframe_chunked(pytables_filepath,
-                           iterateion_column: Union[str, Sequence[str]],
+def read_dataframe_chunked(pytables_filepaths,
                            logger: logging.Logger):
-    dfile = tables.open_file(pytables_filepath)
-    table = dfile.root.data.measurements
-    if isinstance(iterateion_column, list):
-        iteration_elements = []
-        for ic in iterateion_column:
-            try:
-                iteration_elements.append(list(set(getattr(table.cols, ic))))
-            except AttributeError as e:
-                columns = ', '.join([col for col in dir(table.cols)
-                                     if not col.startswith('_')])
-                logger.ctritical(f"The column {ic} can't be found in\
-                        the table {pytables_filepath}\
-                    columns are: {columns}")
-                raise e
-    else:
-        try:
-            iteration_elements = [list(set(getattr(table.cols, iterateion_column)))]
-            iterateion_column = [iterateion_column]
-        except AttributeError as e:
-            columns = ', '.join([col for col in dir(table.cols)
-                                 if not col.startswith('_')])
-            logger.ctritical(f"The column {ic} can't be found in the table"
-                             f" {pytables_filepath} columns are: {columns}")
-            raise e
-
-    for elem in cartesian(iteration_elements):
-        selection = " & ".join([f"({c} == {v})" for c, v in
-                                zip(iterateion_column, elem)])
-        param_dict = {}
-        for c, v in zip(iterateion_column, elem):
-            param_dict[c] = v
-        yield param_dict, pd.DataFrame.from_records(table.read_where(selection))
+    for filepath in pytables_filepaths:
+        dfile = tables.open_file(filepath)
+        table = dfile.root.data.measurements
+        yield pd.DataFrame.from_records(table.read())
     dfile.close()
 
 
