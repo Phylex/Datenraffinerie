@@ -178,13 +178,13 @@ class ValveYard(luigi.Task):
 
     @staticmethod
     def detrmin_daq_mode(root_config_path, procedure_name):
-        procedures, workflows = cfu.parse_config_file(self.root_config_file)
+        procedures, workflows = cfu.parse_config_file(root_config_path)
         try:
-            procedure = procedures[self.procedure_label]
+            procedure = procedures[procedure_name]
             if procedure['raw']:
                 return "event_mode"
         except KeyError:
-            workflow = workflows[self.procedure_label]
+            workflow = workflows[procedure_name]
             for procedure in workflow['tasks']:
                 if procedure['raw']:
                     return "event_mode"
