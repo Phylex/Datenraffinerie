@@ -179,14 +179,43 @@ class ValveYard(luigi.Task):
     @staticmethod
     def detrmin_daq_mode(root_config_path, procedure_name):
         procedures, workflows = cfu.parse_config_file(root_config_path)
-        try:
-            procedure = procedures[procedure_name]
-            if procedure['raw']:
-                return "event_mode"
-        except KeyError:
-            workflow = workflows[procedure_name]
-            for procedure in workflow['tasks']:
+        procedure_names = list(map(lambda p: p['name'], procedures))
+        workflow_names = list(map(lambda w: w['name'], workflows))
+        procedure = None
+        workflow = None
+        if procedure_name in procedure_names:
+            try:
+                procedure_index = procedure_names.index(procedure_name)
+            except ValueError:
+                logger.critical(f'{procedure_name} is not in the list of procedures of {root_config_path}')
+                return None
+            procedure = procedures[procedure_index]
+        elif procedure_name in workflow_names:
+            try:
+                workflow_index = workflow_names.index(procedure_name)
+                workflow = workflows[workflow_index]
+            except ValueError as e:
+                logger.critical(f"{procedure_name} is not in the list of workflows of {root_config_path}")
+        else:
+            raise ctrl.DAQConfigError(f"No '{procedure_name}' found in"
+                                      f" the config file {root_config_path}")
+        if procedure is not None:
+            try:
                 if procedure['raw']:
                     return "event_mode"
+            except KeyError:
+                    pass
+        else:
+            for procedure_name in workflow['tasks']:
+                try:
+                    procedure_index = procedure_names.index(procedure_name)
+                    procedure = procedures[procedure_index]
+                except IndexError:
+                    continue
+                try:
+                    if procedure['raw']:
+                        return "event_mode"
+                except KeyError:
+                    pass
         return "summary_mode"
 
