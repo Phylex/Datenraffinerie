@@ -91,6 +91,17 @@ int main(int argc, char **argv) {
 	hid_t data_group = create_pytables_group(data_file, "data", "");
 	hid_t table_type = create_compound_datatype_form_columns(data_columns, config_columns, event_mode);
 	hid_t table = create_pytables_table(data_group, "measurements", table_type, block_size, compression);
+	/* prepare the information that is needed later in the loop to avoid costly operations */
+	unsigned int table_member_count = H5Tget_nmembers(table_type);
+	size_t table_size = H5Tget_size(table_type);
+	unsigned char *member_sizes = (unsigned char *)malloc(table_member_count * sizeof(char));
+	unsigned int *member_offset = (unsigned int *)malloc(table_member_count * sizeof(unsigned int));
+	char **member_names  = (char **)malloc(table_member_count * sizeof(char *));
+	for (int i = 0; i < table_member_count; i++) {
+		member_sizes[i] = H5Tget_size(H5Tget_member_type(table_type, i));
+		member_offset[i] = H5Tget_member_offset(table_type, i);
+		member_names[i] = H5Tget_member_name(table_type, i);
+	}
 
 	/* create the cache from the rows of the table */
 	std::map<CacheKey, std::vector<long long>> cache = generate_hgcroc_config_cache<long long>(run_config, columns);
@@ -104,6 +115,24 @@ int main(int argc, char **argv) {
 	/* set up the arrays to buffer the data between the root and hdf files */
 	hgcroc_data d_buffer;
 	hgcroc_summary_data summary_buffer;
+	/* initialize a vector with the pointers to the members so that strcmp can be avoided in the main loop */
+	void **data_member_pointers = (void **)malloc(data_columns.size() * sizeof(void *));
+	for (int i = 0; i < data_columns.size(); i ++) {
+		if (event_mode) {
+			data_member_pointers[i] = d_buffer.get_pointer_to_entry(data_columns[i].c_str());
+			if (data_member_pointers[i] == NULL) {
+				std::cout << "Invalid data column passed to fracker" << std::endl;
+				exit(EXIT_FAILURE);
+			}
+		} else {
+			data_member_pointers[i] = summary_buffer.get_pointer_to_entry(data_columns[i].c_str());
+			if (data_member_pointers[i] == NULL) {
+				std::cout << "Invalid data column passed to fracker" << std::endl;
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
+
 	
 	/* set up the  values holding the cache key info */
 	unsigned int chip;
@@ -137,21 +166,11 @@ int main(int argc, char **argv) {
 
 	/* link the elements of the root tree to the small local buffer */
 	for (size_t i = 0; i < data_columns.size(); i++) {
-		void *data_member_pointer;
-		if (event_mode) {
-			data_member_pointer = d_buffer.get_pointer_to_entry(data_columns[i].c_str());
-		} else {
-			data_member_pointer = summary_buffer.get_pointer_to_entry(data_columns[i].c_str());
-		}
-		if (data_member_pointer == NULL) {
-			std::cout << "Invalid data column passed to fracker" << std::endl;
-			exit(EXIT_FAILURE);
-		}
-		if (data_columns[i] == "chip") key_chip_source = data_member_pointer;
-		else if (data_columns[i] == "channel") key_channel_source = data_member_pointer;
-		else if (data_columns[i] == "half") key_half_source = data_member_pointer;
-		else if (data_columns[i] == "channeltype") key_half_source = data_member_pointer;
-		measurement_tree->SetBranchAddress(data_columns[i].c_str(), data_member_pointer);
+		if (data_columns[i] == "chip") key_chip_source = data_member_pointers[i];
+		else if (data_columns[i] == "channel") key_channel_source = data_member_pointers[i];
+		else if (data_columns[i] == "half") key_half_source = data_member_pointers[i];
+		else if (data_columns[i] == "channeltype") key_half_source = data_member_pointers[i];
+		measurement_tree->SetBranchAddress(data_columns[i].c_str(), data_member_pointers[i]);
 	}
 
 	/* run through the root file, retrieve the config from the cache entries and write the output */
@@ -169,32 +188,24 @@ int main(int argc, char **argv) {
 			} else {
 				key = CacheKey(*((int *)key_chip_source), *((short *)key_channel_source), *((short *)key_half_source));
 			}
-			if (!validate_key(key)) {
-				std::cout << "Key is invalid. Chip=" << std::get<0>(key) << " Channel=" << std::get<1>(key) << " Type=" << std::get<2>(key) << std::endl;
-				exit(EXIT_FAILURE);
-			}
+			/* assume the key is valid */
+			//if (!validate_key(key)) {
+			//	std::cout << "Key is invalid. Chip=" << std::get<0>(key) << " Channel=" << std::get<1>(key) << " Type=" << std::get<2>(key) << std::endl;
+			//	exit(EXIT_FAILURE);
+			//}
 			/* copy the data from the root file and the config into the m_block_buffer */
-			for ( size_t i = 0; i < H5Tget_nmembers(table_type);  i ++) {
-				hid_t member_type = H5Tget_member_type(table_type, i);
-				size_t member_size = H5Tget_size(member_type);
-				char * member_name = H5Tget_member_name(table_type, i);
-				H5Tclose(member_type);
+			for ( size_t i = 0; i < table_member_count;  i ++) {
 				char *elem;
 				if (i < data_columns.size()) {
-					if (event_mode) {
-						elem = (char *)d_buffer.get_pointer_to_entry(member_name);
-					} else {
-						elem = (char *)summary_buffer.get_pointer_to_entry(member_name);
-					}
+					elem = (char *)data_member_pointers[i];
 				} else {
 					elem = (char *)&(cache[key].data()[i - data_columns.size()]);
 				}
-				for (int byteno = 0; byteno < member_size; byteno++) {
+				for (int byteno = 0; byteno < member_sizes[i]; byteno++) {
 					// this is the actual copy step
 					// the use of pointers is necessary to avoid lots of code to cast the members into the correct sizes
-					*((char *)(m_block_buffer) + (row % block_size) * H5Tget_size(table_type) + H5Tget_member_offset(table_type, i) + byteno) = *(elem+byteno);
+					*((char *)(m_block_buffer) + (row % block_size) * table_size + member_offset[i] + byteno) = *(elem+byteno);
 				}
-				free(member_name);
 			}
 		}
 		/* this value is needed to determine how much of the buffer needs to be written into the hdf file */
@@ -206,6 +217,12 @@ int main(int argc, char **argv) {
 		write_buffer_to_pytable(table, table_type, write_row_count, m_block_buffer);
 	}
 	/* clean up */
+	for (int i = 0; i < table_member_count; i ++) {
+		free(member_names[i]);
+	}
+	free(member_names);
+	free(member_offset);
+	free(member_sizes);
 	free(m_block_buffer);
 	H5Dclose(table);
 	H5Tclose(table_type);
