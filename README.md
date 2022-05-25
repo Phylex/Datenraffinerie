@@ -1,10 +1,16 @@
 # Datenraffinerie
 
-A tool to acquire and analyse HGCROCv3 Data for the HGCAL subdetector of the CMS at CERN.
+The Datenraffinerie is a tool to acquire data from the various frontend systems of HGCAL and provide a framework
+for online and offline analyses to plug in to. The Datenraffinerie automates the entire DAQ process for test
+systems from a user perspective. It handles configuration of the DAQ system and target and conversion of the
+data from the target system into a pandas DataFrame, simplifying the life of the analysis developer.
 
-To characterise the HGCROCv3 many measurements need to be acquired using different chip configurations. As the HGCROCv3 has built-in testing circuits
-these are used for chip characterisation. The Datenraffinerie is a tool/framework that tries to simplify the execution of such data acquisition and
-analysis tasks.
+The Datenraffinerie can create multidimensional scans through the target parameter space, making it the ideal
+tool for characterizing and calibrating the Frontend electronics. 
+
+To specify the DAQ procedure the User specifies all necessary Information in a yaml file that serves as
+configuration for the system. The configuration specifies the power-on state of the system, the initial state
+of the system before running a measurement, and the range/values of the parameters to be scanned over.
 
 ## Definition of the Terms used in this Document
 - Target: The device/system that acquires the measurements and accepts the configuration. This can be either an LD/HD Hexaboard or a
@@ -12,13 +18,12 @@ Single-roc-tester. In future the Train might also be supported.
 - backend: The combination of both the daq system and the Target.
 - Procedure: A sequence of steps that are performed together and use a common configuration. Examples of procedures are daq-procedures that acquire
 measurements from a target; analysis-procedures take the data acquired by daq-procedures and try to derive meaningful insights from that.
-- Task: The smallest unit of a procedure. This term is taken from the library luigi used in this framework. A task produces a file at completion.
+- Run: Procedures are made up of at least one run. A run consists of two steps: configuration of the daq system and target, and collection of data for the previously loaded data. The data measured during a run is measured from a single point in the targets configuration parameter space. is a data acquisition that happens for a single configuration of the chip.
 - Acquisition: The procedure that acquires data from the target also known as daq-procedure
 - Analysis: An analysis takes data that was acquired during an acquisition and derives some sort of 'insight' from it. An 'insight' might be a plot or
 the decision to keep/discard the chip that the data was acquired on.
-- Distillery: Analyses are performed in 'Distilleries' which are the part of the datenraffinerie framework and provide the analysis code with the data
-and the output directory where the analysis is expected to place it's outputs.
-
+- Distillery: Analyses are performed in 'Distilleries' which are the part of the datenraffinerie framework and provide the analysis code with the environment they run in.
+  
 ## Installation
 ### PyPi
 The Datenraffinerie is available on pypi. This means that it can be installed via pip. To be able to use the datenraffine Python 3.9 is needed. Python 2
@@ -76,7 +81,7 @@ $ cmake ..
 $ sudo make install
 ```
 
-This installs the `fracker` program onto the system. After running the above commands the fracker command should be available on the command line.
+This installs the `fracker` and `turbo-pump` program onto the system. After running the above commands the fracker command should be available on the command line.
 
 ## Running Datenraffinerie
 After the installation the command `datenraffinerie` is available.
@@ -96,17 +101,38 @@ As the Datenraffinerie was designed for the use of parallel processes, it is cap
 parallel tasks can be specified by setting the number of `workers` with the `-w` option. The default for this option is 1, so without setting
 this value explicitly it will not run in parallel.
 
-## Concepts
-The Datenraffinerie expresses the Creation of plots as a sequence of two types of procedures. There is a DAQ procedure and an Analysis procedure.
-A daq-procedure acquires data from the target system. As most Measurements are scans of a multi dimensional phase space, the daq system was designed
+## Concepts and Design
+The main task that the Datenraffinerie was designed for is to acquire data from DUTs and provide this data to user provided analysis code in a consistent format.
+The user provided analysis code can then extract the desired information from the Data and either visualize it as plots or generate reports from it.
+
+The creation of reports and plots happens in a two step process. First the Datenraffinerie needs to acquire the data. This happens during the daq-procedure. At the end of the DAQ procedure the Data is available as a pandas `DataFrame` stored as an HDF file inside the directory specified by the user.
+If specified the Datenraffinerie will then run the analysis-procedure using the data acquired from the previously run DAQ procedure.
+
+### The Analysis procedure
+It is assumed that analysis code changes often and is provided by the user. Therefore the Datenraffinerie tries
+to make the creation of new analyses as easy as possible. This is accomplished by defining a minimal interface
+for analyses that define input and output of the analyses so that the Datenraffinerie can place the outputs into
+the proper locations along with providing the analysis with the correct data to work on.
+The module that contains the Analysis code is loaded at runtime by the Datenraffinerie and is desigend to run
+custom analysis code, see [writing a custom Distillery](#Writing a custom Distillery).
+If the custom distillery needs any sort of configuration it can be specified in the corresponding analysis
+configuration. The configuration is in a very similar format to the configuration of the daq system and provided as a yaml file.
+
+### The DAQ procedure
+To acquire data, it is necessary to define the configuration with which the data should be captured and what state of the DAQ system e.g. the hexactontroller
+is needed to properly acquire the data. These configurations along with the specifications of the different target/daq configurations data should be
+acquired.
+
+The DAQ procedure is a set of a least one run. Every run starts by configuring the DAQ and DUT systems and then collecting data from the target.
+The output of a run is a single HDF file in the data directory for the corresponding DAQ procedure. At the end of the DAQ procedure all these files
+are combined into a single file, that is then passed to the Analysis.
+As most Measurements/DAQ-procedures are scans of the multi dimensional configuration phase space of the DUT, the daq system was designed
 to make these kind of phase space scans as easy as possible. A daq procedure that is configured with a list of multiple parameter scans will combine
 them into a Cartesian product of the parameters and performs a measurement for every target configuration from that Cartesian product space.
 The daq-procedure is fully configurable, the daq-task structure is derived from a yaml configuration, see [configuratoin](#Configuration) for details.
 
-Analyses (also called Distilleries in the context of the Datenraffinerie) derive useful information from the data provided by the acquisitions.
-The module that contains the Analysis code is loaded at runtime by the Datenraffinerie and is desigend to run custom analysis code, see [writing a custom Distillery](#Writing a custom Distillery).
-If the custom distillery needs any sort of configuration it can be specified in the corresponding analysis
-configuration. The configuration is in a very similar format to the configuration of the daq system and provided as a yaml file.
+The Datenraffinerie expresses the Creation of plots as a sequence of two types of procedures. There is a DAQ procedure and an Analysis procedure.
+A daq-procedure acquires data from the target system. 
 
 Data acquisition is performed by a target, that accepts some configuration and produces measurements where the it has configured itself and the HGCROCv3
 chips that are part of it according to the configuration received. The Datenraffinerie computes the entire configuration of target and daq system 
