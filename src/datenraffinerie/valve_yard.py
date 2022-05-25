@@ -110,7 +110,7 @@ class ValveYard(luigi.Task):
                                   analysis_module_path=self.analysis_module_path,
                                   network_config=self.network_config,
                                   loop=self.loop,
-                                  event_mode=procedure['event_mode'],
+                                  event_mode=True if self.detrmin_daq_mode(self.root_config_file, procedure['daq']) == "event_mode" else False,
                                   sort_by=procedure['iteration_columns'])
             if procedure['type'] == 'daq':
                 if len(procedure['parameters']) == 1 and self.loop:
@@ -158,7 +158,7 @@ class ValveYard(luigi.Task):
         # do not concatenate the files but simply pass them on
         if self.detrmin_daq_mode(self.root_config_file, self.procedure_label)\
                 == "event_mode":
-            return
+            return self.input()
         if not isinstance(self.input(), list):
             return
         in_files = [data_file.path for data_file in self.input()]
@@ -219,3 +219,5 @@ class ValveYard(luigi.Task):
                     pass
         return "summary_mode"
 
+def test_daq_mode():
+    pass

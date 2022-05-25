@@ -68,7 +68,10 @@ class Distillery(luigi.Task):
                 if paths is None:
                     continue
                 output[key] = (Path(self.output_dir) / paths).resolve()
-        return output
+        if len(output) == 0:
+            return
+        else:
+            return output
 
     def run(self):
         """ perform the analysis using the imported distillery
@@ -82,11 +85,17 @@ class Distillery(luigi.Task):
         analysis = analysis(unfreeze(self.parameters))
 
         # open and read the data
-        if not self.raw:
+        if not self.event_mode:
             analysis.run(read_whole_dataframe(self.input().path),
                          self.output_dir)
         else:
-            data_iter = read_dataframe_chunked([i.path for i in self.input()])
+            in_files = []
+            for l in self.input():
+                if isinstance(l, list):
+                    in_files += l
+                else:
+                    in_files.append(l)
+            data_iter = read_dataframe_chunked([i.path for i in in_files])
             analysis.run(data_iter, self.output_dir)
 
     @staticmethod

@@ -51,13 +51,12 @@ def read_whole_dataframe(pytables_filepath):
     return df
 
 
-def read_dataframe_chunked(pytables_filepaths,
-                           logger: logging.Logger):
+def read_dataframe_chunked(pytables_filepaths):
     for filepath in pytables_filepaths:
         dfile = tables.open_file(filepath)
         table = dfile.root.data.measurements
         yield pd.DataFrame.from_records(table.read())
-    dfile.close()
+        dfile.close()
 
 
 def extract_data(rootfile: str, raw_data=False):
