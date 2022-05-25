@@ -73,6 +73,7 @@ class ValveYard(luigi.Task):
                 workflow = workflows[workflow_index]
             except ValueError as e:
                 logger.critical(f"{self.procedure_label} is not in the list of workflows of {self.root_config_file}")
+                raise e
 
         else:
             raise ctrl.DAQConfigError(f"No '{self.procedure_label}' found in"
@@ -130,8 +131,7 @@ class ValveYard(luigi.Task):
                                    network_config=self.network_config,
                                    loop=self.loop,
                                    raw=procedure['raw'],
-                                   data_columns=procedure['data_columns'],
-                                   initialized_to_default=False)
+                                   data_columns=procedure['data_columns'])
                 return DataField(identifier=0,
                                  label=self.procedure_label,
                                  output_dir=str(output_dir.resolve()),
@@ -148,8 +148,7 @@ class ValveYard(luigi.Task):
                                  network_config=self.network_config,
                                  loop=self.loop,
                                  raw=procedure['raw'],
-                                 data_columns=procedure['data_columns'], # indicate if to produce event by event data data
-                                 initialized_to_default=False)
+                                 data_columns=procedure['data_columns']) # indicate if to produce event by event data data
             raise cfu.ConfigFormatError("The type of an entry must be either "
                                         "'daq' or 'analysis'")
 

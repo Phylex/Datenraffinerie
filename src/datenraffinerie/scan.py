@@ -26,6 +26,7 @@ class Calibration(luigi.Task):
     calibration = luigi.Parameter()
     output_dir = luigi.Parameter()
     analysis_module_path = luigi.Parameter()
+    network_config = luigi.DictParameter(significant=True)
     loop = luigi.BoolParameter()
 
     def requires(self):
@@ -39,6 +40,7 @@ class Calibration(luigi.Task):
                              os.path.dirname(
                                  str(Path(self.output_dir).resolve())),
                              str(Path(self.analysis_module_path).resolve()),
+                             self.network_config,
                              self.loop)
 
     def output(self):
@@ -56,6 +58,61 @@ class Calibration(luigi.Task):
         else:
             with self.output().open('w') as local_calib_copy:
                 local_calib_copy.write('')
+
+
+class FieldPreparation(luigi.Task):
+    """
+    Initialize (or re-initialize) the chips to the power-on default
+    """
+    root_config_path = luigi.Parameter()
+    calibration = luigi.Parameter()
+    output_dir = luigi.Parameter()
+    analysis_module_path = luigi.Parameter()
+    network_config = luigi.DictParameter(significant=True)
+    loop = luigi.BoolParameter()
+    daq_system_default_config = luigi.DictParameter(significant=False)
+    target_default_config = luigi.DictParameter(significant=False)
+    initialized_to_default = luigi.BoolParameter(default=False)
+
+    def requires(self):
+        return Calibration(self.root_config_path,
+                           self.calibration,
+                           self.output_dir,
+                           self.analysis_module_path,
+                           self.network_config,
+                           self.loop)
+
+    def output(self):
+        return self.input()
+
+    def complete(self):
+        return self.initialized_to_default
+
+    def run(self):
+        # the default values for the DAQ system and the target need to
+        # be loaded on to the backend only once
+        context = zmq.Context()
+        socket = context.socket(zmq.REQ)
+        socket.connect(
+            f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
+            f"{self.network_config['daq_coordinator']['port']}")
+        complete_default_config = {
+            'daq': cfu.unfreeze(self.daq_system_default_config),
+            'target': cfu.unfreeze(self.target_default_config)}
+        socket.send_string('load defaults;' +
+                           yaml.safe_dump(complete_default_config))
+        socket.setsockopt(zmq.RCVTIMEO, 20000)
+        try:
+            resp = socket.recv()
+        except zmq.error.Again as e:
+            raise RuntimeError("Socket is not responding. "
+                               "Please check that client and server apps are running, "
+                               "and that your network configuration is correct") from e
+        else:
+            if resp != b'defaults loaded':
+                raise DAQConfigError('Default config could not be loaded into the backend')
+
+            self.initialized_to_default = True
 
 
 class DrillingRig(luigi.Task):
@@ -88,13 +145,17 @@ class DrillingRig(luigi.Task):
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=True)
     data_columns = luigi.ListParameter(significant=False)
-
+    daq_system_default_config = luigi.DictParameter(significant=False)
+    
     def requires(self):
-        return Calibration(self.root_config_path,
-                           self.calibration,
-                           self.output_dir,
-                           self.analysis_module_path,
-                           self.loop)
+        return FieldPreparation(self.root_config_path,
+                                self.calibration,
+                                self.output_dir,
+                                self.analysis_module_path,
+                                self.network_config,
+                                self.loop,
+                                self.daq_system_default_config,
+                                self.target_default_config)
 
     def output(self):
         """
@@ -232,7 +293,6 @@ class DataField(luigi.Task):
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=False)
     data_columns = luigi.ListParameter(significant=False)
-    initialized_to_default = luigi.BoolParameter(significant=False)
     supported_formats = ['hdf5']
 
     @property
@@ -258,32 +318,6 @@ class DataField(luigi.Task):
         daq_system_config = cfu.unfreeze(self.daq_system_config)
         complete_config = {'target': target_config,
                            'daq': daq_system_config}
-
-        # the default values for the DAQ system and the target need to
-        # be loaded on to the backend only once 
-        if not self.initialized_to_default:
-            context = zmq.Context()
-            socket = context.socket(zmq.REQ)
-            socket.connect(
-                f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
-                f"{self.network_config['daq_coordinator']['port']}")
-            complete_default_config = {
-                'daq': cfu.unfreeze(self.daq_system_default_config),
-                'target': cfu.unfreeze(self.target_default_config)}
-            socket.send_string('load defaults;' +
-                               yaml.safe_dump(complete_default_config))
-            socket.setsockopt(zmq.RCVTIMEO, 20000)
-            try:
-                resp = socket.recv()
-            except zmq.error.Again as e:
-                raise RuntimeError("Socket is not responding. "
-                                   "Please check that client and server apps are running, "
-                                   "and that your network configuration is correct") from e
-            else:
-                if resp != b'defaults loaded':
-                    raise DAQConfigError('Default config could not be loaded into the backend')
-
-            self.initialized_to_default=True
         # if there are more than one entry in the parameter list the scan still
         # has more than one dimension. So spawn more scan tasks for the lower
         # dimension
@@ -322,8 +356,7 @@ class DataField(luigi.Task):
                                                   self.network_config,
                                                   self.loop,
                                                   self.raw,
-                                                  self.data_columns,
-                                                  self.initialized_to_default))
+                                                  self.data_columns))
                 else:
                     required_tasks.append(DataField(self.identifier + 1 + task_id_offset * i,
                                                     self.label,
@@ -340,17 +373,19 @@ class DataField(luigi.Task):
                                                     self.network_config,
                                                     self.loop,
                                                     self.raw,
-                                                    self.data_columns,
-                                                    self.initialized_to_default))
+                                                    self.data_columns))
         # The scan has reached the one dimensional case. Spawn a measurement
         # for every value that takes part in the scan
         else:
             if self.loop:
-                return Calibration(self.root_config_path,
-                                   self.calibration,
-                                   self.output_dir,
-                                   self.analysis_module_path,
-                                   self.loop)
+                return FieldPreparation(self.root_config_path,
+                                        self.calibration,
+                                        self.output_dir,
+                                        self.analysis_module_path,
+                                        self.network_config,
+                                        self.loop,
+                                        self.daq_system_default_config,
+                                        self.target_default_config)
 
             for i, value in enumerate(values):
                 measurement_target_config = target_config
@@ -372,7 +407,8 @@ class DataField(luigi.Task):
                                                   self.network_config,
                                                   self.loop,
                                                   self.raw,
-                                                  self.data_columns))
+                                                  self.data_columns,
+                                                  self.daq_system_default_config))
         return required_tasks
 
     def output(self):
@@ -541,7 +577,6 @@ class Fracker(luigi.Task):
     loop = luigi.BoolParameter(significant=False)
     raw = luigi.BoolParameter(significant=False)
     data_columns = luigi.ListParameter(significant=False)
-    initialized_to_default = luigi.BoolParameter(significant=False)
     supported_formats = ['hdf5']
 
     def requires(self):
@@ -560,8 +595,7 @@ class Fracker(luigi.Task):
                          network_config=self.network_config,
                          loop=self.loop,
                          raw=self.raw,
-                         data_columns=self.data_columns,
-                         initialized_to_default=self.initialized_to_default)
+                         data_columns=self.data_columns)
 
     def output(self):
         """
