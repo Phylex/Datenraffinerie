@@ -12,6 +12,7 @@ Welcome to Datenraffinerie's documentation!
 
    usage/installation
    usage/quickstart
+   structs/system_state
 
 
 Indices and tables
