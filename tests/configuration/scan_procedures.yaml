@@ -21,7 +21,7 @@
       range:
         start: 0
         stop: 2048
-        step: 32
+        step: 1
 
 - name: timewalk_scan_with_template
   type: daq
@@ -57,3 +57,453 @@
              {{ value }}:
                HighRange: 1
 
+- name: timewalk_scan_v2
+  type: daq
+  target_settings:
+    power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ./init_timewalk_scan.yaml
+  daq_settings:
+    default: ./defaults/daq-system-config.yaml
+    server_override:
+      NEvents: 1000
+      l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
+      - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
+      - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
+      - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+      - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+  parameters:
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - 'ReferenceVoltage'
+      - [0, 1]
+      - 'Calib'
+      range:
+        start: 0
+        stop: 2048
+        step: 32
+  data_columns:
+    - HighRange
+    - channel
+    - chip
+    - channeltype
+    - Calib
+    - toa_mean
+    - toa_median
+    - phase_strobe
+
+- name: timewalk_and_phase_scan
+  type: daq
+  target_settings:
+    power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ./init_timewalk_scan.yaml
+  daq_settings:
+    default: ./defaults/daq-system-config.yaml
+    server_override:
+      NEvents: 1000
+      l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
+      - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
+      - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
+      - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+      - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+  parameters:
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - Top
+      - 0
+      - phase_strobe
+      range:
+        start: 0
+        stop: 10
+        step: 1
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - 'ReferenceVoltage'
+      - [0, 1]
+      - 'Calib'
+      range:
+        start: 0
+        stop: 2048
+        step: 128
+  data_columns:
+    - HighRange
+    - channel
+    - chip
+    - channeltype
+    - Calib
+    - toa_mean
+    - toa_median
+    - phase_strobe
+
+- name: full_toa_scan
+  type: daq
+  event_mode: false
+  target_settings:
+    power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ./init_timewalk_scan.yaml
+  daq_settings:
+    default: ./defaults/daq-system-config.yaml
+    server_override:
+      NEvents: 1000
+      l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
+      - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
+      - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
+      - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+      - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+  parameters:
+    - template: |-
+       target:
+         roc_s0:
+           ch:
+             {{ value }}:
+               HighRange: 1
+               Channel_off: 0
+         roc_s1:
+           ch:
+             {{ value }}:
+               HighRange: 1
+               Channel_off: 0
+         roc_s2:
+           ch:
+             {{ value }}:
+               HighRange: 1
+               Channel_off: 0
+      range:
+        start: 0
+        stop: 72
+        step: 10
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - ReferenceVoltage
+      - [0, 1]
+      - Toa_vref
+      range:
+        start: 112
+        stop: 613
+        step: 100
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - Top
+      - 0
+      - phase_strobe
+      range:
+        start: 0
+        stop: 17
+        step: 2
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - ReferenceVoltage
+      - [0, 1]
+      - Calib
+      range:
+        start: 0
+        stop: 1500
+        step: 16
+  data_columns:
+    - HighRange
+    - channel
+    - channeltype
+    - chip
+    - Calib
+    - adc_mean
+    - adc_stdd
+    - toa_mean
+    - toa_median
+    - toa_stdd
+    - Toa_vref
+    - phase_strobe
+
+- name: master_tdc_SIG_calibration_daq
+  type: daq
+  event_mode: true
+  target_settings:
+    power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ./initLDv3_ToA_Calib.yaml
+    override:
+      roc_s0:
+        ch:
+          0:
+            Channel_off: 0
+          4:
+            Channel_off: 0
+          8:
+            Channel_off: 0
+          12:
+            Channel_off: 0
+          16:
+            Channel_off: 0
+          20:
+            Channel_off: 0
+          24:
+            Channel_off: 0
+          28:
+            Channel_off: 0
+          32:
+            Channel_off: 0
+          36:
+            Channel_off: 0
+          40:
+            Channel_off: 0
+          44:
+            Channel_off: 0
+          48:
+            Channel_off: 0
+          52:
+            Channel_off: 0
+          56:
+            Channel_off: 0
+          60:
+            Channel_off: 0
+          64:
+            Channel_off: 0
+          68:
+            Channel_off: 0
+      roc_s1:
+        ch:
+          0:
+            Channel_off: 0
+          4:
+            Channel_off: 0
+          8:
+            Channel_off: 0
+          12:
+            Channel_off: 0
+          16:
+            Channel_off: 0
+          20:
+            Channel_off: 0
+          24:
+            Channel_off: 0
+          28:
+            Channel_off: 0
+          32:
+            Channel_off: 0
+          36:
+            Channel_off: 0
+          40:
+            Channel_off: 0
+          44:
+            Channel_off: 0
+          48:
+            Channel_off: 0
+          52:
+            Channel_off: 0
+          56:
+            Channel_off: 0
+          60:
+            Channel_off: 0
+          64:
+            Channel_off: 0
+          68:
+            Channel_off: 0
+      roc_s2:
+        ch:
+          0:
+            Channel_off: 0
+          4:
+            Channel_off: 0
+          8:
+            Channel_off: 0
+          12:
+            Channel_off: 0
+          16:
+            Channel_off: 0
+          20:
+            Channel_off: 0
+          24:
+            Channel_off: 0
+          28:
+            Channel_off: 0
+          32:
+            Channel_off: 0
+          36:
+            Channel_off: 0
+          40:
+            Channel_off: 0
+          44:
+            Channel_off: 0
+          48:
+            Channel_off: 0
+          52:
+            Channel_off: 0
+          56:
+            Channel_off: 0
+          60:
+            Channel_off: 0
+          64:
+            Channel_off: 0
+          68:
+            Channel_off: 0
+  daq_settings:
+    default: ./defaults/daq-master-tdc-calibration.yaml
+  parameters:
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - MasterTdc
+      - [0, 1]
+      - CTRL_IN_SIG_CTDC_P_D
+      range:
+        start: 0
+        stop: 32
+        step: 1
+  data_columns:
+    - event_mode
+    - chip
+    - half
+    - channel 
+    - toa 
+    - tot
+    - bxcounter
+    - corruption
+    - adc
+    - errorbit
+    - CTRL_IN_SIG_CTDC_P_D
+    - CTRL_IN_REF_CTDC_P_D
+    - DAC_CAL_CTDC_TOA
+
+- name: master_tdc_REF_calibration_daq
+  type: daq
+  event_mode: true
+  target_settings:
+    power_on_default: ./defaults/V3LDHexaboard-poweron-default.yaml
+    initial_config: ./initLDv3_ToA_Calib.yaml
+    override:
+      roc_s0:
+        ch:
+          0:
+            Channel_off: 0
+          4:
+            Channel_off: 0
+          8:
+            Channel_off: 0
+          12:
+            Channel_off: 0
+          16:
+            Channel_off: 0
+          20:
+            Channel_off: 0
+          24:
+            Channel_off: 0
+          28:
+            Channel_off: 0
+          32:
+            Channel_off: 0
+          36:
+            Channel_off: 0
+          40:
+            Channel_off: 0
+          44:
+            Channel_off: 0
+          48:
+            Channel_off: 0
+          52:
+            Channel_off: 0
+          56:
+            Channel_off: 0
+          60:
+            Channel_off: 0
+          64:
+            Channel_off: 0
+          68:
+            Channel_off: 0
+      roc_s1:
+        ch:
+          0:
+            Channel_off: 0
+          4:
+            Channel_off: 0
+          8:
+            Channel_off: 0
+          12:
+            Channel_off: 0
+          16:
+            Channel_off: 0
+          20:
+            Channel_off: 0
+          24:
+            Channel_off: 0
+          28:
+            Channel_off: 0
+          32:
+            Channel_off: 0
+          36:
+            Channel_off: 0
+          40:
+            Channel_off: 0
+          44:
+            Channel_off: 0
+          48:
+            Channel_off: 0
+          52:
+            Channel_off: 0
+          56:
+            Channel_off: 0
+          60:
+            Channel_off: 0
+          64:
+            Channel_off: 0
+          68:
+            Channel_off: 0
+      roc_s2:
+        ch:
+          0:
+            Channel_off: 0
+          4:
+            Channel_off: 0
+          8:
+            Channel_off: 0
+          12:
+            Channel_off: 0
+          16:
+            Channel_off: 0
+          20:
+            Channel_off: 0
+          24:
+            Channel_off: 0
+          28:
+            Channel_off: 0
+          32:
+            Channel_off: 0
+          36:
+            Channel_off: 0
+          40:
+            Channel_off: 0
+          44:
+            Channel_off: 0
+          48:
+            Channel_off: 0
+          52:
+            Channel_off: 0
+          56:
+            Channel_off: 0
+          60:
+            Channel_off: 0
+          64:
+            Channel_off: 0
+          68:
+            Channel_off: 0
+  daq_settings:
+    default: ./defaults/daq-master-tdc-calibration.yaml
+  parameters:
+    - key:
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - MasterTdc
+      - [0, 1]
+      - CTRL_IN_REF_CTDC_P_D
+      range:
+        start: 0
+        stop: 32
+        step: 1
+  data_columns:
+    - event_mode
+    - chip
+    - half
+    - channel 
+    - toa 
+    - tot
+    - bxcounter
+    - corruption
+    - adc
+    - errorbit
+    - CTRL_IN_SIG_CTDC_P_D
+    - CTRL_IN_REF_CTDC_P_D
+    - DAC_CAL_CTDC_TOA

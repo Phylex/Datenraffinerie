@@ -5,3 +5,9 @@
     p1: 346045
     p2: 45346
     p3: 'string option'
+
+- name: timewalk_analysis
+  type: analysis
+  daq: timewalk_and_phase_scan
+  python_module_name: timewalk_analysis
+  parameters: {}
