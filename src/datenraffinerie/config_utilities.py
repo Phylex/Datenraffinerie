@@ -101,8 +101,8 @@ def update_dict(original: dict, update: dict, offset: bool = False,
     TypeError: If offset is set to true and the types don't match the addition
                of the values will cause a TypeError to be raised
 
-    ConfigPatchError: If lists are updated the length of the lists needs to match
-               otherwise a error is raised
+    ConfigPatchError: If lists are updated the length of the lists needs to
+               match otherwise a error is raised
     """
 
     if in_place is True:
@@ -129,7 +129,7 @@ def update_dict(original: dict, update: dict, offset: bool = False,
                                              offset=offset,
                                              in_place=in_place)
         elif isinstance(result[update_key], list) or\
-             isinstance(result[update_key], tuple):
+                isinstance(result[update_key], tuple):
             if len(result[update_key]) != len(update[update_key]):
                 raise ConfigPatchError(
                     'If a list is a value of the dict the list'
@@ -191,6 +191,14 @@ def test_update_dict():
     updated_dict = update_dict(original, update)
     assert updated_dict == expected_output
 
+    # check that the in_place feature works as expected
+    original = {'this': [{'a': 1}, {'b': 2}, {'c': 3}, 3], 'that': 'what'}
+    update = {'this': [{'a': 3}, {'b': 3}, {'c': 5}, 5]}
+    expected_output = {'this': [{'a': 3}, {'b': 3}, {'c': 5}, 5],
+                       'that': 'what'}
+    update_dict(original, update, in_place=True)
+    assert original == expected_output
+
 
 def patch_configuration(config: dict, patch: dict):
     """
@@ -219,9 +227,9 @@ def generate_patch(keys: Union[list, str], value):
     # this is needed to work with luigi as it turns stuffinto
     # tuples
     keys = list(keys)
-    # here we need to insert 'target' if the key 'target' or 'daq' is not present
-    # as the top level key to extend the scannable parameters to both the daq and target
-    # configuration
+    # here we need to insert 'target' if the key 'target' or 'daq' is not
+    # present as the top level key to extend the scannable parameters to both
+    # the daq and target configuration
     if keys[0] not in ['target', 'daq']:
         keys.insert(0, 'target')
 
@@ -651,6 +659,21 @@ def parse_analysis_config(config: dict) -> tuple:
             'type': 'analysis'}
 
 
+def test_analysis_config():
+    test_fpath = Path('../../examples/analysis_procedures.yaml')
+    config = load_configuration(test_fpath)
+    parsed_config = parse_analysis_config(config[0])
+    assert parsed_config['daq'] == 'example_scan'
+    assert isinstance(parsed_config['parameters'], dict)
+    assert parsed_config['name'] == 'example_analysis'
+    assert parsed_config['type'] == 'analysis'
+    assert not parsed_config['event_mode']
+    ana_params = parsed_config['parameters']
+    assert ana_params['p1'] == 346045
+    assert ana_params['p2'] == 45346
+    assert ana_params['p3'] == 'string option'
+
+
 def parse_config_entry(entry: dict, path: str):
     """
     take care of calling the right function for the different configuration
@@ -708,6 +731,7 @@ def parse_config_file(config_path: str):
     procedures = []
     workflows = []
     config = load_configuration(path)
+    print(config)
     if isinstance(config, dict):
         if 'libraries' in config.keys():
             # resolve the path to the library files taking
@@ -727,8 +751,9 @@ def parse_config_file(config_path: str):
                 workflows = workflows + other_workflows
         if 'workflows' in config.keys():
             raw_workflows = config['workflows']
+            print(raw_workflows)
             workflows = workflows + validate_wokflow_config(raw_workflows,
-                                                            config_path)
+                                                            path)
         # The root configuration file can also specify new
         # procedures, similar to libraries
         if 'procedures' in config.keys():
@@ -750,6 +775,14 @@ def parse_config_file(config_path: str):
     return procedures, workflows
 
 
+def test_parse_config_file():
+    config_file = Path('../../tests/configuration/main_config.yaml')
+    procedures, workflows = parse_config_file(config_file)
+    assert procedures is not None
+    assert len(procedures) == 7
+    assert len(workflows) == 1
+
+
 def get_target_config(procedure_config: dict):
     default = procedure_config['target_settings']['power_on_default']
     init = procedure_config['target_settings']['initial_config']
@@ -758,7 +791,7 @@ def get_target_config(procedure_config: dict):
 
 
 def get_daq_config(procedure_config: dict):
-    default = procedure_config['daq_settings']['default']
+    default = deepcopy(procedure_config['daq_settings']['default'])
     try:
         server_override = procedure_config['daq_settings']['server_override']
         default = patch_configuration(default, {'server': server_override})
@@ -772,16 +805,104 @@ def get_daq_config(procedure_config: dict):
     return default
 
 
-def test_analysis_config():
-    test_fpath = Path('../../examples/analysis_procedures.yaml')
-    config = load_configuration(test_fpath)
-    parsed_config = parse_analysis_config(config[0])
-    assert parsed_config['daq'] == 'example_scan'
-    assert isinstance(parsed_config['parameters'], dict)
-    assert parsed_config['name'] == 'example_analysis'
-    assert parsed_config['type'] == 'analysis'
-    assert not parsed_config['event_mode']
-    ana_params = parsed_config['parameters']
-    assert ana_params['p1'] == 346045
-    assert ana_params['p2'] == 45346
-    assert ana_params['p3'] == 'string option'
+def test_get_daq_config():
+    test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
+    # test_dir = Path(os.path.dirname(test_fpath))
+    scan_configs = []
+    test_config = load_configuration(test_fpath)
+    for scan in test_config:
+        scan_configs.append(parse_scan_config(scan, test_fpath))
+
+    test_config = scan_configs[0]
+    default_daq_config = deepcopy(test_config['daq_settings']['default'])
+    daq_config = get_daq_config(test_config)
+    delta = diff_dict(default_daq_config, daq_config)
+    print(delta)
+    assert delta is not None
+    assert delta['server']['NEvents'] == 1000
+
+
+def generate_subsystem_states(system_state: dict):
+    """
+    generate the system state for every subtask given the current system state
+
+    generator to produce the system state for every subtask of the current task
+    (most often the DataField task) takes the firs list from the
+    scan_parameters and patches the correct part of the subtask config. It also
+    removes the first element of the parameters list
+    """
+    subsystem_state = deepcopy(system_state)
+    try:
+        subsystem_state['procedure']['parameters'] = system_state[
+                'procedure'][
+                'parameters'][1:]
+    except IndexError:
+        subsystem_state['procedure']['parameters'] = []
+    for patch in system_state['procedure']['parameters'][0]:
+        if 'target' in patch:
+            tpatch = patch['target']
+            subsystem_state['procedure']['target_settings']['initial_config']\
+                = update_dict(system_state['procedure'][
+                    'target_settings']['initial_config'], tpatch)
+        if 'daq' in patch and len(patch.keys()) == 1:
+            dpatch = patch['daq']
+            if 'server' in dpatch:
+                sp = dpatch['server']
+                subsystem_state['procedure']['daq_settings'][
+                        'server_override'] = update_dict(
+                                system_state['procedure'][
+                                             'daq_settings'][
+                                             'server_override'], sp)
+            if 'client' in dpatch:
+                cp = dpatch['client']
+                subsystem_state['procedure']['daq_settings'][
+                        'client_override'] = update_dict(
+                                system_state['procedure'][
+                                             'daq_settings'][
+                                             'client_override'], cp)
+        yield subsystem_state
+
+
+def test_generate_subsystem_states():
+    scan_configs = _get_scan_configs()
+    test_config = scan_configs[0]
+    system_state = {}
+    system_state['procedure'] = test_config
+    init = test_config['target_settings']['initial_config']
+    patches = test_config['parameters'][0]
+    for patch, subscan_system_state in\
+            zip(patches, generate_subsystem_states(system_state)):
+        assert len(subscan_system_state['procedure']['parameters']) == 0
+        sub_init = subscan_system_state[
+                'procedure'][
+                'target_settings'][
+                'initial_config']
+        delta = diff_dict(init, sub_init)
+        assert {'target': delta} == patch
+
+
+def generate_run_config(system_state: dict, calibration: dict):
+    target_config = get_target_config(system_state['procedure'])
+    daq_config = get_daq_config(system_state['procedure'])
+    update_dict(target_config, calibration, in_place=True)
+    complete_config = {'target': target_config,
+                       'daq': daq_config}
+    return complete_config
+
+
+def test_generate_run_configurations():
+    pass
+
+
+def _get_scan_configs():
+    """
+    Function that makes loading scan configurations a one liner
+    instead of copying the code everywhere
+    """
+    test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
+    # test_dir = Path(os.path.dirname(test_fpath))
+    scan_configs = []
+    test_config = load_configuration(test_fpath)
+    for scan in test_config:
+        scan_configs.append(parse_scan_config(scan, test_fpath))
+    return scan_configs

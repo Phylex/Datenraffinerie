@@ -18,8 +18,10 @@ from .daq_coordination import coordinate_daq_access
                 metavar='[Procedure to be run by the datenraffinerie]')
 @click.argument('output', type=click.Path(),
                 metavar='[data output directory]')
-@click.option('-a', '--analysis_path', 'analysis_path', type=click.Path(exists=True),
-              help='specify the path to the python module containing the analyses')
+@click.option('-a', '--analysis_path', 'analysis_path',
+              type=click.Path(exists=True),
+              help="specify the path to the python "
+                   "module containing the analyses")
 @click.option('-w', '--workers', 'workers', type=int, default=1,
               help='specify the amount of parallel tasks to be executed')
 @click.option('-l', '--loop', 'loop', is_flag=True, default=False,
@@ -35,16 +37,24 @@ def cli(netcfg, config, procedure, workers, output, analysis_path, loop):
         print('Error reading in the network config:\n'
               + str(err) + '\nexiting ..')
         sys.exit(1)
-    daq_coordination_process = multiprocessing.Process(target=coordinate_daq_access, args=(netcfg, ))
+    daq_coordination_process = multiprocessing.Process(
+            target=coordinate_daq_access,
+            args=(netcfg, ))
     daq_coordination_process.start()
+    # prepare the configuration for the procedure that will be passed from
+    # task to task and modified on the way
+    # it holds the system state
+    procedure_config = {}
+    procedure_config['root_config_path'] = click.format_filename(config)
+    procedure_config['name'] = procedure
+    procedure_config['output_path'] = output
+    procedure_config['analysis_path'] = analysis_path
+    procedure_config['network_config'] = netcfg
+    procedure_config['loop'] = True if loop else False
+    # run the valveyard
     try:
-        run_result = luigi.build([ValveYard(
-            click.format_filename(config),
-            procedure,
-            output,
-            analysis_path,
-            netcfg,
-            loop='true' if loop else 'false')],
+        run_result = luigi.build(
+            [ValveYard(procedure_config=procedure_config)],
             local_scheduler=True,
             workers=workers,
         )

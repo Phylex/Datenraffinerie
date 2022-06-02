@@ -12,8 +12,6 @@ import uproot
 import tables
 import yaml
 import uuid
-import logging
-from typing import Union, Sequence
 
 
 class AnalysisError(Exception):
@@ -157,7 +155,8 @@ def fill_block(file, group_name, block, data: np.ndarray):
         axis1.append(np.arange(maxindex, len(block)))
 
 
-def run_compiled_fracker(rootfile, hdf_file, complete_config, raw_data, columns):
+def run_compiled_fracker(rootfile, hdf_file,
+                         complete_config, raw_data, columns):
     """
     Assuming there is a fracker command that merges in the configuration
     and transforms the root into the hdf file call it with the proper arguments
@@ -487,18 +486,19 @@ def roc_channel_to_globals(complete_config: dict, chip_id: int, channel_id: int,
         result.update(roc_config[gl_key][0])
     return result
 
+
 event_mode_data_columns = [
         'event', 'chip', 'half', 'channel', 'adc', 'adcm', 'toa',
         'tot', 'totflag', 'trigtime', 'trigwidth', 'corruption',
-        'bxcounter', 'eventcounter', 'orbitcounter' ]
+        'bxcounter', 'eventcounter', 'orbitcounter']
 
 data_columns = ['chip', 'channel', 'channeltype',
-                    'adc_median', 'adc_iqr', 'tot_median',
-                    'tot_iqr', 'toa_median', 'toa_iqr', 'adc_mean',
-                    'adc_stdd', 'tot_mean',
-                    'tot_stdd', 'toa_mean', 'toa_stdd', 'tot_efficiency',
-                    'tot_efficiency_error', 'toa_efficiency',
-                    'toa_efficiency_error']
+                'adc_median', 'adc_iqr', 'tot_median',
+                'tot_iqr', 'toa_median', 'toa_iqr', 'adc_mean',
+                'adc_stdd', 'tot_mean',
+                'tot_stdd', 'toa_mean', 'toa_stdd', 'tot_efficiency',
+                'tot_efficiency_error', 'toa_efficiency',
+                'toa_efficiency_error']
 expected_columns = [
     'Adc_pedestal', 'Channel_off', 'DAC_CAL_CTDC_TOA', 'DAC_CAL_CTDC_TOT',
     'DAC_CAL_FTDC_TOA', 'DAC_CAL_FTDC_TOT', 'DIS_TDC', 'ExtData',

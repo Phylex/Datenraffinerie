@@ -2,10 +2,12 @@ import luigi
 import importlib
 import os
 import sys
+import yaml
+from copy import deepcopy
 from pathlib import Path
 from .analysis_utilities import read_dataframe_chunked
 from .analysis_utilities import read_whole_dataframe
-from .config_utilities import unfreeze
+from .config_utilities import unfreeze, update_dict
 from .errors import OutputError
 
 
@@ -13,19 +15,8 @@ class Distillery(luigi.Task):
     """ Task that encapsulates analysis tasks and makes them executable
     inside the Datenraffinerie
     """
-    name = luigi.Parameter(significant=True)
-    python_module = luigi.Parameter(significant=True)
-    daq = luigi.Parameter(significant=True)
-    output_dir = luigi.Parameter(significant=True)
-    parameters = luigi.DictParameter(significant=True)
-    root_config_path = luigi.Parameter(significant=True)
-    analysis_module_path = luigi.OptionalParameter(significant=True,
-                                                   default=None)
-    network_config = luigi.DictParameter(significant=False)
-    loop = luigi.BoolParameter(significant=False)
-    event_mode = luigi.BoolParameter(significant=False)
-    sort_by = luigi.OptionalParameter(significant=False,
-                                      default=None)
+    system_state = luigi.DictParameter(significant=True)
+    priority = luigi.OptionalParameter(significant=False, default=0)
 
     def requires(self):
         from .valve_yard import ValveYard
@@ -33,10 +24,12 @@ class Distillery(luigi.Task):
         the data for the analysis
         :returns: The acquisition procedure needed to produce the data
         """
-        return ValveYard(self.root_config_path, self.daq,
-                         os.path.dirname(self.output_dir),
-                         self.analysis_module_path, self.network_config,
-                         self.loop)
+        subtask_state = deepcopy(self.system_state)
+        subtask_state['output_path'] = os.path.dirname(
+                self.system_state['output_path'])
+        subtask_state['name'] = self.system_state['procedure']['daq']
+        del subtask_state['procedure']
+        return ValveYard(subtask_state)
 
     def output(self):
         """ Define the files that are produced by the analysis
@@ -47,56 +40,89 @@ class Distillery(luigi.Task):
             and the value associated to 'plots' is a list of relative
             paths. All paths should be strings.
         """
-        analysis = self.import_analysis(self.analysis_module_path,
-                                        self.python_module)
-        analysis_parameters = unfreeze(self.parameters)
+        analysis_module_path = self.system_state['analysis_module_path']
+        output_path = self.system_state['output_path']
+        python_module = self.system_state['procedure']['python_module_name']
+        parameters = self.system_state['procedure']['parameters']
+        analysis = self.import_analysis(analysis_module_path,
+                                        python_module)
+        analysis_parameters = unfreeze(parameters)
         analysis = analysis(analysis_parameters)
         output = {}
+        output['full-calibration'] = self.input()['full-calibration']
         for key, paths in analysis.output().items():
+            if paths is None:
+                continue
+            try:
+                if len(paths) == 0:
+                    continue
+            except TypeError:
+                pass
             if key == 'plots':
                 try:
                     if len(paths) == 0:
                         continue
-                    output[key] = [luigi.LocalTarget(
-                        (Path(self.output_dir) / path).resolve())
-                        for path in paths]
+                    output['plots'] = [luigi.LocalTarget((Path(output_path)
+                                                          / path).resolve())
+                                       for path in paths]
                 except TypeError as err:
                     raise OutputError('The plots output must be a list ' +
                                       'of paths. Use an empty list if ' +
                                       'no plots are generated') from err
+            elif key == 'calibration':
+                output['full-calibration']\
+                        = (Path(output_path) / paths).resolve()
             else:
-                if paths is None:
-                    continue
-                output[key] = (Path(self.output_dir) / paths).resolve()
-        if len(output) == 0:
-            return
-        else:
-            return output
+                if isinstance(paths, list):
+                    output[key] = [Path(output_path) / path for path in paths]
+                else:
+                    output[key] = Path(output_path) / paths
+        return output
 
     def run(self):
         """ perform the analysis using the imported distillery
         :returns: TODO
 
         """
-        # import the class definition
-        analysis = self.import_analysis(self.analysis_module_path,
-                                        self.python_module)
-        # instantiate an analysis object from the imported analysis class
-        analysis = analysis(unfreeze(self.parameters))
+        analysis_module_path = self.system_state['analysis_module_path']
+        output_path = self.system_state['output_path']
+        python_module = self.system_state['procedure']['python_module_name']
+        parameters = self.system_state['procedure']['parameters']
+        analysis = self.import_analysis(analysis_module_path,
+                                        python_module)
+        analysis_parameters = unfreeze(parameters)
 
+        # import the class definition
+        analysis = self.import_analysis(analysis_module_path,
+                                        python_module)
+        # instantiate an analysis object from the imported analysis class
+        analysis = analysis(analysis_parameters)
+
+        event_mode = self.system_state['event_mode']
         # open and read the data
-        if not self.event_mode:
-            analysis.run(read_whole_dataframe(self.input().path),
-                         self.output_dir)
+        if not event_mode:
+            analysis.run(read_whole_dataframe(self.input()['data'].path),
+                         output_path)
         else:
             in_files = []
-            for l in self.input():
-                if isinstance(l, list):
-                    in_files += l
+            for dfile in self.input()['data']:
+                if isinstance(dfile, list):
+                    in_files += dfile
                 else:
-                    in_files.append(l)
+                    in_files.append(dfile)
             data_iter = read_dataframe_chunked([i.path for i in in_files])
-            analysis.run(data_iter, self.output_dir)
+            analysis.run(data_iter, output_path)
+
+        # merge the calibrations
+        if self.output()['full-calibration'].path\
+                != self.input()['full-calibration'].path:
+            with self.input()['full-calibration'].open('r') as prev_calib_file:
+                previous_calib = yaml.safe_load(prev_calib_file.read())
+            with self.output()['full-calibration'].open('w') as new_calib_file:
+                new_calib = yaml.safe_load(new_calib_file.read())
+                update_dict(previous_calib, new_calib, in_place=True)
+                new_calib_file.truncate(0)
+                new_calib_file.write(yaml.safe_dump(previous_calib))
 
     @staticmethod
     def import_analysis(distillery_path: str, name: str):
