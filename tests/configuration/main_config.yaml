@@ -1,2 +1,8 @@
 libraries:
   - ./scan_procedures.yaml
+
+workflows:
+  - name: master_tdc_daq
+    tasks:
+      - master_tdc_SIG_calibration_daq
+      - master_tdc_REF_calibration_daq
