@@ -12,7 +12,14 @@ Welcome to Datenraffinerie's documentation!
 
    usage/installation
    usage/quickstart
+   usage/daq-procedure-configuration
+   usage/analysis-procedure-configuration
    structs/system_state
+   structs/File-list
+   tasks/Calibration
+   tasks/DataField
+   tasks/FieldPreparation
+
 
 
 Indices and tables

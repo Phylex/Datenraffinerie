@@ -17,6 +17,4 @@ Dictionary.
   are stored in this directory.
 * ``analysis_path``: ``string``: Path to the directory containing the analysis python module.
 * ``network_config``: ``string``: The path to the file containing the network configuration for that run
-* ``task_id``: ``int``: The ID of the task being executed. This distinguishes the different tasks from each other
 * ``event_mode``: ``bool``: Indicates if the data processed by the Datenraffinerie is summary data or event by event data
-* 
