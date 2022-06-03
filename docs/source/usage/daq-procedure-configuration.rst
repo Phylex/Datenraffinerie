@@ -1,6 +1,6 @@
-===========================
-DAQ procedure configuration
-===========================
+=================
+DAQ configuration
+=================
 A DAQ procedure is one type of procedure of the Datenraffinerie. It's primary job is to aquire data from the device under test (DUT).
 To be able to collect the Data from the DUT the Datenraffinerie needs to be propely configured. A daq procedure configuration is an enty
 in a YAML list. Every entry is a fully contained procedure configuration and does not directly depend on any other procedure being defined.
@@ -14,25 +14,31 @@ Fields
 The daq procedure configuration consists of the following Fields. Each field controls a specific aspect of the behaviour of the Datenraffinerie
 or defiens the configuration of the DUT and DAQ system directly.
 
-**name**
+**name**:str (required)
   Each procedure has a name. The name must be unique, meaning there must be no two procedure configurations with the same name.
 
-**type**
+**type**:str (required)
   Each procedure needs a type. There are currently two types of procedures, ``daq`` and ``analysis``
 
-**merge**
+**calibration**:str (optional)
+  Specifies the name of the procedure that needs to be run in order to produce a calibration for the current daq procedure. If more than one procedure is requires
+  they should be specified as list. If omitted no calibration procedure is run.
+
+**merge**:bool (optional)
   Specifies if the Datenraffinerie should merge the data resulting from the DAQ procedure into one file or if the files should not be merged to aviod
   losing performance when loading/searching for data in the file. If the result of the merge is too large it may not be able to fit into main memmory.
+  The default behaviour is to merge the data
 
-**mode**
-  Specifies the mode of operation of the Datenraffinerie. Current modes are ``summary`` and ``full``.
+**mode**:str (optional)
+  Specifies the mode of operation of the Datenraffinerie. Current modes are ``summary`` and ``full``. Defaults to ``summary`` if not specified.
 
-**system_settings**
+**system_settings**:dict (required)
   The system_settings field has multiple subfields. All these fields relate to the configuration of the DUT/DAQ system. See `System settings`_ for more details
 
-**parameters**
+**parameters**:dict (optional)
   The parameters section is a list of either template/value pairs or key/value pairs. Each entry specifies a *dimension* of the scan to be performed. The final scan
-  will be a cartesian product of all dimensions. See `Parameters`_ for more details.
+  will be a cartesian product of all dimensions. See `Parameters`_ for more details. If parameters is not specified, then A single run will be performed using the 
+  init configuration.
 
 -----
 
@@ -43,21 +49,21 @@ System settings
 ---------------
 The Target settings specify the configuration of the DUT/target device and DAQ system.
 
-**default**
+**default**:dict (required)
   this specifies the *relative path* to the yaml file containing the default configuration of the DUT. This configuration should list every parameter of the
   DUT and the value of the parameter after power-up or reset. It is assumed that the device is in this state after a reset command is sent to the DAQ system.
   The default is used internally to help improve performance of the program and ensure that no unneccessary configuration command is sent to the device.
   Multiple files may be specified as a list and act as if they where appended into a single file. Every file needs to be valid YAML.
   If values are specified in more than one file the value from the the last file that the value occurs in is used. Later values overwrite earlier ones
 
-**init**
+**init**:dict (required)
   This field specifies the *relative path* to the yaml file containing the initial parameters of the DUT needed to perform the procedure this config describes
   This file only needs to list the parameters that are different from the default. The initial configuration is used as the basis for applying the config modifications
   specified by the `parameters`_ to.
   Multiple files may be specified as a list and act as if they where appended into a single file. Every file needs to be valid YAML.
   If values are specified in more than one file the value from the the last file that the value occurs in is used. Later values overwrite earlier ones
 
-**override**
+**override**:dict (optional)
   This field offers the possibility to further modify or extend the configuration specified in the file listed in the *init* field. The intent behind this is that
   when two daq procedures differ only slightly, it is possible to specify a common init file and then list the differences as *override* parameters. The override parameters
   only apply to the init and do not affect the default values of the parameters. 
@@ -73,7 +79,7 @@ The parameters are at the heart of the Datenraffinerie. The definition of the pa
 the procedure.
 
 The parameters section is a list of key/range and/or template/range paris. Every entry of this list describes one dimension of the procedure. The total amount of measurements will be 
-the cartesian product of all measurements from the different dimensions.
+the cartesian product of all measurements from the different dimensions see `key generation`_ for more details on the **template** and **key** field.
 
 ::
 
@@ -118,6 +124,8 @@ There are two ways of specifying the values that are to be assumed for the dimen
   over a complex sequence of configurations that may change different values for each step. It is assumed that the value, even if it is a complex
   structure is the value for the specified key. The key may be ommitted when using specifying individual values. If ommitted, the values need to be 
   valid configuration fragments.
+
+.. _`key generation`:
 
 Key generation
 ==============

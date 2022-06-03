@@ -14,6 +14,7 @@ Welcome to Datenraffinerie's documentation!
    usage/quickstart
    usage/daq-procedure-configuration
    usage/analysis-procedure-configuration
+   usage/writing-analyses
    structs/system_state
    structs/File-list
    tasks/Calibration
