@@ -372,38 +372,28 @@ def test_dimension_value_generation():
 def build_scan_dim_patch_set(scan_dimension):
     scan_values = parse_scan_dimension_values(scan_dimension)
     patch_set = []
-    if ('key' not in scan_dimension and 'template' not in scan_dimension)\
-       or (('range' not in scan_dimension)
-           and ('values' not in scan_dimension)):
-        raise ConfigFormatError("A range or a list of values along with "
-                                "a key must be specified"
-                                " for a scan dimension")
-    if 'key' in scan_dimension and 'template' in scan_dimension:
-        raise ConfigFormatError("'key' and 'template' are mutually"
-                                " exclusive")
-    if 'key' in scan_dimension:
+    try:
         if scan_dimension['key'] is None:
             return [{}]
         scan_dim_key = scan_dimension['key']
-        if not isinstance(scan_dim_key, list):
-            raise ConfigFormatError(
-                    "The key field in the parameter section of "
-                    " needs to be a list")
         for val in scan_values:
             patch = generate_patch(scan_dim_key, val)
             patch_set.append(patch)
         return patch_set
-    if 'template' in scan_dimension:
-        template = scan_dimension['template']
+    except KeyError:
         try:
+            template = scan_dimension['template']
             template = jinja2.Template(template)
+            for val in scan_values:
+                patch_set.append(yaml.safe_load(template.render(value=val)))
+            return patch_set
         except jinja2.TemplateSyntaxError as e:
             raise ConfigFormatError(
-                    "The template in"
-                    " scan config {daq_label} is malformed") from e
-        for val in scan_values:
-            patch_set.append(yaml.safe_load(template.render(value=val)))
-        return patch_set
+                    f"The template is malformed: {e.message}")
+        except KeyError:
+            raise ConfigFormatError(
+                    "Neither the template keyword nor the 'key' keyword"
+                    " could not be found")
 
 
 def test_build_patch_set():
@@ -424,14 +414,13 @@ def test_build_patch_set():
 
 
 def parse_scan_parameters(scan_config: dict):
-    # parse the scan dimensions
-    daq_label = scan_config['name']
     scan_parameters = []
-    if 'parameters' not in scan_config:
-        raise ConfigFormatError("There needs to be a 'parameters' list"
-                                f" in the scan entry {daq_label}")
-    for scan_dimension in scan_config['parameters']:
-        scan_parameters.append(build_scan_dim_patch_set(scan_dimension))
+    try:
+        for scan_dimension in scan_config['parameters']:
+            scan_parameters.append(build_scan_dim_patch_set(scan_dimension))
+        scan_config['parameters'] = scan_parameters
+    except KeyError:
+        scan_config['parameters'] = None
     return scan_parameters
 
 
@@ -446,7 +435,116 @@ def test_parse_scan_parameters():
         assert isinstance(patch, dict)
 
 
-def parse_scan_config(scan_config: dict, path: str) -> tuple:
+def parse_daq_parameters(scan_config: dict, path: Path):
+    try:
+        if not isinstance(scan_config['parameters'], list):
+            raise ConfigFormatError(
+                f"The parameters section of daq {scan_config['name']} in"
+                f" file {path.resolve()} needs to be a list")
+    except KeyError:
+        scan_config['parameters'] = []
+        return
+    for scan_dimension in scan_config['parameters']:
+        if ('key' not in scan_dimension and 'template' not in scan_dimension)\
+           or (('range' not in scan_dimension)
+               and ('values' not in scan_dimension)):
+            raise ConfigFormatError(
+                    "A range or a list of values along with "
+                    "a key must be specified"
+                    f" for a scan dimension daq config {scan_config['name']}"
+                    f" in file {path.resolve()}")
+        if 'key' in scan_dimension and 'template' in scan_dimension:
+            raise ConfigFormatError(
+                "'key' and 'template' are mutually"
+                f" exclusive, both where defined in {scan_config['name']} in"
+                f" file {path.resolve()}")
+        if 'key' in scan_dimension:
+            if not isinstance(scan_dimension['key'], list):
+                raise ConfigFormatError(
+                    "The key field in the parameter section of "
+                    " needs to be a list")
+        if 'template' in scan_dimension:
+            template = scan_dimension['template']
+            try:
+                template = jinja2.Template(template)
+            except jinja2.TemplateSyntaxError as e:
+                raise ConfigFormatError(
+                    "The template in"
+                    f" scan config {scan_config['name']} in "
+                    f"file {path.resolve()} is malformed") from e
+        scan_dimension['values'] = parse_scan_dimension_values(scan_dimension)
+        if 'range' in scan_dimension:
+            del scan_dimension['range']
+    scan_config['parameters'].sort(key=lambda x: len(x['values']))
+
+
+def parse_system_settings(system_settings: dict, name: str, path: str) -> dict:
+    """
+    Parses the system settings section of a daq configuration
+
+    Parameters
+    ---------
+    system_settings : dict
+        the subsection of the config that is labled system_settings
+    name : str
+        the name of the daq procedure being parsed
+    path : Path
+        the path to the file the current daq procedure is defined in
+
+    Raises
+    ------
+    ConfigFormatError :
+        if an error in the format is detected, this kind of error is raised
+        directly by the function.
+    """
+    path = Path(path)
+    dir = Path(os.path.dirname(path))
+    try:
+        default_path = system_settings['default']
+    except KeyError:
+        raise ConfigFormatError(
+            f'No default config specified in procedure {name} in file'
+            f' {path.resolve()}')
+    if not isinstance(default_path, list):
+        default_path = [default_path]
+    full_paths = []
+    for rel_path in default_path:
+        rel_path = Path(rel_path)
+        full_path = dir / rel_path
+        if not full_path.exists():
+            raise ConfigFormatError(
+                f"the default config file {full_path} can't be found")
+        full_paths.append(full_path.resolve())
+    system_settings['default'] = full_paths
+
+    try:
+        init_paths = system_settings['init']
+    except KeyError:
+        raise ConfigFormatError(
+            f'No init config specified in procedure {name} in file'
+            f' {path.resolve()}')
+    if not isinstance(init_paths, list):
+        init_paths = [init_paths]
+    full_paths = []
+    for rel_path in init_paths:
+        rel_path = Path(rel_path)
+        full_path = dir / rel_path
+        if not full_path.exists():
+            raise ConfigFormatError(
+                f"the init config file {full_path} can't be found")
+        full_paths.append(full_path.resolve())
+    system_settings['init'] = full_paths
+
+    try:
+        if not isinstance(system_settings['override'], dict):
+            raise ConfigFormatError(
+                f'the override section in procedure {name} in file '
+                f'{path.resolve()} needs to be a dictionary')
+    except KeyError:
+        system_settings['override'] = {}
+
+
+def parse_daq_config(daq_config: dict, path: str):
     """
     parse the different entries of the dictionary to create
     the configuration that can be passed to the higher_order_scan function
@@ -458,211 +556,171 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
     daq-system configuration with ones specified in the sever_override and
     client_override section
 
-    Arguments:
-        scan_config: Dictionary that is the configuration for a single
-                     scan/measurement
-        path: Path to the file that contained the scan_config dict in yaml
-              format this is needed to be able to find the daq-system default
-              configuration
-    Returns:
-        the tuple of scan parameters, scan_requirement, scan_name and
-        daq_system configuration.
+    Parameters
+    ---------
+    daq_config : dict
+        Dictionary that is the configuration for a single scan/measurement
+    path : str
+        Path to the file that contained the scan_config dict in yaml
+        format this is needed to be able to find the daq-system default
+        configuration
+
+    Returns
+    -------
+    This funciton does not return anything directly instead altering the
+    contents of the daq_config dict
     """
-    daq_label = scan_config['name']
+    # get the directory the file is located in
     scan_config_path = Path(path)
-    scan_file_dir = Path(os.path.dirname(scan_config_path))
+    try:
+        if not isinstance(daq_config['name'], str):
+            ConfigFormatError(f'A procedure inside the file'
+                              f' {scan_config_path.resolve()} has an'
+                              ' invalid `name`')
+    except KeyError:
+        raise ConfigFormatError(f'A daq procedure in {path} has no name')
+
+    # the verification of type is skipped because this is done in the
+    # previous function
 
     # check if any calibrations need to be performed before taking data
-    if 'calibration' not in scan_config:
-        scan_config['calibration'] = None
-    elif not isinstance(scan_config['calibration'], str):
-        raise ConfigFormatError(
-                'The calibration needs to be the '
-                'name of the procedure used to calibrate '
-                'the current procedure')
-
     try:
-        raw_data = scan_config['event_mode']
-        if not isinstance(raw_data, bool):
-            raise ConfigFormatError("The event_data field needs to contain a"
-                                    " boolean")
+        if not isinstance(daq_config['calibration'], str):
+            raise ConfigFormatError(
+                    'The calibration needs to be the '
+                    'name of the procedure used to calibrate '
+                    'the current procedure')
     except KeyError:
-        scan_config['event_mode'] = False
-    # parse the daq-system configuration
-    # build the path for the default config
-    try:
-        daq_settings = scan_config['daq_settings']
-    except KeyError as err:
-        raise ConfigFormatError("A daq Task must specify a 'daq_settings'"
-                                " section that at least contains the "
-                                "'default' key pointing"
-                                " to the default system config used") from err
-    try:
-        default_daq_settings_path = scan_file_dir / \
-            Path(daq_settings['default'])
-    except KeyError as err:
-        raise ConfigFormatError("A daq Task must specify a 'daq_settings'"
-                                " section that at least contains the "
-                                "'default' key pointing"
-                                " to the default system config used") from err
-    # load the default config
-    try:
-        daq_system_config = load_configuration(
-                default_daq_settings_path.resolve())
-        daq_system_default_config = daq_system_config
-        scan_config['daq_settings']['default'] = daq_system_default_config
-    except FileNotFoundError as err:
-        raise ConfigFormatError(f"The path specified for the default config"
-                                f"of the daq_settings in {daq_label} does"
-                                " not exist") from err
-    if 'server_override' not in scan_config['daq_settings']:
-        scan_config['daq_settings']['server_override'] = {}
-    if 'client_override' not in scan_config['daq_settings']:
-        scan_config['daq_settings']['client_override'] = {}
-
-    # load the power on and initial config for the target
-    try:
-        target_config = scan_config['target_settings']
-    except KeyError as err:
-        raise ConfigFormatError(f"The 'target_settings' section in the daq"
-                                f" task {daq_label} is missing") from err
-    try:
-        target_power_on_config_path = target_config['power_on_default']
-    except KeyError as err:
-        raise ConfigFormatError(f"The 'power_on_default' key in the daq"
-                                f" task {daq_label} is missing. It should"
-                                "be a path to the power on default config"
-                                " of the target") from err
-    try:
-        pwr_on_path = scan_file_dir /\
-                target_power_on_config_path
-        target_power_on_config = load_configuration(pwr_on_path)
-        scan_config['target_settings']['power_on_default']\
-            = target_power_on_config
-    except FileNotFoundError as err:
-        raise ConfigFormatError(f"The target power on configuration for"
-                                f" {daq_label} could not be found") from err
-    try:
-        initial_config_path = target_config['initial_config']
-    except KeyError as err:
-        raise ConfigFormatError(f"The 'initial_config' key in the daq"
-                                f" task {daq_label} is missing. It should"
-                                "be a path to the configuration of the "
-                                " target at the beginning of the measure"
-                                "ments") from err
-    try:
-        init_cfg_path = scan_file_dir / initial_config_path
-        target_initial_config = load_configuration(init_cfg_path.resolve())
-        scan_config['target_settings']['initial_config']\
-            = target_initial_config
-    except FileNotFoundError as err:
-        raise ConfigFormatError(f"The initial target config of {daq_label}"
-                                " could not be found") from err
+        daq_config['calibration'] = None
 
     try:
-        if not isinstance(scan_config['data_columns'], list):
+        if not isinstance(daq_config['merge'], bool):
+            raise ConfigFormatError("The merge_data field of procedure"
+                                    f" {daq_config['name']} in file "
+                                    f"{scan_config_path.resolve()}"
+                                    " needs to be a bool")
+    except KeyError:
+        daq_config['merge'] = False
+
+    try:
+        if 'summary' != daq_config['mode'] and 'full' != daq_config['mode']:
+            raise ConfigFormatError(f'The mode specified in procedure '
+                                    f'{daq_config["name"]} in file '
+                                    f'{scan_config_path.resolve()} is not '
+                                    f'"full" or "summary"')
+    except KeyError:
+        daq_config['mode'] = 'summary'
+
+    try:
+        if not isinstance(daq_config['data_columns'], list):
             raise ConfigFormatError("The columns key must be a list of the "
                                     " dataframe, columns is a "
-                                    f"{type(scan_config['data_columns'])}")
+                                    f"{type(daq_config['data_columns'])}")
     except KeyError:
-        scan_config['data_columns'] = None
-    scan_parameters = parse_scan_parameters(scan_config)
-    scan_config['parameters'] = scan_parameters
-    return scan_config
+        daq_config['data_columns'] = 'all'
+
+    try:
+        system_settings = daq_config['system_settings']
+    except KeyError:
+        raise ConfigFormatError(
+            f'the procedure {daq_config["name"]} in file {path.resolve()}'
+            ' needs a system_settings entry')
+    parse_system_settings(system_settings, daq_config['name'], path)
+    parse_daq_parameters(daq_config, path)
 
 
 def test_parse_scan_config():
     test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
     test_dir = Path(os.path.dirname(test_fpath))
-    scan_configs = []
-    test_config = load_configuration(test_fpath)
-    for scan in test_config:
-        scan_configs.append(parse_scan_config(scan, test_fpath))
-    assert len(scan_configs) == 7  # number of different scans
+    test_configs = load_configuration(test_fpath)
+    for i, scan in enumerate(test_configs):
+        parse_daq_config(test_configs[i], test_fpath)
 
     # test with the first daq_procedure
-    test_config = scan_configs[0]
+    test_config = test_configs[0]
     assert test_config['name'] == 'timewalk_scan'
     assert test_config['type'] == 'daq'
-    assert isinstance(test_config['target_settings']['power_on_default'], dict)
-    assert len(test_config['target_settings']['power_on_default']) == 3
-    assert isinstance(test_config['target_settings']['initial_config'], dict)
-    assert len(test_config['target_settings']['initial_config']) == 3
-    init_config = load_configuration(test_dir
-                                     / 'init_timewalk_scan.yaml')
-    assert test_config['target_settings']['initial_config'] == init_config
-    daq_config = load_configuration(test_dir /
-                                    'defaults/daq-system-config.yaml')
-    assert test_config['daq_settings']['default'] == daq_config
-    assert test_config['daq_settings']['client_override'] == {}
-    assert test_config['daq_settings']['server_override']['NEvents'] == 1000
-    assert test_config['daq_settings']['server_override'][
-            'l1a_generator_settings'][0]['BX'] == 16
-    print(test_config.keys())
+    assert isinstance(test_config['system_settings']['default'], list)
+    assert len(test_config['system_settings']['default']) == 2
+    assert isinstance(test_config['system_settings']['init'], list)
+    assert len(test_config['system_settings']['init']) == 1
+    init_path = test_dir / 'init_timewalk_scan.yaml'
+    daq_path = test_dir / 'defaults/daq-system-config.yaml'
+
+    assert test_config['system_settings']['init'][0].resolve()\
+        == init_path.resolve()
+    assert test_config['system_settings']['default'][1].resolve()\
+        == daq_path.resolve()
+    assert test_config[
+        'system_settings']['override']['daq']['server']['NEvents'] == 1000
+    assert test_config['system_settings']['override'][
+            'daq']['server']['l1a_generator_settings'][0]['BX'] == 16
     assert len(test_config['parameters']) == 1
-    assert len(test_config['parameters'][0]) == 2048
+    assert 'key' in test_config['parameters'][0]
+    assert 'values' in test_config['parameters'][0]
+    test_config = test_configs[0]
+    tree_dim = [len(dim['values']) for dim in test_config['parameters']]
+    for td, ptd in zip(tree_dim[1:], tree_dim[:-1]):
+        assert td >= ptd
 
 
-def parse_analysis_config(config: dict) -> tuple:
+def parse_analysis_config(config: dict, path: str) -> tuple:
     """
     parse the analysis configuration from a dict and return it in the
     same way that the parse_scan_config
 
     Returns
-        Tuple containing the parameters relevant to the analysis given
-        by the analysis_label along with the name of the daq task that
-        provides the data for the analysis
-        analysis_parameters: parameters of the analysis to be performed
-        daq: daq task required by the analysis
-        analysis_label: name of the analysis
+    -------
+    Tuple containing the parameters relevant to the analysis given
+    by the analysis_label along with the name of the daq task that
+    provides the data for the analysis
+    analysis_parameters: parameters of the analysis to be performed
+    daq: daq task required by the analysis
+    analysis_label: name of the analysis
     """
+    path = Path(path)
     try:
-        event_mode = config['event_mode']
-        if not isinstance(event_mode, bool):
-            raise ConfigFormatError("The event_data field needs to contain a"
-                                    " boolean")
+        if not isinstance(config['name'], str):
+            ConfigFormatError(f'A procedure inside the file'
+                              f' {path.resolve()} has an'
+                              ' invalid `name`')
     except KeyError:
-        event_mode = False
+        raise ConfigFormatError(
+                f'An analysis procedure in {path.resolve()} has no name')
+
     try:
-        analysis_label = config['name']
-    except KeyError as err:
-        raise ConfigFormatError("The analysis configuration needs"
-                                " a name field") from err
-    try:
-        analysis_object_name = config['python_module_name']
-    except KeyError as err:
-        raise ConfigFormatError("The analysis configuration needs"
-                                " a python_module_name field") from err
+        if not isinstance(config['module_name'], str):
+            raise ConfigFormatError(
+                    f"The 'module_name' field of the analysis {config['name']}"
+                    f" needs to contain a string")
+    except KeyError:
+        config['module_name'] = config['name']
+
     # parse the daq that is required for the analysis
     try:
-        daq = config['daq']
-    except KeyError as err:
-        raise ConfigFormatError("an analysis must specify a daq task") from err
+        if not isinstance(config['daq'], str):
+            raise ConfigFormatError(
+                    f"The 'daq' field of the analysis {config['name']}"
+                    f" in file {path.resolve()} needs to contain a string")
+    except KeyError:
+        raise ConfigFormatError(
+                f"The analysis {config['name']} in file {path.resolve()} "
+                "must specify a daq task")
 
     try:
-        iteration_columns = config['iteration_columns']
-    except KeyError:
-        iteration_columns = None
-
-    analysis_parameters = {}
-    if 'parameters' in config.keys():
         if not isinstance(config['parameters'], dict):
-            raise ConfigFormatError("The parameters of an analysis must be"
-                                    " a dictionary")
-        analysis_parameters = config['parameters']
-    return {'iteration_columns': iteration_columns,
-            'parameters': analysis_parameters,
-            'event_mode': event_mode,
-            'daq': daq,
-            'python_module': analysis_object_name,
-            'name': analysis_label,
-            'type': 'analysis'}
+            raise ConfigFormatError(
+                    f"The parameters section of analysis {config['name']}"
+                    f" in file {path.resolve()} needs to be a dictionary")
+    except KeyError:
+        config['parameters'] = None
 
 
 def test_analysis_config():
     test_fpath = Path('../../examples/analysis_procedures.yaml')
     config = load_configuration(test_fpath)
-    parsed_config = parse_analysis_config(config[0])
+    parse_analysis_config(config[0], test_fpath)
+    parsed_config = config[0]
     assert parsed_config['daq'] == 'example_scan'
     assert isinstance(parsed_config['parameters'], dict)
     assert parsed_config['name'] == 'example_analysis'
@@ -679,26 +737,32 @@ def parse_config_entry(entry: dict, path: str):
     take care of calling the right function for the different configuration
     types calls the parse_scan_config and parse_analysis_config.
     """
-    ptype = entry['type']
+    try:
+        ptype = entry['type']
+    except KeyError:
+        ConfigFormatError(
+                f"A procedure configuration was found in {path} that"
+                " does not define a type")
     if ptype.lower() == 'daq':
-        return parse_scan_config(entry, path)
-    if ptype.lower() == 'analysis':
-        return parse_analysis_config(entry)
-    raise ValueError("The type of a procedure must be"
-                     " either daq or analysis")
+        parse_daq_config(entry, path)
+    elif ptype.lower() == 'analysis':
+        parse_analysis_config(entry)
+    else:
+        raise ValueError("The type of a procedure must be"
+                         " either daq or analysis")
 
 
 def test_parse_config_entry():
     scan_test_config = Path('../../tests/configuration/scan_procedures.yaml')
     config = load_configuration(scan_test_config)
-    parsed_config = [parse_config_entry(elem, scan_test_config)
-                     for elem in config]
+    for i in range(len(config)):
+        parse_config_entry(config[i], scan_test_config)
     names = ['timewalk_scan', 'timewalk_scan_with_template',
              'timewalk_scan_v2',
              'timewalk_and_phase_scan', 'full_toa_scan',
              'master_tdc_SIG_calibration_daq',
              'master_tdc_REF_calibration_daq']
-    for name, entry in zip(names, parsed_config):
+    for name, entry in zip(names, config):
         assert name == entry['name']
 
 
@@ -731,7 +795,6 @@ def parse_config_file(config_path: str):
     procedures = []
     workflows = []
     config = load_configuration(path)
-    print(config)
     if isinstance(config, dict):
         if 'libraries' in config.keys():
             # resolve the path to the library files taking
@@ -751,7 +814,6 @@ def parse_config_file(config_path: str):
                 workflows = workflows + other_workflows
         if 'workflows' in config.keys():
             raw_workflows = config['workflows']
-            print(raw_workflows)
             workflows = workflows + validate_wokflow_config(raw_workflows,
                                                             path)
         # The root configuration file can also specify new
@@ -761,7 +823,7 @@ def parse_config_file(config_path: str):
                 for procedure in config['procedures']:
                     ptype = procedure['type']
                     if ptype.lower() == 'daq':
-                        procedures.append(parse_scan_config(procedure, path))
+                        procedures.append(parse_daq_config(procedure, path))
                     elif ptype.lower() == 'analysis':
                         procedures.append(parse_analysis_config(procedure))
                     else:
@@ -783,126 +845,126 @@ def test_parse_config_file():
     assert len(workflows) == 1
 
 
-def get_target_config(procedure_config: dict):
-    default = procedure_config['target_settings']['power_on_default']
-    init = procedure_config['target_settings']['initial_config']
-    full_initial = patch_configuration(default, init)
-    return full_initial
+def get_system_config(procedure_config: dict):
+    config = {}
+    init_config_fragments = [
+            load_configuration(icp)
+            for icp in procedure_config['system_settings']['init']]
+    for frag in init_config_fragments:
+        update_dict(config, frag, in_place=True)
+    override = procedure_config['system_settings']['override']
+    update_dict(config, override, in_place=True)
+    return config
 
 
-def get_daq_config(procedure_config: dict):
-    default = deepcopy(procedure_config['daq_settings']['default'])
-    try:
-        server_override = procedure_config['daq_settings']['server_override']
-        default = patch_configuration(default, {'server': server_override})
-    except KeyError:
-        pass
-    try:
-        client_override = procedure_config['daq_settings']['client_override']
-        default = patch_configuration(default, client_override)
-    except KeyError:
-        pass
-    return default
+def get_system_default_config(procedure_config: dict):
+    config = {}
+    default_config_fragments = [
+            load_configuration(dcp)
+            for dcp in procedure_config['system_settings']['default']]
+    for frag in default_config_fragments:
+        update_dict(config, frag, in_place=True)
+    return config
 
 
-def test_get_daq_config():
-    test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
-    # test_dir = Path(os.path.dirname(test_fpath))
-    scan_configs = []
-    test_config = load_configuration(test_fpath)
-    for scan in test_config:
-        scan_configs.append(parse_scan_config(scan, test_fpath))
-
-    test_config = scan_configs[0]
-    default_daq_config = deepcopy(test_config['daq_settings']['default'])
-    daq_config = get_daq_config(test_config)
-    delta = diff_dict(default_daq_config, daq_config)
-    print(delta)
-    assert delta is not None
-    assert delta['server']['NEvents'] == 1000
+def test_get_system_config():
+    test_configs = _get_daq_configs()
+    test_config = test_configs[0]
+    default_daq_config = load_configuration(
+            test_config['system_settings']['default'][1])['daq']
+    system_default_config = get_system_default_config(test_config)['daq']
+    print(system_default_config)
+    delta = diff_dict(default_daq_config, system_default_config)
+    assert delta is None
 
 
-def generate_subsystem_states(system_state: dict):
+def generate_worker_config(system_state: dict):
     """
-    generate the system state for every subtask given the current system state
+    create procedure configrurations that can be distributed to the worker
+    tasks.
 
-    generator to produce the system state for every subtask of the current task
-    (most often the DataField task) takes the firs list from the
-    scan_parameters and patches the correct part of the subtask config. It also
-    removes the first element of the parameters list
+    Do this by figuring out how many runs there are and how many workers there
+    and then modifying the parameters section of the procedure configuration
+    for each worker so that the worker will work through roughly 1/nworker
+    of the runs
     """
-    subsystem_state = deepcopy(system_state)
-    try:
-        subsystem_state['procedure']['parameters'] = system_state[
-                'procedure'][
-                'parameters'][1:]
-    except IndexError:
-        subsystem_state['procedure']['parameters'] = []
-    for patch in system_state['procedure']['parameters'][0]:
-        if 'target' in patch:
-            tpatch = patch['target']
-            subsystem_state['procedure']['target_settings']['initial_config']\
-                = update_dict(system_state['procedure'][
-                    'target_settings']['initial_config'], tpatch)
-        if 'daq' in patch and len(patch.keys()) == 1:
-            dpatch = patch['daq']
-            if 'server' in dpatch:
-                sp = dpatch['server']
-                subsystem_state['procedure']['daq_settings'][
-                        'server_override'] = update_dict(
-                                system_state['procedure'][
-                                             'daq_settings'][
-                                             'server_override'], sp)
-            if 'client' in dpatch:
-                cp = dpatch['client']
-                subsystem_state['procedure']['daq_settings'][
-                        'client_override'] = update_dict(
-                                system_state['procedure'][
-                                             'daq_settings'][
-                                             'client_override'], cp)
-        yield subsystem_state
+    values = [parse_scan_dimension_values(dim)
+              for dim in system_state['procedure']['parameters']]
+    total_runs = 1
+    tree_dim = [1]
+    for val in values:
+        total_runs *= len(val)
+        assert len(val) > tree_dim[-1]
+        tree_dim.append(len(val))
+
+    workers = system_state['workers']
+
+    split_level = len(tree_dim) - 1
+    for i, dim in enumerate(tree_dim):
+        if dim >= workers:
+            split_level = i - 1
+            break
+    split_vals = [values[split_level][i::workers] for i in range(workers)]
+
+    worker_states = []
+    for vals in split_vals:
+        worker_state = deepcopy(system_state)
+        worker_state['procedure']['parameters'][split_level]['values'] = vals
+        worker_states.append(worker_state)
+    return worker_states
 
 
 def test_generate_subsystem_states():
-    scan_configs = _get_scan_configs()
+    scan_configs = _get_daq_configs()
     test_config = scan_configs[0]
+    reference_dim = [len(dim['values'])
+                     for dim in test_config['parameters']]
     system_state = {}
+    system_state['workers'] = 1
     system_state['procedure'] = test_config
-    init = test_config['target_settings']['initial_config']
-    patches = test_config['parameters'][0]
-    for patch, subscan_system_state in\
-            zip(patches, generate_subsystem_states(system_state)):
-        assert len(subscan_system_state['procedure']['parameters']) == 0
-        sub_init = subscan_system_state[
-                'procedure'][
-                'target_settings'][
-                'initial_config']
-        delta = diff_dict(init, sub_init)
-        assert {'target': delta} == patch
+    for state in generate_worker_config(system_state):
+        parameters = state['procedure']['parameters']
+        tree_dim = [len(dim['values']) for dim in parameters]
+        assert tree_dim == reference_dim
+    system_state = {}
+    system_state['workers'] = 3
+    system_state['procedure'] = test_config
+    for i, state in enumerate(generate_worker_config(system_state)):
+        parameters = state['procedure']['parameters']
+        tree_dim = [len(dim['values']) for dim in parameters]
+        assert len(tree_dim) == len(reference_dim)
+        assert parameters[0]['values'] == list(range(2048))[i::3]
+
+    test_config = scan_configs[3]
+    system_state = {}
+    system_state['workers'] = 3
+    system_state['procedure'] = test_config
+    dim_vals = [dim['values']
+                for dim in system_state['procedure']['parameters']]
+    ref_tree_dim = [len(vals) for vals in dim_vals]
+    assert system_state['procedure']['name'] == 'timewalk_and_phase_scan'
+    collected_dim_vals = [[] for vals in dim_vals]
+    merge_dim = 0
+    for i, state in enumerate(generate_worker_config(system_state)):
+        parameters = state['procedure']['parameters']
+        tree_dim = [len(dim['values']) for dim in parameters]
+        for j, dim in enumerate(parameters):
+            if tree_dim[j] != ref_tree_dim[j]:
+                merge_dim = j
+                collected_dim_vals[j] += dim['values']
+    assert len(collected_dim_vals[merge_dim]) == len(dim_vals[merge_dim])
+    for val in collected_dim_vals[merge_dim]:
+        assert val in dim_vals[merge_dim]
 
 
-def generate_run_config(system_state: dict, calibration: dict):
-    target_config = get_target_config(system_state['procedure'])
-    daq_config = get_daq_config(system_state['procedure'])
-    update_dict(target_config, calibration, in_place=True)
-    complete_config = {'target': target_config,
-                       'daq': daq_config}
-    return complete_config
-
-
-def test_generate_run_configurations():
-    pass
-
-
-def _get_scan_configs():
+def _get_daq_configs():
     """
     Function that makes loading scan configurations a one liner
     instead of copying the code everywhere
     """
     test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
     # test_dir = Path(os.path.dirname(test_fpath))
-    scan_configs = []
     test_config = load_configuration(test_fpath)
-    for scan in test_config:
-        scan_configs.append(parse_scan_config(scan, test_fpath))
-    return scan_configs
+    for i, _ in enumerate(test_config):
+        parse_daq_config(test_config[i], test_fpath)
+    return test_config
