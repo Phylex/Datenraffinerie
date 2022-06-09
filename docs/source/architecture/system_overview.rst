@@ -48,7 +48,7 @@ transforming it into the ``hdf5`` file format containing a table with the user s
 
 The Distillery Task
 -------------------
-The :doc:`Distillery </architecture/distillery>` task is responsible for loading and executing the user provided analysis. It's purpose is to find an analysis class that matches the one specified in the 
+The :doc:`Distillery </tasks/distillery>` task is responsible for loading and executing the user provided analysis. It's purpose is to find an analysis class that matches the one specified in the 
 configuration and execute it so that it integrates into the Datenraffinerie.
 
 ----
@@ -60,7 +60,7 @@ Data structures
 The Task-State
 --------------
 As it is possible that a ValveYard declares either a distillery or a well as it's dependency and both distillery and well can in turn declare a ValveYard as their dependency
-The flow of information needs to be managed. To do this a data structure the :doc:`task state </architecture/task_state` is used. It provides a container for all the information needed
+The flow of information needs to be managed. To do this a data structure the :doc:`task state </architecture/system_state>` is used. It provides a container for all the information needed
 by the a task and is adapted by the parent task to contain the correct information for the child classes to function properly.
 
 

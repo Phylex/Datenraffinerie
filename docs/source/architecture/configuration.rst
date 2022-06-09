@@ -114,7 +114,10 @@ look like this:
         connected: 0
     	  threshold: 0
 
-Assuming that the target config would also specify a daq parameter like in the following example:
+Assuming that the target config would also specify a daq parameter like in the following example and Assuming
+that the files are listed in the following order in the ``system_settings/default`` list:
+1. daq-default.yaml
+2. target-default.yaml
 
 ::
 
@@ -275,7 +278,7 @@ the following set of patches is generated:
 The patches are the difference in phase space between the local null vector that is the initial configuration, and the points in phase
 space that measurement should be taken at. overlaying the patch onto the init and then overlaying the result of that onto the default
 configuration gives the exact point in the 'absolute' phase space. The fully qualified configuration for the point in phase space specified
-by the first patch in the above list (along with the above mentioned init and default configurations) would be:
+by the **first patch in the above list** (along with the above mentioned init and default configurations) would be:
 
 ::
 
@@ -289,13 +292,13 @@ by the first patch in the above list (along with the above mentioned init and de
         - id: 2
           name: 2
           link: 4
-      data_port: 5000
+      data_port: 5001
     client:
-      data_port: 5000
+      data_port: 5001
       output_file_name: ./myfilename.raw
   target:
     global:
-      ADC_gain: 1
+      ADC_gain: 2
       DAC_gain: 1
     ch:
       0:
@@ -310,6 +313,11 @@ by the first patch in the above list (along with the above mentioned init and de
       3:
         connected: 0
     	  threshold: 0
+
+It can be seen that the ``data_port`` and ``ADC_gain`` from the initial configuration are applied to the fully qualified config, and the 
+``threshold`` of channel 0 and 1 are taken from the patch.
+
+aA value specified in the patch takes precedence over the the value in the init config which in turn takes precedence over the default configuration.
 
 Important Note
 --------------
