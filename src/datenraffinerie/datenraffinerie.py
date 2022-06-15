@@ -46,15 +46,15 @@ def cli(netcfg, config, procedure, workers, output, analysis_path, loop):
     # it holds the system state
     procedure_config = {}
     procedure_config['root_config_path'] = click.format_filename(config)
-    procedure_config['name'] = procedure
     procedure_config['output_path'] = output
     procedure_config['analysis_path'] = analysis_path
     procedure_config['network_config'] = netcfg
     procedure_config['loop'] = True if loop else False
+    procedure_config['workers'] = workers
     # run the valveyard
     try:
         run_result = luigi.build(
-            [ValveYard(procedure_config=procedure_config)],
+            [ValveYard(system_state=procedure_config, task_name=procedure)],
             local_scheduler=True,
             workers=workers,
         )
