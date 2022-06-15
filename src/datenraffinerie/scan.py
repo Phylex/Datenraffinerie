@@ -5,230 +5,25 @@ hexaboard
 """
 from pathlib import Path
 from functools import reduce
+from multiprocessing import Process, Queue
 import os
+from time import sleep
 import operator
 import shutil
 import luigi
 import yaml
 import zmq
 from uproot.exceptions import KeyInFileError
+from . import dict_utils as dtu
 from . import config_utilities as cfu
 from . import analysis_utilities as anu
 from .errors import DAQConfigError, DAQError
 from copy import deepcopy
+from luigi.freezing import FrozenOrderedDict
+from luigi.parameter import ParameterVisibility
 
 
-class Calibration(luigi.Task):
-    """
-    The calibration task manages the possibility of the initial state of the
-    procedure to be calibrated by a previous procedure
-    """
-    system_state = luigi.DictParameter()
-
-    def requires(self):
-        from .valve_yard import ValveYard
-        # if a calibration is needed then the delegate finding
-        # the calibration and adding the subsequent tasks to the
-        # to the ValveYard
-        if 'calibration' in self.system_state['procedure']\
-                and self.system_state['procedure']['calibration'] is not None:
-            child_state = deepcopy(self.system_state)
-            del child_state['procedure']
-            child_state['name'] = self.system_state['procedure']['calibration']
-            return ValveYard(child_state)
-
-    def output(self):
-        output_dir = self.system_state['ouptut_path']
-        local_calib_path = Path(output_dir) / 'calibration.yaml'
-        return {'full-calibration': luigi.LocalTarget(local_calib_path)}
-
-    def run(self):
-        # figure out if there is a calibration that we need and if so create a
-        # local copy so that we don't end up calling the valve yard multiple
-        # times
-        if 'full-calibration' in self.input():
-            full_calibration = yaml.safe_load(
-                    self.input()['full-calibration'].read())
-        else:
-            full_calibration = {}
-        if 'calibration' in self.system_state['procedure'] and\
-           self.system_state['procedure']['calibration'] is not None:
-            with self.input()['calibration'].open('r') as calibration_file:
-                with self.output().open('w') as local_calib_copy:
-                    calibration = cfu.patch_configuration(
-                            full_calibration,
-                            yaml.safe_load(calibration_file.read()))
-                    local_calib_copy.write(yaml.safe_dump(calibration))
-
-        else:
-            with self.output().open('w') as local_calib_copy:
-                local_calib_copy.write(yaml.safe_dump(full_calibration))
-
-
-class FieldPreparation(luigi.Task):
-    """
-    Initialize (or re-initialize) the chips to the power-on default
-    """
-    system_state = luigi.DictParameter()
-
-    def requires(self):
-        return Calibration(self.system_state)
-
-    def output(self):
-        return self.input()
-
-    def complete(self):
-        return self.initialized_to_default
-
-    def run(self):
-        # the default values for the DAQ system and the target need to
-        # be loaded on to the backend only once
-        network_config = self.system_state['network_config']
-        context = zmq.Context()
-        socket = context.socket(zmq.REQ)
-        socket.connect(
-            f"tcp://{network_config['daq_coordinator']['hostname']}:"
-            f"{network_config['daq_coordinator']['port']}")
-        target_default_config = self.system_state[
-                'produce'][
-                'target_settings'][
-                'power_on_default']
-        daq_default_config = self.system_state[
-                'procedure'][
-                'daq_settings'][
-                'default']
-        complete_default_config = {
-            'daq': cfu.unfreeze(daq_default_config),
-            'target': cfu.unfreeze(target_default_config)}
-        socket.send_string('load defaults;' +
-                           yaml.safe_dump(complete_default_config))
-        socket.setsockopt(zmq.RCVTIMEO, 20000)
-        try:
-            resp = socket.recv()
-        except zmq.error.Again as e:
-            raise RuntimeError("Socket is not responding. Please check that "
-                               "client and server apps are running, "
-                               "and that your network configuration "
-                               "is correct") from e
-        else:
-            if resp != b'defaults loaded':
-                raise DAQConfigError('Default config could not be loaded into'
-                                     ' the backend')
-
-            self.initialized_to_default = True
-
-
-class DrillingRig(luigi.Task):
-    """
-    Task that unpacks the raw data into the desired data format
-    also merges the yaml chip configuration with the reformatted
-    data.
-    """
-    # configuration and connection to the target
-    # (aka hexaboard/SingleROC tester)
-    system_state = luigi.DictParameter(significant=True)
-    id = luigi.IntParameter(significant=True)
-
-    def requires(self):
-        return FieldPreparation(self.system_state)
-
-    def output(self):
-        """
-        define the file that is to be produced by the unpacking step
-        the identifier is used to make the file unique from the other
-        unpacking steps
-        """
-        output_dir = self.system_state['output_path']
-        name = self.system_state['name']
-        formatted_data_path = Path(output_dir) / \
-            f'{name}_{self.id}.h5'
-        out_struct = self.input()
-        out_struct['data'] = luigi.LocalTarget(formatted_data_path.resolve())
-        return out_struct
-
-    def run(self):
-        # load the configurations
-        try:
-            calibration = yaml.safe_load(
-                    self.input()['full-calibration'].read())
-        except KeyError:
-            calibration = {}
-
-        complete_config = cfu.generate_run_config(self.system_state,
-                                                  calibration)
-        network_config = self.system_state['network_config']
-
-        # create the config on disk
-        output_config = os.path.splitext(self.output()['data'].path)[0]\
-            + '.yaml'
-        config_string = yaml.safe_dump(complete_config)
-        with open(output_config, 'w') as run_config:
-            run_config.write(config_string)
-
-        # send config to the backend and wait for the response
-        context = zmq.Context()
-        socket = context.socket(zmq.REQ)
-        socket.connect(
-                f"tcp://{network_config['daq_coordinator']['hostname']}:"
-                f"{network_config['daq_coordinator']['port']}")
-        socket.send_string('measure;' + config_string)
-        data = socket.recv()
-        socket.close()
-        context.term()
-        base_path = os.path.splitext(self.output()['data'].path)[0]
-        raw_data_file_path = base_path + '.raw'
-        unpacked_file_path = base_path + '.root'
-        # save the data in a file so that the unpacker can work with it
-        with open(raw_data_file_path, 'wb') as raw_data_file:
-            raw_data_file.write(data)
-
-        # merge in the configuration into the raw data
-        # if the fracker can be found run it
-
-        event_mode = self.system_state['event_mode']
-        result = anu.unpack_raw_data_into_root(raw_data_file_path,
-                                               unpacked_file_path,
-                                               raw_data=event_mode)
-        if result != 0:
-            os.remove(raw_data_file_path)
-            if os.path.exists(unpacked_file_path):
-                os.remove(unpacked_file_path)
-            raise ValueError(f"The unpacker failed for {raw_data_file_path}")
-
-        # load the data from the unpacked root file and merge in the
-        # data from the configuration for that run with the data
-        formatted_data_path = Path(self.output()['data'].path)
-        if shutil.which('fracker') is not None:
-            retval = anu.run_compiled_fracker(
-                    unpacked_file_path,
-                    formatted_data_path,
-                    complete_config,
-                    event_mode,
-                    self.system_state['procedure']['data_columns'])
-            if retval != 0:
-                print("The fracker failed!!!")
-                if formatted_data_path.exists():
-                    os.remove(formatted_data_path)
-        # otherwise fall back to the python code
-        else:
-            try:
-                anu.reformat_data(unpacked_file_path,
-                                  formatted_data_path,
-                                  complete_config,
-                                  event_mode,
-                                  columns=self.system_state[
-                                      'procedure'][
-                                      'data_columns'])
-            except KeyInFileError:
-                os.remove(unpacked_file_path)
-                os.remove(raw_data_file_path)
-                return
-            except FileNotFoundError:
-                return
-        os.remove(unpacked_file_path)
-
-
-class DataField(luigi.Task):
+class Well(luigi.Task):
     """
     A Scan over one parameter or over other scans
 
@@ -240,7 +35,8 @@ class DataField(luigi.Task):
     """
     # parameters describing the position of the parameters in the task
     # tree
-    system_state = luigi.DictParameter(significant=True)
+    system_state = luigi.DictParameter(significant=True,
+                                       visibility=ParameterVisibility.PRIVATE)
     id = luigi.IntParameter(significant=True)
     priority = luigi.OptionalParameter(significant=False, default=0)
 
@@ -254,38 +50,11 @@ class DataField(luigi.Task):
         the parameter that the current scan is to scan over, essentially
         creating the Cartesian product of all parameters specified.
         """
-        subtasks = []
-        scan_parameters = self.system_state['procedure']['parameters']
-
-        # if there are more than one entry in the parameter list the scan still
-        # has more than one dimension. So spawn more scan tasks for the lower
-        # dimension
-        if len(scan_parameters) > 1:
-            # calculate the id of the task by multiplication of the length of
-            # the dimensions still in the list
-            task_id_offset = reduce(operator.mul,
-                                    map(lambda x: len(x[1]),
-                                        scan_parameters[1:]))
-            for i, state in enumerate(
-                    cfu.generate_subsystem_states(self.system_state)):
-                subtask_id = self.id + 1 + task_id_offset * i
-                if len(self.scan_parameters[1:]) == 1 and self.loop:
-                    subtasks.append(Fracker(id=subtask_id,
-                                            system_state=state))
-                else:
-                    subtasks.append(DataField(id=subtask_id,
-                                              system_state=state))
-        # The scan has reached the one dimensional case. Spawn a measurement
-        # for every value that takes part in the scan
-        else:
-            if self.loop:
-                return FieldPreparation(self.system_state)
-            else:
-                for i, state in enumerate(
-                        cfu.generate_subsystem_states(self.system_state)):
-                    subtasks.append(DrillingRig(id=self.id + i,
-                                                system_state=state))
-        return subtasks
+        from .valve_yard import ValveYard
+        if self.system_state['procedure']['calibration'] is not None:
+            return ValveYard(system_state=self.system_state,
+                             task_name=self.system_state['procedure']['calibration'],
+                             priority=self.priority)
 
     def output(self):
         """
@@ -299,38 +68,33 @@ class DataField(luigi.Task):
         the luigi pipeline if it can't unpack the file. The user then needs to
         rerun the datenraffinerie
         """
-        loop = self.system_state['loop']
-        scan_parameters = self.system_state['procedure']['parameters']
-        name = self.system_state['name']
-        output_dir = self.system_state['output_path']
-        output_files = {}
-        output_files['full-calibration'] = self.input()['full-calibration']
-        # we are being called by the fracker, so only produce the raw output
-        # files
-        if len(scan_parameters) == 1 and loop:
-            # pass the calibrated default config to the fracker
-            values = self.scan_parameters[0][1]
-            raw_files = []
-            for i, value in enumerate(values):
-                base_file_name = f'{name}_{self.id + i}'
-                raw_file_name = f'{base_file_name}.raw'
-                # if there already is a converted file we do not need to
-                # acquire the data again
-                raw_file_path = Path(self.output_dir) / raw_file_name
-                raw_files.append(luigi.LocalTarget(raw_file_path,
-                                                   format=luigi.format.Nop))
-            output_files['data'] = raw_files
-            return output_files
-
-        # this task is not required by the fracker so we do the usual merge job
-        elif not self.system_state['event_mode']:
-            out_file = f'{name}_{self.id}_merged.h5'
-            merged_file_path = Path(output_dir) / out_file
-            output_files['data'] = luigi.LocalTarget(merged_file_path)
-            return output_files
-        # if we are running in raw mode do not concatenate the files together
-        else:
-            return output_files
+        name = self.system_state['procedure']['name']
+        output_dir = Path(self.system_state['output_path'])
+        output = {}
+        full_calib_path = output_dir / 'full-calibration.yaml'
+        output['full-calibration'] = luigi.LocalTarget(
+                full_calib_path.resolve())
+        run_ids = reduce(operator.mul,
+                         map(lambda x: len(x['values']),
+                             self.system_state['procedure']['parameters']))
+        output['default'] = luigi.LocalTarget(output_dir /
+                                              name + '_full_init.yaml')
+        output['data'] = []
+        output['raw'] = []
+        output['config'] = []
+        for i in run_ids:
+            output['raw'].append(
+                    luigi.LocalTarget(output_dir / name + f'_{i}.raw',
+                                      format=Nop))
+            output['config'].append(
+                    luigi.LocalTarget(output_dir / name + f'_{i}.yaml'))
+            if not self.system_state['procedure']['merge']:
+                output['data'].append(
+                        luigi.LocalTarget(output_dir / name + f'_{i}.h5'))
+            else:
+                output['data'].append(
+                        luigi.LocalTarget(output_dir / name + '_merged.h5'))
+        return output
 
     def run(self):
         """
@@ -344,171 +108,201 @@ class DataField(luigi.Task):
 
         # the fracker required us so we acquire the data and don't do any
         # further processing
-        loop = self.system_state['loop']
-        scan_parameters = self.system_state['procedure']['parameters']
+        self.system_state = cfu.unfreeze(self.system_state)
         network_config = self.system_state['network_config']
 
-        # if we are in the base case (there is only one array in the
-        # scan_parameters) and the loop flag has been set, the
-        # DataField preforms the measurement
-        if loop and len(scan_parameters) == 1:
-            # open the socket to the daq coordinator
-            context = zmq.Context()
-            socket = context.socket(zmq.REQ)
-            socket.connect(
-                f"tcp://{network_config['daq_coordinator']['hostname']}:"
-                f"{network_config['daq_coordinator']['port']}")
+        # open the connection to the daq coordinator
+        context = zmq.Context()
+        socket = context.socket(zmq.REQ)
+        socket.connect(
+            f"tcp://{network_config['daq_coordinator']['hostname']}:"
+            f"{network_config['daq_coordinator']['port']}"
+        )
+        # load the configurations
+        try:
+            with self.input()['full-calibration'].open('r') as calibf:
+                calibration = yaml.safe_load(calibf.read())
+        except KeyError:
+            calibration = {}
 
-            # load the configurations
-            try:
-                calibration = yaml.safe_load(
-                        self.input()['full-calibration'].read())
-            except KeyError:
-                calibration = {}
+        # generate the default config
+        default_config = cfu.generate_system_default_config(
+                self.system_state['procedure'])
 
-            # perform the scan
-            output_files = self.output()['data']
-            output_configs = [os.path.splitext(of.path)[0] + '.yaml'
-                              for of in output_files]
-            system_state = cfu.unfreeze(self.system_state)
-            subtask_states = cfu.generate_subsystem_states(system_state)
-            for raw_file, output_config, state in\
-                    zip(output_files, output_configs, subtask_states):
-                # if the file exists then simply skip it as we are in
-                # a rerun as the unpacker/fracker failed
-                if Path(raw_file.path).exists():
+        # generate initial config and apply calibration
+        initial_config = cfu.generate_init_config(
+                self.system_state['procedure'])
+        dtu.update_dict(initial_config, calibration, in_place=True)
+
+        # write
+
+        # generate the patches for the daq procedure
+        daq_patches = cfu.generate_patches(self.system_state)
+
+        # set up the fracker subprocesses
+        fracker_task_queue = Queue()
+        fracker_processes = []
+
+        for i in range(self.system_state['workers']):
+            p = Process(target=self.frack, args=(fracker_task_queue,
+                                                 default_config))
+            fracker_processes.append(p)
+
+        # aquire lock from the daq coordinator
+        lock_key = None
+        retries = 100
+        while True:
+            socket.send_string('aquire_lock;')
+            message = socket.recv()
+            state_separator = message.find(b';')
+            state = message[:state_separator]
+            if state == b"busy":
+                sleep(.5)
+                retries -= 1
+                if retries > 0:
                     continue
+                else:
+                    socket.close()
+                    context.term()
+                    raise DAQError(
+                        "Failed to aquire Lock in procedure: "
+                        f"{self.system_state['procedure']['name']}")
+            elif state == b"free":
+                lock_key = message[state_separator+1:]
 
-                # generate the complete config and save it as the run config
-                complete_config = cfu.generate_run_config(
-                        subtask_states, calibration)
-                serialized_config = yaml.safe_dump(complete_config)
-                with open(output_config, 'w') as run_config:
-                    run_config.write(serialized_config)
+        # ------------------ lock aquired ---------------------------
 
-                # send the measurement command to the backend starting the
-                # measurement
-                socket.send_string('measure;'+serialized_config)
-                # wait for the data to return
-                data = socket.recv()
+        # load default config
+        socket.send_string("load defaults;" + yaml.safe_dump(default_config))
+        resp = socket.recv()
+        state_separator = resp.find(b';')
+        if state_separator < 0:
+            raise DAQError("Message from daq coordinator malformed")
+        state = resp[:state_separator]
+        if state != b"defaults loaded":
+            if state == b'error':
+                error_message = resp[state_separator+1:]
+                raise DAQError(
+                        "Failed to load defaults: " + error_message)
 
-                # save the data in a file so that the unpacker can work with it
+        # compute the filenames for the runs
+        output_files = self.output()
+        for patch, raw_file, config_file in\
+                zip(daq_patches, output_files['raw'], output_files['config']):
+            # build run config and write it to disk
+            if raw_file.exists():
+                continue
+            run_config = dtu.update_dict(initial_config, patch)
+            serialized_config = yaml.safe_dump(run_config)
+            with config_file.open('w') as cf:
+                cf.write(serialized_config)
+
+            # send measure command to daq coordinator
+            socket.send_string('measure;'+str(lock_key)+';'+serialized_config)
+            message = socket.recv()
+            state_separator = message.find(b';')
+            state = message[:state_separator]
+            data = message[state_separator+1:]
+            if state == b'invalid key':
+                raise DAQError("Aquired daq coordinator lock but was refused"
+                               "to perform measurement")
+            if state == b'error':
+                raise DAQError("Received Error from the daq coordinator: "
+                               + data.decode())
+            if state == b'data':
                 with raw_file.open('w') as raw_data_file:
                     raw_data_file.write(data)
 
-            # close the connection to the daq coordinator
-            # as the scan is now complete
-            socket.close()
-            context.term()
+            # put the fracking tasks on the queue
+            columns = self.system_state['procedure']['data_columns']
+            mode = self.system_state['procedure']['mode']
+            command = 'format'
+            fracker_task_queue.put((command, raw_file.path,
+                                    config_file.path,
+                                    columns, mode))
 
-        # the measurements are being performed in the Measurement tasks
-        # so the inputs are already unpacked hdf5 files and output is
-        # the single merged file
-        elif not self.system_state['event_mode']:
-            in_files = [data_file.path for data_file in self.input()['data']]
+        # stop fracking fracker_processes
+        for p in fracker_processes:
+            fracker_task_queue.put(('stop', '', '', '', ''))
+        for p in fracker_processes:
+            p.join()
+
+        # release the lock
+        socket.send_string("release lock;")
+        resp = socket.recv()
+        state_separator = resp.find(b';')
+        state = resp[:state_separator]
+        content = resp[state_separator+1:]
+        if state.decode() == 'error':
+            raise DAQError('Error from the daq coordinator: '
+                           + content.decode())
+        if state.decode() != 'released':
+            raise DAQError('Unknown response Received from daq coordinator: '
+                           + resp.decode())
+
+        # ------------------------- lock released -------------------------
+
+        # join all previous tasks
+        # merge the files if the procedure is configured to do so
+        if self.system_state['merge']:
+            raw_files = [r.path for r in self.output()['raw']]
+            fracked_file_paths = [
+                    Path(os.path.splitext(rf)[0] + '.h5').absolute()
+                    for rf in raw_files
+            ]
+            for p in fracked_file_paths:
+                if not Path(p).exists():
+                    base_name = os.path.splitext(p.resolve())[0]
+                    os.remove(base_name + '.raw')
+                    raise DAQError(f'Fracker subtask failed, '
+                                   f'{base_name + "h5"} could not be found')
+
             # run the compiled turbo pump if available
             if shutil.which('turbo-pump') is not None:
-                if len(in_files) == 1:
-                    shutil.copy(in_files[0], self.output()['data'].path)
+                if len(fracked_file_paths) == 1:
+                    shutil.copy(fracked_file_paths[0],
+                                self.output()['data'].path)
                     return
                 result = anu.run_turbo_pump(self.output()['data'].path,
-                                            in_files)
+                                            fracked_file_paths)
                 if result != 0:
                     raise DAQError("turbo-pump crashed")
             # otherwise run the python version
             else:
-                anu.merge_files(in_files, self.output()['data'].path,
+                anu.merge_files(fracked_file_paths, self.output()['data'].path,
                                 self.system_state['event_mode'])
-            for file in in_files:
-                os.remove(file)
 
-
-class Fracker(luigi.Task):
-    """
-    convert the format of the raw data into something that can be
-    used by the distilleries
-    """
-    # parameters describing the position of the parameters in the task
-    # tree
-    id = luigi.IntParameter(significant=True)
-    system_state = luigi.DictParameter(significant=True)
-    priority = luigi.OptionalParameter(significant=False, default=0)
-
-    def requires(self):
-        return DataField(id=self.id,
-                         system_state=self.system_state)
-
-    def output(self):
-        """
-        generate the output filenames for the fracker
-        """
-        if self.system_state['event_mode']:
-            output = {}
-            output['full-calibration'] = self.input()['full-calibration']
-            output['data'] = []
-            for raw_file in self.input()['data']:
-                processed_file_path = Path(
-                        os.path.splitext(raw_file.path)[0] + '.h5')
-                output['data'].append(luigi.LocalTarget(processed_file_path))
-            return output
-        else:
-            out_file = self.system_state['name'] + str(self.id) + '_merged.h5'
-            output_path = self.system_state['output_path']
-            full_output_path = Path(output_path) / out_file
-            return luigi.LocalTarget(full_output_path)
-
-    def run(self):
-        subtask_states = cfu.generate_subsystem_states(self.system_state)
-        event_mode = self.system_state['event_mode']
-        expected_files = list(map(lambda x: x.path, self.output()['data']))
-        data_columns = self.system_state['procedure']['data_columns']
-        for i, (raw_file, run_state, processed_file) in enumerate(zip(
-                    self.input()['data'],
-                    subtask_states,
-                    self.output()['data'])):
-            # compute the paths of the different files produced by the fracker
-            data_file_base_name = os.path.splitext(raw_file.path)[0]
-            formatted_data_base_name = os.path.splitext(processed_file.path)[0]
-            if data_file_base_name == formatted_data_base_name:
-                raise DAQConfigError(
-                        f'Filenames do not match {data_file_base_name}, '
-                        f'{formatted_data_base_name}')
-            unpacked_file_path = Path(data_file_base_name + '.root')
-            formatted_data_path = processed_file.path
-            config_file_path = data_file_base_name + '.yaml'
-
-            # load configuration
-            with open(config_file_path, 'r') as config_file:
-                complete_config = yaml.safe_load(config_file.read())
-
-            # check if the formatted file allready exists
-            if formatted_data_path.exists():
-                continue
-
-            # attempt to unpack the files into root files using the unpack
-            # command
+    def frack_data(raw_data_queue, default_config):
+        # TODO implement queue logic
+        command, raw_file_path, config_file_path, columns, mode =\
+                raw_data_queue.get()
+        while command != "stop":
+            unpacked_file_path = os.path.splitext(raw_file_path)[0] + '.root'
+            formatted_data_path = os.path.splitext(raw_file_path)[0] + '.h5'
             result = anu.unpack_raw_data_into_root(
-                    raw_file.path,
+                    raw_file_path,
                     unpacked_file_path,
-                    raw_data=event_mode)
+            )
             # if the unpaack command failed remove the raw file to
             # trigger the Datafield to rerun the data taking
             if result != 0 and unpacked_file_path.exists():
                 os.remove(unpacked_file_path)
-                os.remove(raw_file.path)
+                os.remove(raw_file_path)
                 continue
             if not unpacked_file_path.exists():
-                os.remove(raw_file.path)
+                os.remove(raw_file_path)
                 continue
-
+            with open(config_file_path, 'r') as rc:
+                run_config = yaml.safe_load(rc.read())
+            complete_config = dtu.update_dict(default_config, run_config),
             # if the fracker can be found run it
             if shutil.which('fracker') is not None:
                 retval = anu.run_compiled_fracker(
                         str(unpacked_file_path.absolute()),
                         str(formatted_data_path.absolute()),
                         complete_config,
-                        event_mode,
-                        data_columns)
+                        mode,
+                        columns)
                 if retval != 0:
                     print("The fracker failed!!!")
                     if formatted_data_path.exists():
@@ -519,33 +313,14 @@ class Fracker(luigi.Task):
                     anu.reformat_data(unpacked_file_path,
                                       formatted_data_path,
                                       complete_config,
-                                      event_mode,
-                                      data_columns)
+                                      mode,
+                                      columns)
                 except KeyInFileError:
                     os.remove(unpacked_file_path)
-                    os.remove(raw_file.path)
+                    os.remove(raw_file_path)
                     continue
                 except FileNotFoundError:
                     continue
             os.remove(unpacked_file_path)
-
-        # check if the unpacker or fracker have failed
-        for formatted_file_path in expected_files:
-            if not formatted_file_path.exists():
-                raise ValueError('An unpacker failed, '
-                                 'the datenraffinerie needs to be rerun')
-
-        # run the compiled turbo pump if available
-        if not event_mode:
-            if shutil.which('turbo-pump') is not None:
-                if len(expected_files) == 1:
-                    shutil.copy(expected_files[0], self.output()['data'].path)
-                    return
-                anu.run_turbo_pump(self.output()['data'].path, expected_files)
-            # otherwise run the python version
-            else:
-                anu.merge_files(expected_files, self.output()['data'].path,
-                                event_mode)
-            # assuming the merge worked, remove the partial files
-            for file in expected_files:
-                os.remove(file)
+            command, raw_file_path, config_file_path, columns, mode =\
+                raw_data_queue.get()
