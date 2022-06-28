@@ -9,5 +9,5 @@
 - name: timewalk_analysis
   type: analysis
   daq: timewalk_and_phase_scan
-  python_module_name: timewalk_analysis
+  module_name: timewalk_analysis
   parameters: {}
