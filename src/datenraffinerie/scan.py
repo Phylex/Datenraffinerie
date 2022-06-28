@@ -17,10 +17,10 @@ from uproot.exceptions import KeyInFileError
 from . import dict_utils as dtu
 from . import config_utilities as cfu
 from . import analysis_utilities as anu
-from .errors import DAQConfigError, DAQError
-from copy import deepcopy
-from luigi.freezing import FrozenOrderedDict
+from .daq_coordination import DAQCoordCommand, DAQCoordResponse
+from .config_errors import DAQError
 from luigi.parameter import ParameterVisibility
+from luigi import Nop
 
 
 class Well(luigi.Task):
@@ -142,7 +142,6 @@ class Well(luigi.Task):
         # set up the fracker subprocesses
         fracker_task_queue = Queue()
         fracker_processes = []
-
         for i in range(self.system_state['workers']):
             p = Process(target=self.frack, args=(fracker_task_queue,
                                                  default_config))
@@ -152,38 +151,44 @@ class Well(luigi.Task):
         lock_key = None
         retries = 100
         while True:
-            socket.send_string('aquire_lock;')
+            command = DAQCoordCommand(command='acquire lock')
+            socket.send(command.serialize())
             message = socket.recv()
-            state_separator = message.find(b';')
-            state = message[:state_separator]
-            if state == b"busy":
-                sleep(.5)
-                retries -= 1
-                if retries > 0:
-                    continue
+            response = DAQCoordResponse.parse(message)
+            if response['type'] == 'lock':
+                if response['content'] is None:
+                    sleep(.5)
+                    retries -= 1
+                    if retries > 0:
+                        continue
+                    else:
+                        socket.close()
+                        context.term()
+                        raise DAQError(
+                            "Failed to aquire Lock in procedure: "
+                            f"{self.system_state['procedure']['name']}")
                 else:
-                    socket.close()
-                    context.term()
-                    raise DAQError(
-                        "Failed to aquire Lock in procedure: "
-                        f"{self.system_state['procedure']['name']}")
-            elif state == b"free":
-                lock_key = message[state_separator+1:]
+                    lock_key = response['content']
+                    break
+            elif response['type'] != 'lock':
+                raise DAQError(
+                        "Failed to aquire lock, received unexpected response"
+                        f"{response}"
+                        )
 
         # ------------------ lock aquired ---------------------------
 
         # load default config
-        socket.send_string("load defaults;" + yaml.safe_dump(default_config))
+        command = DAQCoordCommand(
+                command='load defaults',
+                locking_token=lock_key,
+                config=default_config
+        )
+        socket.send(command.serialize())
         resp = socket.recv()
-        state_separator = resp.find(b';')
-        if state_separator < 0:
-            raise DAQError("Message from daq coordinator malformed")
-        state = resp[:state_separator]
-        if state != b"defaults loaded":
-            if state == b'error':
-                error_message = resp[state_separator+1:]
-                raise DAQError(
-                        "Failed to load defaults: " + error_message)
+        resp = DAQCoordResponse.parse(resp)
+        if resp['type'] != 'ack':
+            raise DAQError(f"received unexpected repsonse: {resp}")
 
         # compute the filenames for the runs
         output_files = self.output()
@@ -198,20 +203,17 @@ class Well(luigi.Task):
                 cf.write(serialized_config)
 
             # send measure command to daq coordinator
-            socket.send_string('measure;'+str(lock_key)+';'+serialized_config)
+            command = DAQCoordCommand(
+                    type='measure',
+                    config=run_config,
+                    locking_token=lock_key
+            )
+            socket.send(command.serialize())
             message = socket.recv()
-            state_separator = message.find(b';')
-            state = message[:state_separator]
-            data = message[state_separator+1:]
-            if state == b'invalid key':
-                raise DAQError("Aquired daq coordinator lock but was refused"
-                               "to perform measurement")
-            if state == b'error':
-                raise DAQError("Received Error from the daq coordinator: "
-                               + data.decode())
-            if state == b'data':
+            response = DAQCoordResponse.parse(message)
+            if response['type'] == 'data':
                 with raw_file.open('w') as raw_data_file:
-                    raw_data_file.write(data)
+                    raw_data_file.write(response['data'])
 
             # put the fracking tasks on the queue
             columns = self.system_state['procedure']['data_columns']
@@ -228,17 +230,12 @@ class Well(luigi.Task):
             p.join()
 
         # release the lock
-        socket.send_string("release lock;")
-        resp = socket.recv()
-        state_separator = resp.find(b';')
-        state = resp[:state_separator]
-        content = resp[state_separator+1:]
-        if state.decode() == 'error':
-            raise DAQError('Error from the daq coordinator: '
-                           + content.decode())
-        if state.decode() != 'released':
-            raise DAQError('Unknown response Received from daq coordinator: '
-                           + resp.decode())
+        command = DAQCoordCommand(type='release lock',
+                                  locking_token=lock_key)
+        socket.send(command.serialize())
+        resp = DAQCoordResponse.parse(socket.recv())
+        if resp['type'] != 'ack':
+            raise DAQError(f'Error from the daq coordinator: {resp}')
 
         # ------------------------- lock released -------------------------
 
@@ -257,20 +254,14 @@ class Well(luigi.Task):
                     raise DAQError(f'Fracker subtask failed, '
                                    f'{base_name + "h5"} could not be found')
 
-            # run the compiled turbo pump if available
-            if shutil.which('turbo-pump') is not None:
-                if len(fracked_file_paths) == 1:
-                    shutil.copy(fracked_file_paths[0],
-                                self.output()['data'].path)
-                    return
-                result = anu.run_turbo_pump(self.output()['data'].path,
-                                            fracked_file_paths)
-                if result != 0:
-                    raise DAQError("turbo-pump crashed")
-            # otherwise run the python version
-            else:
-                anu.merge_files(fracked_file_paths, self.output()['data'].path,
-                                self.system_state['event_mode'])
+            if len(fracked_file_paths) == 1:
+                shutil.copy(fracked_file_paths[0],
+                            self.output()['data'].path)
+                return
+            result = anu.run_turbo_pump(self.output()['data'].path,
+                                        fracked_file_paths)
+            if result != 0:
+                raise DAQError("turbo-pump crashed")
 
     def frack_data(raw_data_queue, default_config):
         # TODO implement queue logic
