@@ -139,7 +139,7 @@ class DrillingRig(luigi.Task):
         socket = context.socket(zmq.REQ)
         socket.connect(
                 f"tcp://{self.network_config['daq_coordinator']['hostname']}:"
-                f" {self.network_config['daq_coordinator']['port']}")
+                f"{self.network_config['daq_coordinator']['port']}")
         socket.send_string('measure;' + config_string)
         data = socket.recv()
         socket.close()
