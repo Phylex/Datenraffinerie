@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 import pandas as pd
-from analysis_utilities import read_dataframe_chunked
+from .analysis_utilities import read_dataframe_chunked
 from .config_utilities import unfreeze
 from .errors import OutputError
 
