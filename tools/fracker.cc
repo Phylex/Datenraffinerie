@@ -3,6 +3,7 @@
 #include "include/hgcroc_caching.h"
 #include "include/root-tools.h"
 #include "include/hdf-utils.h"
+#include <H5Spublic.h>
 #include <iostream>
 #include <tuple>
 #include <string>
@@ -17,6 +18,7 @@ int main(int argc, char **argv) {
 	std::string data_file_path;
 	std::string output_path;
 	std::vector<std::string> columns;
+	bool iterable;
 	unsigned int block_size;
 
 	/* set up the options of the command */
@@ -32,6 +34,7 @@ int main(int argc, char **argv) {
 		->default_val(1000000);
 	app.add_option("-s", columns, "The selection of columns that should appear in the output data");
 	app.add_option("-o", output_path, "path to the output containing the data and config specified");
+	app.add_option("-t", iterable, "specify if the output file should be iterable");
 
 	/* parse the options */
 	try {
@@ -42,7 +45,7 @@ int main(int argc, char **argv) {
 	}
 
 	/* open the (overlay) config */
-	YAML::Node config;	// this is the config that will hold the final config
+	YAML::Node run_config;	// this is the config that will hold the final config
 	YAML::Node overlay_config;
 	try {
 		overlay_config = YAML::LoadFile(config_file_path);
@@ -62,9 +65,9 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 		update<int>(default_config, overlay_config);
-		config = default_config;
+		run_config = default_config;
 	} else {
-		config = overlay_config;
+		run_config = overlay_config;
 	}
 
 	/* get the tree from the root file containing the data */
@@ -72,108 +75,33 @@ int main(int argc, char **argv) {
 	TFile *Measurement;
 	TTree *measurement_tree = openRootTree(Measurement, data_file_path, &event_mode);
 	std::vector<std::string> data_columns = filter_measurement_columns(event_mode, columns);
+	std::vector<std::string> config_columns;
+	/* filter out the columns needed for the configuration */
+	for (auto column: columns) {
+		if (column_type.find(column) != column_type.end()) {
+			config_columns.push_back(column);
+		}
+	}
 
 	/* create the output file and set it up */
-	hid_t output = H5Fcreate(output_path.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-	hid_t group_id = set_up_file(output, "data");
-	hid_t axis0 = 0;
-	hid_t axis1 = 0;
+	hid_t data_file = create_pytables_file(output_path);
+	hid_t data_group = create_pytables_group(data_file, "data", "");
+	hid_t table_type = create_compound_datatype_form_columns(data_columns, config_columns, event_mode);
+	hid_t table = create_pytables_table(data_group, "measurements", table_type, 100000);
 
-	create_axes(group_id, &axis0, &axis1);
-
-	/* generate the columns that are going to be used to store the data in */
-	hid_t measurement_block = 0;
-	if ( data_columns.size() > 0 ) {
-		measurement_block = add_block(group_id, H5T_NATIVE_FLOAT, data_columns);
-	} else {
-		std::cout << "At least one Column of the measurement Data needs to be selected" << std::endl;
-		exit(EXIT_FAILURE);
-	}
-
-	/* generate the cache of the configuration along with the blocks in the hdf file*/
-	bool channel_cache = false;			// flag to tell the code if there is a channel wise cache
-	bool half_wise_cache = false;		// flag to tell if there is a half wise cache
-	bool global_cache = false;			// flag to say if there is a global cache
-	bool config_columns = false;		// flag to say if there is any caching at all (OR of all previous flags)
-	hid_t channel_config_block = 0;
-	hid_t half_wise_config_block = 0;
-	hid_t global_config_block = 0;
-	/* generate channel wise config cache */
-	std::vector<std::string> channel_columns = filter_channel_columns(columns);
-	for (auto &col: channel_columns) {
-	}
-	std::map<CacheKey, std::vector<int>> channel_config;
-	if (channel_columns.size() > 0 ) {
-		try {
-			channel_config = generate_hgcroc_chan_config_cache<int>(config, channel_columns);
-		} catch (YAML::TypedBadConversion<int>) {
-			std::cout << "Encountered an Error building the Channel Cache" << std::endl;
-			std::cout << "Columns exported: " << std::endl;
-			for (auto col: channel_columns) { 
-				std::cout << col << ", ";
-			}
-			std::cout << std::endl;
-			std::cout << "Config: " << std::endl << config <<std::endl;
-			exit(EXIT_FAILURE);
-		}
-		channel_cache = true;
-		channel_config_block = add_block(group_id, H5T_STD_I32LE, channel_columns);
-	}
-	/* generate the half wise configuration cache */
-	std::vector<ConfigKey> half_wise_columns = filter_half_wise_columns(columns);
-	std::map<HalfWiseCacheKey, std::vector<int>> half_wise_config;
-	if (half_wise_columns.size() > 0 ) {
-		std::vector<std::string> half_wise_column_names;
-		for (ConfigKey ck: half_wise_columns) {
-			half_wise_column_names.push_back(std::get<1>(ck));
-		}
-		try {
-			half_wise_config = generate_hgcroc_halfwise_config<int>(config, half_wise_columns);
-		} catch (YAML::TypedBadConversion<int>) {
-			std::cout << "Encountered an Error building the Channel Cache" << std::endl;
-			std::cout << "Columns exported: " << std::endl;
-			for (auto col: channel_columns) { 
-				std::cout << col << ", ";
-			}
-			std::cout << std::endl;
-			std::cout << "Config: " << std::endl << config <<std::endl;
-			exit(EXIT_FAILURE);
-		}
-		half_wise_cache = true;
-		half_wise_config_block = add_block(group_id, H5T_STD_I32LE, half_wise_column_names);
-	}
-	/* generate the global config cache */
-	std::vector<ConfigKey> global_columns = filter_global_columns(columns);
-	std::map<GlobalCacheKey, std::vector<int>> global_config;
-	if (global_columns.size() > 0 ) {
-		std::vector<std::string> global_column_names;
-		for (ConfigKey ck: global_columns) {
-			global_column_names.push_back(std::get<1>(ck));
-		}
-		try {
-			global_config = generate_hgcroc_global_config<int>(config, global_columns);
-		} catch (YAML::TypedBadConversion<int>) {
-			std::cout << "Encountered an Error building the Channel Cache" << std::endl;
-			std::cout << "Columns exported: " << std::endl;
-			for (auto col: channel_columns) { 
-				std::cout << col << ", ";
-			}
-			std::cout << std::endl;
-			std::cout << "Config: " << std::endl << config <<std::endl;
-			exit(EXIT_FAILURE);
-		}
-		global_cache = true;
-		global_config_block = add_block(group_id, H5T_STD_I32LE, global_column_names);
+	/* create the cache from the rows of the table */
+	std::map<CacheKey, std::vector<long long>> cache = generate_hgcroc_config_cache<long long>(run_config, columns);
+	/* create the block buffer that is filed with the data from the root file and the config 
+	 * before being written to the hdf file */
+	void *m_block_buffer= malloc(block_size * H5Tget_size(table_type));
+	for (size_t i = 0; i < block_size * H5Tget_size(table_type); i++) {
+		*((char *)m_block_buffer + i) = 0;
 	}
 
 	/* set up the arrays to buffer the data between the root and hdf files */
-	hgcroc_data<float> d_buffer;
-	hgcroc_summary_data<float> summary_buffer;
-	float *m_block_buffer= (float *)malloc(block_size * data_columns.size() * sizeof(float));
-	for (size_t i = 0; i < block_size *data_columns.size(); i++) {
-		m_block_buffer[i] = 0;
-	}
-
+	hgcroc_data d_buffer;
+	hgcroc_summary_data summary_buffer;
+	
 	/* set up the  values holding the cache key info */
 	unsigned int chip;
 	unsigned short channel;
@@ -181,137 +109,104 @@ int main(int argc, char **argv) {
 	int e_chip;
 	int half;
 	int e_channel;
-
-	/* if there is any channel_config info set up it's buffer and block storage */
-	unsigned int* c_config_data = NULL;
-	if ( channel_cache ) {
-		c_config_data = (unsigned int *)malloc(block_size * channel_columns.size() * sizeof(unsigned int));
-		for ( size_t i = 0; i < block_size * channel_columns.size(); i++ ) {
-			c_config_data[i] = 0;
-		}
-	}
-	/* do the same for the half wise config */
-	unsigned int* hw_config_data = NULL;
-	if ( half_wise_cache ) {
-		hw_config_data = (unsigned int *)malloc(block_size * half_wise_columns.size() * sizeof(unsigned int));
-		for ( size_t i = 0; i < block_size * half_wise_columns.size(); i++ ) {
-			hw_config_data[i] = 0;
-		}
-	}
-	/* and the global config */
-	unsigned int* g_config_data = NULL;
-	if ( global_cache ) {
-		g_config_data = (unsigned int *)malloc(block_size * global_columns.size() * sizeof(unsigned int));
-		for ( size_t i = 0; i < block_size * global_columns.size(); i++ ) {
-			g_config_data[i] = 0;
-		}
-	}
-
+	void *key_chip_source = NULL;
+	void *key_channel_source = NULL;
+	void *key_half_source = NULL;
 	/* get the size of the data in the root file */
 	size_t total_rows = measurement_tree->GetEntries();
 	size_t blocks = total_rows / block_size + 1;
-	
-
 	/* link the entries of the keys to the variables to build the caching key */
 	if ( event_mode ) {
 		measurement_tree->SetBranchAddress("chip", &e_chip);
 		measurement_tree->SetBranchAddress("half", &half);
 		measurement_tree->SetBranchAddress("channel", &e_channel);
+		key_channel_source = &e_channel;
+		key_chip_source = &e_chip;
+		key_half_source = &half;
 	} else {
 		measurement_tree->SetBranchAddress("chip", &chip);
 		measurement_tree->SetBranchAddress("channeltype", &channeltype);
 		measurement_tree->SetBranchAddress("channel", &channel);
+		key_channel_source = &channel;
+		key_chip_source = &chip;
+		key_half_source = &channeltype;
 	}
-	/* link the elements of the root tree to the small local buffer */
 
+	/* link the elements of the root tree to the small local buffer */
 	for (size_t i = 0; i < data_columns.size(); i++) {
-		void *entry_pointer;
+		void *data_member_pointer;
 		if (event_mode) {
-			entry_pointer = d_buffer.get_pointer_to_entry(data_columns[i]);
+			data_member_pointer = d_buffer.get_pointer_to_entry(data_columns[i].c_str());
 		} else {
-			entry_pointer = summary_buffer.get_pointer_to_entry(data_columns[i]);
+			data_member_pointer = summary_buffer.get_pointer_to_entry(data_columns[i].c_str());
 		}
-		if (entry_pointer == NULL) {
+		if (data_member_pointer == NULL) {
 			std::cout << "Invalid data column passed to fracker" << std::endl;
 			exit(EXIT_FAILURE);
 		}
-		measurement_tree->SetBranchAddress(data_columns[i].c_str(), entry_pointer);
+		if (data_columns[i] == "chip") key_chip_source = data_member_pointer;
+		else if (data_columns[i] == "channel") key_channel_source = data_member_pointer;
+		else if (data_columns[i] == "half") key_half_source = data_member_pointer;
+		else if (data_columns[i] == "channeltype") key_half_source = data_member_pointer;
+		measurement_tree->SetBranchAddress(data_columns[i].c_str(), data_member_pointer);
 	}
 
 	/* run through the root file, retrieve the config from the cache entries and write the output */
+	/* do this for every block */
+	size_t row = 0;
 	for ( size_t block = 0; block < blocks; block++ ) {
-		size_t row = 0;
+		/* copy all the data for this block into the buffer */
 		for (; row < block_size * (block + 1) && row < total_rows; row ++) {
 			/* read in the current row from the root file */
 			measurement_tree->GetEntry(row);
-			/* copy the data from the row buffer into the block buffer */
-			for ( size_t i = 0; i < data_columns.size(); i ++) {
-				if (event_mode) {
-					m_block_buffer[i + (row % block_size) * data_columns.size()] = d_buffer.get_value(data_columns[i]);
-				} else {
-					m_block_buffer[i + (row % block_size) * data_columns.size()] = summary_buffer.get_value(data_columns[i]);
-				}
-			}
-			/* generate the cache key from the entries */
-			CacheKey row_cache_key;
+			CacheKey key;
 			if (event_mode) {
-				row_cache_key = {e_chip, half, e_channel};
-				row_cache_key = transform_event_row_to_cache_key(row_cache_key);
+				key = CacheKey(*((int *)key_chip_source), *((int *)key_channel_source), *((int *)key_half_source));
+				key = transform_event_row_to_cache_key(key);
 			} else {
-				row_cache_key = {chip, channel, channeltype};
+				key = CacheKey(*((int *)key_chip_source), *((short *)key_channel_source), *((short *)key_half_source));
 			}
-			/* get the entries from the channel cache if there are any */
-			if ( channel_cache ) {
-				std::vector<int> &curr_config = channel_config[row_cache_key];
-				for ( size_t i = 0; i < channel_columns.size(); i++ ) {
-					c_config_data[i + (row % block_size) * channel_columns.size()] = curr_config[i];
-				}
+			if (!validate_key(key)) {
+				std::cout << "Key is invalid. Chip=" << std::get<0>(key) << " Channel=" << std::get<1>(key) << " Type=" << std::get<2>(key) << std::endl;
+				exit(EXIT_FAILURE);
 			}
-			/* get the entries from the half_wise cache if there are any */
-			if ( half_wise_cache ) {
-				HalfWiseCacheKey hw_key = calc_half_wise_cache_key(row_cache_key);
-				std::vector<int> &curr_config = half_wise_config[hw_key];
-				for ( size_t i = 0; i < half_wise_columns.size(); i++ ) {
-					hw_config_data[i + (row % block_size) * half_wise_columns.size()] = curr_config[i];
+			/* copy the data from the root file and the config into the m_block_buffer */
+			for ( size_t i = 0; i < H5Tget_nmembers(table_type);  i ++) {
+				hid_t member_type = H5Tget_member_type(table_type, i);
+				size_t member_size = H5Tget_size(member_type);
+				char * member_name = H5Tget_member_name(table_type, i);
+				H5Tclose(member_type);
+				char *elem;
+				if (i < data_columns.size()) {
+					if (event_mode) {
+						elem = (char *)d_buffer.get_pointer_to_entry(member_name);
+					} else {
+						elem = (char *)summary_buffer.get_pointer_to_entry(member_name);
+					}
+				} else {
+					elem = (char *)&(cache[key].data()[i - data_columns.size()]);
 				}
-			}
-			/* get the entries from the global cache if there are any */
-			if ( global_cache ) {
-				GlobalCacheKey g_key = calc_global_cache_key(row_cache_key);
-				std::vector<int> &curr_config = global_config[g_key];
-				for ( size_t i = 0; i < global_columns.size(); i++ ) {
-					g_config_data[i + (row % block_size) * global_columns.size()] = curr_config[i];
+				for (int byteno = 0; byteno < member_size; byteno++) {
+					// this is the actual copy step
+					// the use of pointers is necessary to avoid lots of code to cast the members into the correct sizes
+					*((char *)(m_block_buffer) + (row % block_size) * H5Tget_size(table_type) + H5Tget_member_offset(table_type, i) + byteno) = *(elem+byteno);
 				}
+				free(member_name);
 			}
 		}
-		size_t write_row_count = 0;
+		/* this value is needed to determine how much of the buffer needs to be written into the hdf file */
+	  hsize_t write_row_count;
 		if ( row == total_rows )
 			write_row_count = row % block_size;
 		else
 			write_row_count = block_size;
-		write_to_block(measurement_block, axis1, write_row_count, (void *)m_block_buffer);
-		if (channel_cache) write_to_block(channel_config_block, axis1, write_row_count, c_config_data);
-		if (half_wise_cache) write_to_block(half_wise_config_block, axis1, write_row_count, hw_config_data);
-		if (global_cache) write_to_block(global_config_block, axis1, write_row_count, g_config_data);
-
+		write_buffer_to_pytable(table, table_type, write_row_count, m_block_buffer);
 	}
-	/* clean up the existing data structures */
-	//measurement_tree->Close();
-	H5Dclose(axis0);
-	H5Dclose(axis1);
-	H5Dclose(measurement_block);
+	/* clean up */
 	free(m_block_buffer);
-	if (channel_cache) {
-		H5Dclose(channel_config_block);
-		free(c_config_data);
-	}
-	if (half_wise_cache) {
-		H5Dclose(half_wise_config_block);
-		free(hw_config_data);
-	}
-	if (global_cache) {
-		H5Dclose(global_config_block);
-		free(g_config_data);
-	}
+	H5Dclose(table);
+	H5Tclose(table_type);
+	H5Gclose(data_group); 
+	H5Fclose(data_file);
 	return 0;
 }

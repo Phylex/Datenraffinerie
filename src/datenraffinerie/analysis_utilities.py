@@ -1,5 +1,5 @@
 """
-Utilities for the use with the handling of the gathered data 
+Utilities for the use with the handling of the gathered data
 in the datenraffinerie.
 """
 from . import config_utilities as cfu
@@ -18,6 +18,19 @@ from numba import jit
 class AnalysisError(Exception):
     def __init__(self, message):
         super().__init__(message)
+
+
+def read_dataframe_chunked(pytables_filepath, chunk_size):
+    dfile = tables.open_file(pytables_filepath)
+    table = dfile.root.data.measurements
+    rows = []
+    for i, row in enumerate(table.iterrows()):
+        rows.append(row.fetch_all_fields())
+        if i == chunk_size:
+            yield pd.DataFrame(np.array(rows), columns=table.colnames)
+            rows.clear()
+    yield pd.DataFrame(np.array(rows), columns=table.colnames)
+    dfile.close()
 
 
 def extract_data(rootfile: str, raw_data=False):
@@ -387,7 +400,6 @@ def l1a_generator_settings(complete_config: dict) -> dict:
     return l1a_config
 
 
-@jit(nopython=True)
 def compute_channel_type_from_event_data(chip: int, channel: int, half: int):
     if channel <= 35:
         out_channel = channel * (half + 1)
@@ -401,7 +413,6 @@ def compute_channel_type_from_event_data(chip: int, channel: int, half: int):
     return chip, out_channel, out_type
 
 
-@jit(nopython=False, forceobj=True)
 def roc_channel_to_dict(complete_config: dict, chip_id: int, channel_id: int, channel_type: int) -> dict:
     """Map a channel identifier to the correct part of the config
 

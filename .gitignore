@@ -7,3 +7,4 @@ dist/
 src/*.egg-info/
 build/
 docs/build/
+tools/.cache/
