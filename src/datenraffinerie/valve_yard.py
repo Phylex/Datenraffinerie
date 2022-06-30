@@ -31,7 +31,8 @@ class ValveYard(luigi.Task):
     priority = luigi.OptionalParameter(significant=False, default=0)
 
     def output(self):
-        if not isinstance(self.input(), list):
+        if self.detrmin_daq_mode(self.root_config_file, self.procedure_label) == "event_mode"\
+           or not isinstance(self.input(), list):
             return self.input()
         else:
             out = Path(self.output_dir) / self.procedure_label \
@@ -61,7 +62,7 @@ class ValveYard(luigi.Task):
         if self.procedure_label in procedure_names:
             try:
                 procedure_index = procedure_names.index(self.procedure_label)
-            except ValueError as e:
+            except ValueError:
                 logger.critical(f'{self.procedure_label} is not in the list of procedures of {self.root_config_path}')
                 return None
             procedure = procedures[procedure_index]
@@ -109,7 +110,8 @@ class ValveYard(luigi.Task):
                                   analysis_module_path=self.analysis_module_path,
                                   network_config=self.network_config,
                                   loop=self.loop,
-                                  event_mode=procedure['event_mode'])
+                                  event_mode=True if self.detrmin_daq_mode(self.root_config_file, procedure['daq']) == "event_mode" else False,
+                                  sort_by=procedure['iteration_columns'])
             if procedure['type'] == 'daq':
                 if len(procedure['parameters']) == 1 and self.loop:
                     return Fracker(identifier=0,
@@ -152,6 +154,11 @@ class ValveYard(luigi.Task):
                                         "'daq' or 'analysis'")
 
     def run(self):
+        # check if the procedure that was executed handles 'raw' data and if so 
+        # do not concatenate the files but simply pass them on
+        if self.detrmin_daq_mode(self.root_config_file, self.procedure_label)\
+                == "event_mode":
+            return self.input()
         if not isinstance(self.input(), list):
             return
         in_files = [data_file.path for data_file in self.input()]
@@ -168,3 +175,49 @@ class ValveYard(luigi.Task):
             anu.merge_files(in_files, self.output().path, self.raw)
         for file in in_files:
             os.remove(file)
+
+    @staticmethod
+    def detrmin_daq_mode(root_config_path, procedure_name):
+        procedures, workflows = cfu.parse_config_file(root_config_path)
+        procedure_names = list(map(lambda p: p['name'], procedures))
+        workflow_names = list(map(lambda w: w['name'], workflows))
+        procedure = None
+        workflow = None
+        if procedure_name in procedure_names:
+            try:
+                procedure_index = procedure_names.index(procedure_name)
+            except ValueError:
+                logger.critical(f'{procedure_name} is not in the list of procedures of {root_config_path}')
+                return None
+            procedure = procedures[procedure_index]
+        elif procedure_name in workflow_names:
+            try:
+                workflow_index = workflow_names.index(procedure_name)
+                workflow = workflows[workflow_index]
+            except ValueError as e:
+                logger.critical(f"{procedure_name} is not in the list of workflows of {root_config_path}")
+        else:
+            raise ctrl.DAQConfigError(f"No '{procedure_name}' found in"
+                                      f" the config file {root_config_path}")
+        if procedure is not None:
+            try:
+                if procedure['raw']:
+                    return "event_mode"
+            except KeyError:
+                    pass
+        else:
+            for procedure_name in workflow['tasks']:
+                try:
+                    procedure_index = procedure_names.index(procedure_name)
+                    procedure = procedures[procedure_index]
+                except IndexError:
+                    continue
+                try:
+                    if procedure['raw']:
+                        return "event_mode"
+                except KeyError:
+                    pass
+        return "summary_mode"
+
+def test_daq_mode():
+    pass

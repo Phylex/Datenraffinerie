@@ -3,16 +3,17 @@ Utilities for the use with the handling of the gathered data
 in the datenraffinerie.
 """
 from . import config_utilities as cfu
+import numpy as np
 from pathlib import Path
 import os
 import shutil
 import pandas as pd
-import numpy as np
 import uproot
 import tables
 import yaml
 import uuid
-from numba import jit
+import logging
+from typing import Union, Sequence
 
 
 class AnalysisError(Exception):
@@ -20,17 +21,42 @@ class AnalysisError(Exception):
         super().__init__(message)
 
 
-def read_dataframe_chunked(pytables_filepath, chunk_size):
-    dfile = tables.open_file(pytables_filepath)
+def cartesian(arrays, dtype=np.float32):
+    n = 1
+    for i in range(len(arrays)):
+        arrays[i] = np.array(arrays[i], dtype=dtype)
+    for x in arrays:
+        n *= x.size
+    out = np.zeros((n, len(arrays)), dtype=dtype)
+
+    for i in range(len(arrays)):
+        m = int(n / arrays[i].size)
+        out[:n, i] = np.repeat(arrays[i], m)
+        n //= arrays[i].size
+
+    n = arrays[-1].size
+    for k in range(len(arrays)-2, -1, -1):
+        n *= arrays[k].size
+        m = int(n / arrays[k].size)
+        for j in range(1, arrays[k].size):
+            out[j*m:(j+1)*m, k+1:] = out[0:m, k+1:]
+    return out
+
+
+def read_whole_dataframe(pytables_filepath):
+    dfile = tables.open_file(pytables_filepath, 'r')
     table = dfile.root.data.measurements
-    rows = []
-    for i, row in enumerate(table.iterrows()):
-        rows.append(row.fetch_all_fields())
-        if i == chunk_size:
-            yield pd.DataFrame(np.array(rows), columns=table.colnames)
-            rows.clear()
-    yield pd.DataFrame(np.array(rows), columns=table.colnames)
+    df = pd.DataFrame.from_records(table.read())
     dfile.close()
+    return df
+
+
+def read_dataframe_chunked(pytables_filepaths):
+    for filepath in pytables_filepaths:
+        dfile = tables.open_file(filepath)
+        table = dfile.root.data.measurements
+        yield pd.DataFrame.from_records(table.read())
+        dfile.close()
 
 
 def extract_data(rootfile: str, raw_data=False):

@@ -27,6 +27,34 @@ struct hgcroc_data {
 	int channelsumid;
 	int rawsum;
 	float decompresssum;
+	char sizes[19] = {sizeof(event), sizeof(chip), sizeof(half), sizeof(channel), sizeof(adc), sizeof(adcm), sizeof(tot),
+									sizeof(toa), sizeof(totflag), sizeof(trigtime), sizeof(trigwidth), sizeof(corruption), sizeof(bxcounter),
+	                sizeof(eventcounter), sizeof(orbitcounter), sizeof(errorbit), sizeof(channelsumid), sizeof(rawsum), sizeof(decompresssum)};
+
+
+	int get_index(const char *column_name) {
+		if (!strcmp(column_name, "event")) return 0;
+		if (!strcmp(column_name, "chip")) return 1;
+		if (!strcmp(column_name, "half")) return 2;
+		if (!strcmp(column_name, "channel")) return 3;
+		if (!strcmp(column_name, "adc")) return 4;
+		if (!strcmp(column_name, "adcm")) return 5;
+		if (!strcmp(column_name, "toa")) return 6;
+		if (!strcmp(column_name, "tot")) return 7;
+		if (!strcmp(column_name, "totflag")) return 8;
+		if (!strcmp(column_name, "trigtime")) return 9;
+		if (!strcmp(column_name, "trigwidth")) return 10;
+		if (!strcmp(column_name, "corruption")) return 11;
+		if (!strcmp(column_name, "bxcounter")) return 12;
+		if (!strcmp(column_name, "eventcounter")) return 13;
+		if (!strcmp(column_name, "orbitcounter")) return 14;
+		if (!strcmp(column_name, "errorbit")) return 15;
+		if (!strcmp(column_name, "channelsumid")) return 16;
+		if (!strcmp(column_name, "rawsum")) return 17;
+		if (!strcmp(column_name, "decompresssum")) return 18;
+		return -1;
+	}
+
 	void *get_pointer_to_entry(const char *column_name) {
 		if (!strcmp(column_name, "event")) return (void *)&(this->event);
 		if (!strcmp(column_name, "chip")) return (void *)&(this->chip);

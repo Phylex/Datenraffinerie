@@ -405,10 +405,13 @@ class DataField(luigi.Task):
             return output_files
 
         # this task is not required by the fracker so we do the usual merge job
-        elif self.output_format in self.supported_formats:
+        elif self.output_format in self.supported_formats and not self.raw:
             out_file = f'{self.label}_{self.identifier}_merged.{self.output_format}'
             raw_file_path = Path(self.output_dir) / out_file
             return luigi.LocalTarget(raw_file_path)
+        # if we are running in raw mode do not concatenate the files together
+        else:
+            return self.input()
         raise KeyError("The output format for the scans needs to"
                        " one of the following:\n"
                        f"{self.supported_formats}")
@@ -488,7 +491,7 @@ class DataField(luigi.Task):
         # the measurements are being performed in the Measurement tasks
         # so the inputs are already unpacked hdf5 files and output is
         # the single merged file
-        else:
+        elif not self.raw:
             in_files = [data_file.path for data_file in self.input()]
             # run the compiled turbo pump if available
             if shutil.which('turbo-pump') is not None:
@@ -564,6 +567,11 @@ class Fracker(luigi.Task):
         """
         generate the output file for the scan task
         """
+        if self.raw:
+            output = []
+            for raw_file in self.input()['raw_data']:
+                output.append(luigi.LocalTarget(Path(os.path.splitext(raw_file.path)[0] + '.hdf5')))
+            return output
         if self.output_format in self.supported_formats:
             out_file = str(self.identifier) + '_merged.' + self.output_format
             output_path = Path(self.output_dir) / out_file
@@ -660,14 +668,15 @@ class Fracker(luigi.Task):
                                  'the datenraffinerie needs to be rerun')
 
         # run the compiled turbo pump if available
-        if shutil.which('turbo-pump') is not None:
-            if len(expected_files) == 1:
-                shutil.copy(expected_files[0], self.output().path)
-                return
-            anu.run_turbo_pump(self.output().path, expected_files)
-        # otherwise run the python version
-        else:
-            anu.merge_files(expected_files, self.output().path, self.raw)
-        # assuming the merge worked, remove the partial files
-        for file in expected_files:
-            os.remove(file)
+        if not self.raw:
+            if shutil.which('turbo-pump') is not None:
+                if len(expected_files) == 1:
+                    shutil.copy(expected_files[0], self.output().path)
+                    return
+                anu.run_turbo_pump(self.output().path, expected_files)
+            # otherwise run the python version
+            else:
+                anu.merge_files(expected_files, self.output().path, self.raw)
+            # assuming the merge worked, remove the partial files
+            for file in expected_files:
+                os.remove(file)

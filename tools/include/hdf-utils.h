@@ -67,7 +67,7 @@ void merge_tables(hid_t merge_file, hid_t input_file, std::string group_name, st
 hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns, bool event_mode);
 hid_t create_pytables_file(std::string filename);
 hid_t create_pytables_group(hid_t parent, std::string name, std::string description);
-hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsize_t chunk_rows);
+hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsize_t chunk_rows, unsigned int deflate);
 void write_buffer_to_pytable(hid_t table, hid_t buffer_datatype, hsize_t buffer_size, void* buffer);
 hid_t get_pytable_type(std::string filepath, std::string group_name, std::string table_name);
 #endif

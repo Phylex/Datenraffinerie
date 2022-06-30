@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 	hid_t input_table_type = get_pytable_type(input_file_paths[0], group_name, "measurements");
 	hid_t output_file = create_pytables_file(output_path);
 	hid_t output_group = create_pytables_group(output_file, group_name, "");
-	hid_t output_talbe = create_pytables_table(output_group, "measurements", input_table_type, block_size);
+	hid_t output_talbe = create_pytables_table(output_group, "measurements", input_table_type, block_size, 2);
 	for (size_t i = 0; i < input_file_paths.size(); i++) {
 		try {
 			hid_t in_file = H5Fopen(input_file_paths[i].c_str(), H5P_DEFAULT, H5P_DEFAULT);

@@ -99,7 +99,7 @@ hid_t get_pytable_type(std::string filepath, std::string group_name, std::string
  **/
 hid_t create_compound_datatype_form_columns(std::vector<std::string> data_columns, std::vector<std::string> config_columns, bool event_mode) {
 	std::vector<std::string> names;
-	std::vector<hid_t> dtypes; 
+	std::vector<hid_t> dtypes;
 	hgcroc_data data;
 	hgcroc_summary_data summary;
 	for (std::string column: data_columns) {
@@ -137,21 +137,21 @@ hid_t create_pytables_group(hid_t parent, std::string name, std::string descript
 	return group;
 }
 
-hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsize_t chunk_rows) {
+hid_t create_pytables_table(hid_t parent, std::string name, hid_t datatype, hsize_t chunk_rows, unsigned int deflate) {
 	hsize_t maxdims[] = {H5S_UNLIMITED};
 	hsize_t chunk_dims[] = {chunk_rows};
 	hsize_t start_dims[] = {0};
 	const hsize_t drank = 1;
-  hid_t dataspace = H5Screate_simple(1, start_dims, maxdims);
-  hid_t properties = H5Pcreate(H5P_DATASET_CREATE);
-  if (chunk_rows > 0) {
-    H5Pset_chunk(properties, drank, chunk_dims);
-    H5Pset_deflate(properties, 3);
-  }
-  hid_t dataset = H5Dcreate(parent, name.c_str(), datatype, dataspace, H5P_DEFAULT,
-                      properties, H5P_DEFAULT);
-  H5Pclose(properties);
-  H5Sclose(dataspace);
+	hid_t dataspace = H5Screate_simple(1, start_dims, maxdims);
+	hid_t properties = H5Pcreate(H5P_DATASET_CREATE);
+	if (chunk_rows > 0) {
+		H5Pset_chunk(properties, drank, chunk_dims);
+		H5Pset_deflate(properties, deflate);
+	}
+	hid_t dataset = H5Dcreate(parent, name.c_str(), datatype, dataspace, H5P_DEFAULT,
+							  properties, H5P_DEFAULT);
+	H5Pclose(properties);
+	H5Sclose(dataspace);
 	create_utf8_attribute(dataset, "CLASS", "TABLE");
 	create_utf8_attribute(dataset, "TITLE", name.c_str());
 	create_utf8_attribute(dataset, "VERSION", "2.7");
@@ -187,7 +187,7 @@ void write_buffer_to_pytable(hid_t table, hid_t buffer_datatype, hsize_t buffer_
 	H5Sselect_hyperslab(table_dspace, H5S_SELECT_SET, &new_data_offset, NULL, &buffer_size, NULL);
 	H5Dwrite(table, buffer_datatype, buffer_dspace, table_dspace, H5P_DEFAULT, buffer);
 	free(dims);
-  free(maxdims);
+	free(maxdims);
 	H5Sclose(table_dspace);
 	H5Sclose(buffer_dspace);
 }

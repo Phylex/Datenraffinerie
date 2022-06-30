@@ -3,10 +3,11 @@ import importlib
 import os
 import sys
 from pathlib import Path
-import pandas as pd
 from .analysis_utilities import read_dataframe_chunked
+from .analysis_utilities import read_whole_dataframe
 from .config_utilities import unfreeze
 from .errors import OutputError
+
 
 class Distillery(luigi.Task):
     """ Task that encapsulates analysis tasks and makes them executable
@@ -23,6 +24,8 @@ class Distillery(luigi.Task):
     network_config = luigi.DictParameter(significant=False)
     loop = luigi.BoolParameter(significant=False)
     event_mode = luigi.BoolParameter(significant=False)
+    sort_by = luigi.OptionalParameter(significant=False,
+                                      default=None)
 
     def requires(self):
         from .valve_yard import ValveYard
@@ -65,7 +68,10 @@ class Distillery(luigi.Task):
                 if paths is None:
                     continue
                 output[key] = (Path(self.output_dir) / paths).resolve()
-        return output
+        if len(output) == 0:
+            return
+        else:
+            return output
 
     def run(self):
         """ perform the analysis using the imported distillery
@@ -79,8 +85,18 @@ class Distillery(luigi.Task):
         analysis = analysis(unfreeze(self.parameters))
 
         # open and read the data
-        data_iter = read_dataframe_chunked(self.input().path, 1000000)
-        analysis.run(data_iter, self.output_dir)
+        if not self.event_mode:
+            analysis.run(read_whole_dataframe(self.input().path),
+                         self.output_dir)
+        else:
+            in_files = []
+            for l in self.input():
+                if isinstance(l, list):
+                    in_files += l
+                else:
+                    in_files.append(l)
+            data_iter = read_dataframe_chunked([i.path for i in in_files])
+            analysis.run(data_iter, self.output_dir)
 
     @staticmethod
     def import_analysis(distillery_path: str, name: str):
