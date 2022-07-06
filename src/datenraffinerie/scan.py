@@ -118,11 +118,8 @@ class DrillingRig(luigi.Task):
                 calibration = yaml.safe_load(
                     calibration_file.read())
             # calculate the configuration to send to the backend
-            target_config = cfu.update_dict(target_config,
-                                            calibration)
+            cfu.update_dict(target_config, calibration, in_place=True)
 
-        target_config = cfu.diff_dict(power_on_default,
-                                      target_config)
         full_target_config = cfu.update_dict(power_on_default,
                                              target_config)
         complete_config = {'daq': daq_system_config,
