@@ -351,6 +351,12 @@ def parse_scan_config(scan_config: dict, path: str) -> tuple:
     except FileNotFoundError as err:
         raise ConfigFormatError(f"The initial target config of {daq_label}"
                                 " could not be found") from err
+    try:
+        target_override_config = scan_config['target_settings']['override']
+        update_dict(target_initial_config,
+                    target_override_config, in_place=True)
+    except KeyError:
+        pass
 
     try:
         columns = scan_config['data_columns']
