@@ -6,12 +6,10 @@ The functions here are testable by calling pytest config_utilities.py
 The tests can also be used as a guide on how to use the functions and
 what to expect of their behaviour
 """
-from pathlib import Path
 from copy import deepcopy
 from typing import Union
 import yaml
 import jinja2
-from . import config_validators as cfv
 from .config_errors import ConfigFormatError
 from . import dict_utils as dtu
 
@@ -130,107 +128,3 @@ def generate_system_default_config(procedure_config: dict):
     for frag in default_config_fragments:
         dtu.update_dict(config, frag, in_place=True)
     return config
-
-
-def test_get_system_config():
-    test_configs = _get_daq_configs()
-    test_config = test_configs[0]
-    default_daq_config = load_configuration(
-            test_config['system_settings']['default'][1])['daq']
-    system_default_config = generate_system_default_config(test_config)['daq']
-    print(system_default_config)
-    delta = dtu.diff_dict(default_daq_config, system_default_config)
-    assert delta is None
-
-
-def generate_worker_state(system_state: dict):
-    """
-    create procedure configrurations that can be distributed to the worker
-    tasks.
-
-    Do this by figuring out how many runs there are and how many workers there
-    and then modifying the parameters section of the procedure configuration
-    for each worker so that the worker will work through roughly 1/nworker
-    of the runs
-    """
-    values = [dim['values']
-              for dim in system_state['procedure']['parameters']]
-    total_runs = 1
-    tree_dim = [1]
-    for val in values:
-        total_runs *= len(val)
-        assert len(val) > tree_dim[-1]
-        tree_dim.append(len(val))
-
-    workers = system_state['workers']
-
-    split_level = len(tree_dim) - 1
-    for i, dim in enumerate(tree_dim):
-        if dim >= workers:
-            split_level = i - 1
-            break
-    split_vals = [values[split_level][i::workers] for i in range(workers)]
-
-    worker_states = []
-    for vals in split_vals:
-        worker_state = deepcopy(system_state)
-        worker_state['procedure']['parameters'][split_level]['values'] = vals
-        worker_states.append(worker_state)
-    return worker_states
-
-
-def test_generate_worker_states():
-    scan_configs = _get_daq_configs()
-    test_config = scan_configs[0]
-    reference_dim = [len(dim['values'])
-                     for dim in test_config['parameters']]
-    system_state = {}
-    system_state['workers'] = 1
-    system_state['procedure'] = test_config
-    for state in generate_worker_state(system_state):
-        parameters = state['procedure']['parameters']
-        tree_dim = [len(dim['values']) for dim in parameters]
-        assert tree_dim == reference_dim
-    system_state = {}
-    system_state['workers'] = 3
-    system_state['procedure'] = test_config
-    for i, state in enumerate(generate_worker_state(system_state)):
-        parameters = state['procedure']['parameters']
-        tree_dim = [len(dim['values']) for dim in parameters]
-        assert len(tree_dim) == len(reference_dim)
-        assert parameters[0]['values'] == list(range(2048))[i::3]
-
-    test_config = scan_configs[3]
-    system_state = {}
-    system_state['workers'] = 3
-    system_state['procedure'] = test_config
-    dim_vals = [dim['values']
-                for dim in system_state['procedure']['parameters']]
-    ref_tree_dim = [len(vals) for vals in dim_vals]
-    assert system_state['procedure']['name'] == 'timewalk_and_phase_scan'
-    collected_dim_vals = [[] for vals in dim_vals]
-    merge_dim = 0
-    for i, state in enumerate(generate_worker_state(system_state)):
-        parameters = state['procedure']['parameters']
-        tree_dim = [len(dim['values']) for dim in parameters]
-        for j, dim in enumerate(parameters):
-            if tree_dim[j] != ref_tree_dim[j]:
-                merge_dim = j
-                collected_dim_vals[j] += dim['values']
-    assert len(collected_dim_vals[merge_dim]) == len(dim_vals[merge_dim])
-    for val in collected_dim_vals[merge_dim]:
-        assert val in dim_vals[merge_dim]
-
-
-def _get_daq_configs():
-    """
-    Function that makes loading scan configurations a one liner
-    instead of copying the code everywhere
-    """
-    test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
-    # test_dir = Path(os.path.dirname(test_fpath))
-    test_config = load_configuration(test_fpath)
-    for i, config in enumerate(test_config):
-        cfv.current_path = test_fpath
-        test_config[i] = cfv.procedure_config.validate(config)
-    return test_config
