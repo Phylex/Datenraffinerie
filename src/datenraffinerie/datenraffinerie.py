@@ -12,7 +12,7 @@ from .daq_coordination import coordinate_daq_access
 @click.command()
 @click.argument('netcfg', type=click.File('r'),
                 metavar='[network configuration file]')
-@click.argument('config', type=click.Path(exists=True),
+@click.argument('config', type=click.File('r'),
                 metavar='[main configuration file]')
 @click.argument('procedure', type=str,
                 metavar='[Procedure to be run by the datenraffinerie]')

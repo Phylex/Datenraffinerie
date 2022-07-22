@@ -4,6 +4,7 @@ setup(
     entry_points={
         'console_scripts': [
             'datenraffinerie = datenraffinerie.datenraffinerie:cli',
+            'generate-configs = datenraffinerie.gen_configurations:generate_configuratons',
         ]
     },
     install_requires=[

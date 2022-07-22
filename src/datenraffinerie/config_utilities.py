@@ -102,9 +102,9 @@ def build_scan_patches(scan_dim_patch_list: list, current_patch={}):
     return patches
 
 
-def generate_patches(system_config):
+def generate_patches(procedure_config):
     scan_dim_patches = []
-    for dimension in system_config['procedure']['parameters']:
+    for dimension in procedure_config['parameters']:
         scan_dim_patches.append(build_dimension_patches(dimension))
     return build_scan_patches(scan_dim_patches)
 
