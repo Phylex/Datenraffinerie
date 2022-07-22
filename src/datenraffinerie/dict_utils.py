@@ -1,8 +1,5 @@
-from luigi.freezing import FrozenOrderedDict
 from copy import deepcopy
-from config_errors import ConfigPatchError
-from config_utilities import load_configuration
-from pathlib import Path
+from .config_errors import ConfigPatchError
 
 
 def patch_configuration(config: dict, patch: dict):
@@ -12,36 +9,6 @@ def patch_configuration(config: dict, patch: dict):
     may be selected
     """
     return update_dict(config, patch)
-
-
-def unfreeze(config):
-    """
-    unfreeze the dictionary that is frozen to serialize it
-    and send it from one luigi task to another
-    """
-    try:
-        unfrozen_dict = {}
-        for key in config.keys():
-            unfrozen_dict[key] = unfreeze(config[key])
-        return unfrozen_dict
-    except AttributeError:
-        try:
-            unfrozen_list = []
-            if not isinstance(config, str):
-                for elem in config:
-                    unfrozen_list.append(unfreeze(elem))
-                return unfrozen_list
-            return config
-        except TypeError:
-            return config
-
-
-def test_unfreeze():
-    input_dict = FrozenOrderedDict({'a': 1, 'b': (1, 2, 3),
-                                    'd': FrozenOrderedDict({'e': 4})})
-    expected_dict = {'a': 1, 'b': [1, 2, 3],
-                     'd': {'e': 4}}
-    assert expected_dict == unfreeze(input_dict)
 
 
 def update_dict(original: dict, update: dict, offset: bool = False,
@@ -130,44 +97,6 @@ def update_dict(original: dict, update: dict, offset: bool = False,
     return result
 
 
-def test_update_dict():
-    """
-    test the update_dict function
-    """
-    test_fpath = Path('../../examples/daq_procedures.yaml')
-    config = load_configuration(test_fpath)
-    original = config[0]
-    assert 'calibration' in original
-    assert original['calibration'] == 'pedestal_calibration'
-    update = {'calibration': 'vref_no_inv'}
-    updated_dict = update_dict(original, update)
-    assert updated_dict['calibration'] == 'vref_no_inv'
-
-    # check that subdicts are properly updated
-    original = {'this': [{'a': 1}, {'b': 2}, {'c': 3}, 3], 'that': 'what'}
-    update = {'this': [{'a': 3}, {'b': 3}, {'c': 5}, 5]}
-    expected_output = {'this': [{'a': 3}, {'b': 3}, {'c': 5}, 5],
-                       'that': 'what'}
-    updated_dict = update_dict(original, update)
-    assert updated_dict == expected_output
-
-    # check that an update with an emty dict is a no-op
-    original = {'this': [{'a': 1}, {'b': 2}, {'c': 3}, 3], 'that': 'what'}
-    update = {}
-    expected_output = {'this': [{'a': 1}, {'b': 2}, {'c': 3}, 3],
-                       'that': 'what'}
-    updated_dict = update_dict(original, update)
-    assert updated_dict == expected_output
-
-    # check that the in_place feature works as expected
-    original = {'this': [{'a': 1}, {'b': 2}, {'c': 3}, 3], 'that': 'what'}
-    update = {'this': [{'a': 3}, {'b': 3}, {'c': 5}, 5]}
-    expected_output = {'this': [{'a': 3}, {'b': 3}, {'c': 5}, 5],
-                       'that': 'what'}
-    update_dict(original, update, in_place=True)
-    assert original == expected_output
-
-
 def diff_dict(d1: dict, d2: dict) -> dict:
     """
     create the diff of two dictionaries.
@@ -207,14 +136,3 @@ def diff_dict(d1: dict, d2: dict) -> dict:
     if diff == {}:
         return None
     return diff
-
-
-def test_diff_dict():
-    test_dict_1 = {'a': 1, 'b': {'c': 2, 'f': 4}, 'e': 3}
-    test_dict_2 = {'a': 2, 'b': {'c': 3, 'f': 4}, 'e': 3, 'g': 4}
-    diff = {'a': 2, 'b': {'c': 3}, 'g': 4}
-    result = diff_dict(test_dict_1, test_dict_2)
-    assert result == diff
-    result = diff_dict(test_dict_2, test_dict_1)
-    assert result['b']['c'] == 2
-    assert result['a'] == 1

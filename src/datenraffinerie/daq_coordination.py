@@ -133,7 +133,6 @@ class DAQCoordinator():
                                          self.network_config['server']['port'],
                                          self.network_config['client']['hostname'],
                                          self.network_config['client']['port'])
-
         while True:
             message = self.command_socket.recv()
             daq_response = None
@@ -187,7 +186,8 @@ class DAQCoordinator():
                 except KeyError:
                     daq_response = DAQCoordResponse(
                         type='error',
-                        content='Configuration did not have a daq or target field')
+                        content='Configuration did not have a '
+                                'daq or target field')
                     self.command_socket.send(daq_response.serialize())
                     continue
                 daq_response = DAQCoordResponse(
@@ -221,4 +221,10 @@ class DAQCoordinator():
                         type='data',
                         content=data_file.read()
                     )
-            self.command_socket.send(daq_response.serialize())
+                    self.command_socket.send(daq_response.serialize())
+            if command == 'shutdown':
+                daq_response = DAQCoordResponse(
+                    type='ack'
+                )
+                self.command_socket.send(daq_response.serialize())
+                break

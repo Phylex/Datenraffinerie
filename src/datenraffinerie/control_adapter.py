@@ -28,7 +28,8 @@ class ControlAdapter:
     the client and server of the daq-system or target.
     """
 
-    def __init__(self, hostname: str = None, port: str = None, default_config: dict = None):
+    def __init__(self, hostname: str = None, port: str = None,
+                 default_config: dict = None):
         """
         Initialize the data structure on the control computer (the one
         coordinating everything) and connect to the system component.

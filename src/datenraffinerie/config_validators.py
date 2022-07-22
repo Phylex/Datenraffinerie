@@ -1,7 +1,15 @@
-from schema import Schema, And, Use, Or, Optional,  SchemaError
+from schema import Schema, And, Use, Or, Optional
 from pathlib import Path
 import yaml
 import os
+
+
+current_path = Path('.')
+
+
+def set_current_path(path):
+    global current_path
+    current_path = path
 
 
 def load_configuration(config_path):
@@ -13,9 +21,6 @@ def load_configuration(config_path):
     """
     with open(config_path, 'r', encoding='utf-8') as config_file:
         return yaml.safe_load(config_file.read())
-
-
-current_path = Path('.')
 
 
 def full_path(path):
@@ -39,13 +44,27 @@ def generate_values(rdict):
     return list(range(start, stop, step))
 
 
+def resolve_library(path):
+    global current_path
+    path = Path(path)
+    path = Path(current_path) / path
+    if not os.path.exists(path.absolute()):
+        raise FileNotFoundError(
+                f"The config file {path.resolve()} cant be found")
+    tmp_path = current_path
+    current_path = os.path.dirname(path)
+    validated_lib = library_file.validate(load_configuration(path))
+    current_path = tmp_path
+    return validated_lib
+
+
 systems_settings = Schema(
         {'default': Or(
             [Use(full_path,
                  error="a default config file could not be found")],
             And(str, Use(full_path,
                          error="a default config file could not be found"))),
-         Optional('init', defult=[]): Or(
+         Optional('init', default=[]): Or(
              [Use(full_path,
                   error="an init config file coule not be found")],
              And(str, Use(full_path,
@@ -86,7 +105,7 @@ analysis_config = Schema(
          'type': 'analysis',
          'daq': str,
          Optional('compatible_modes', default='summary'):
-            Or([Or('summary', 'full')], Or('summary', 'full'),
+            Or('summary', 'full',
                error="compatible modes are either 'summary' or 'full'"),
          Optional('provides_calibration', default=False): bool,
          Optional('module_name'): str,
@@ -102,50 +121,8 @@ workflow_config = Schema({'name': str,
 library_file = Schema([procedure_config])
 
 
-def resolve_library(path):
-    global current_path
-    path = Path(path)
-    path = Path(current_path) / path
-    if not os.path.exists(path.absolute()):
-        raise FileNotFoundError(
-                f"The config file {path.resolve()} cant be found")
-    tmp_path = current_path
-    current_path = os.path.dirname(path)
-    validated_lib = library_file.validate(load_configuration(path))
-    current_path = tmp_path
-    return validated_lib
-
-
 main_config = Schema({
     Optional('libraries', default=[]): [Use(resolve_library)],
     Optional('procedures', default=[]): [procedure_config],
     Optional('workflows', default=[]): [workflow_config]
     })
-
-
-def test_config_validators():
-    import yaml
-    import os
-    global current_path
-    fp = Path('../../tests/configuration/scan_procedures.yaml')
-    current_path = Path(os.path.dirname(fp))
-    with open(fp.absolute(), 'r') as f:
-        configs = yaml.safe_load(f.read())
-    fp = Path('../../tests/configuration/analysis_procedures.yaml')
-    current_path = Path(os.path.dirname(fp))
-    with open(fp.absolute(), 'r') as f:
-        configs += yaml.safe_load(f.read())
-    for config in configs:
-        try:
-            validated_config = procedure_config.validate(config)
-        except SchemaError as e:
-            print(e.code)
-            continue
-        print(validated_config)
-        print()
-    fp = Path('../../tests/configuration/main_config.yaml')
-    current_path = Path(os.path.dirname(fp))
-    with open(fp.absolute(), 'r') as f:
-        config = yaml.safe_load(f.read())
-    validated_config = main_config.validate(config)
-    print(validated_config['workflows'])

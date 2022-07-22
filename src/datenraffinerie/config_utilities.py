@@ -11,9 +11,9 @@ from copy import deepcopy
 from typing import Union
 import yaml
 import jinja2
-import config_validators as cfv
-from config_errors import ConfigFormatError
-import dict_utils as dtu
+from . import config_validators as cfv
+from .config_errors import ConfigFormatError
+from . import dict_utils as dtu
 
 
 def load_configuration(config_path):
@@ -28,13 +28,6 @@ def load_configuration(config_path):
             return yaml.safe_load(config_file.read())
         except yaml.YAMLError as e:
             raise ConfigFormatError("unable to load yaml") from e
-
-
-def test_load_config():
-    test_fpath = Path('../../tests/configuration/scan_procedures.yaml')
-    config = load_configuration(test_fpath)
-    assert isinstance(config, list)
-    assert isinstance(config[0], dict)
 
 
 def generate_patch_from_key(keys: Union[list, str], value):
@@ -58,9 +51,6 @@ def generate_patch_from_key(keys: Union[list, str], value):
     # here we need to insert 'target' if the key 'target' or 'daq' is not
     # present as the top level key to extend the scannable parameters to both
     # the daq and target configuration
-    if keys[0] not in ['target', 'daq']:
-        keys.insert(0, 'target')
-
     # now the rest of the generation can run as usual
     if len(keys) == 0:
         return {}
@@ -75,33 +65,6 @@ def generate_patch_from_key(keys: Union[list, str], value):
             level[key] = current_root
         current_root = level
     return current_root
-
-
-def test_patch_generator():
-    """
-    test that the generate_patch_dict_from_key_tuple function
-    """
-    keys = [[['k1', 'k2', 'k3'], 'k4', 'k5'],
-            ['daq', ['k1', 'k2', 'k3'], 'k4', 'k5'],
-            ['daq', ['k1', 'k2', 'k3'], ['k4', 'k5'], 'k6']]
-    value = 1
-    expected_dict = [{'target': {'k1': {'k4': {'k5': 1}},
-                                 'k2': {'k4': {'k5': 1}},
-                                 'k3': {'k4': {'k5': 1}}}},
-                     {'daq': {'k1': {'k4': {'k5': 1}},
-                              'k2': {'k4': {'k5': 1}},
-                              'k3': {'k4': {'k5': 1}}}},
-                     {'daq': {'k1': {'k4': {'k6': 1},
-                                     'k5': {'k6': 1}},
-                              'k2': {'k4': {'k6': 1},
-                                     'k5': {'k6': 1}},
-                              'k3': {'k4': {'k6': 1},
-                                     'k5': {'k6': 1}}
-                              }
-                      }]
-    for key, exd_dict in zip(keys, expected_dict):
-        patch_dict = generate_patch_from_key(key, value)
-        assert patch_dict == exd_dict
 
 
 def build_dimension_patches(scan_dimension):
@@ -127,25 +90,6 @@ def build_dimension_patches(scan_dimension):
             raise ConfigFormatError(
                     "Neither the template keyword nor the 'key' keyword"
                     " could not be found")
-
-
-def test_build_dimension_patches():
-    daq_config = load_configuration(
-        '../../tests/configuration/scan_procedures.yaml')
-    validated_configs = [cfv.procedure_config.validate(config)
-                         for config in daq_config]
-    scan_dimension = validated_configs[0]['parameters'][0]
-    scan_parameters = build_dimension_patches(scan_dimension)
-    assert len(scan_parameters) == 2048
-    for patch in scan_parameters:
-        assert isinstance(patch, dict)
-
-    scan_dimension = daq_config[1]['parameters'][0]
-    scan_parameters = build_dimension_patches(scan_dimension)
-    assert len(scan_parameters) == 35
-    for patch in scan_parameters:
-        assert isinstance(patch, dict)
-    assert scan_parameters[0]['target']['roc_s0']['ch'][1]['HighRange'] == 1
 
 
 def build_scan_patches(scan_dim_patch_list: list, current_patch={}):
