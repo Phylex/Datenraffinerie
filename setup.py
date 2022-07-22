@@ -23,5 +23,6 @@ setup(
         'h5py',
         'numba',
         'jinja2',
+        'schema',
     ]
 )
