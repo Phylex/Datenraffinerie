@@ -17,8 +17,8 @@ from . import config_validators as cvd
 import logging
 
 
-def get_procedure_config(main_config_file: str, procedure_name: dict,
-                         calibration: dict = None, diff: bool = False):
+def get_procedure_configs(main_config_file: str, procedure_name: str,
+                          calibration: dict = None, diff: bool = False):
     cvd.set_current_path(os.path.dirname(main_config_file))
     with open(main_config_file, 'r') as cfp:
         config = yaml.safe_load(cfp.read())
@@ -26,7 +26,7 @@ def get_procedure_config(main_config_file: str, procedure_name: dict,
     available_procedures = config['procedures'] + config['libraries']
     available_procedures = available_procedures[0]
     try:
-        procedure = list(filter(lambda x: x['name'] == procedure,
+        procedure = list(filter(lambda x: x['name'] == procedure_name,
                                 available_procedures))[0]
     except IndexError:
         all_procedure_names = list(map(lambda x: x['name'],
@@ -34,7 +34,8 @@ def get_procedure_config(main_config_file: str, procedure_name: dict,
         logging.critical(f"The procedure with name: {procedure} could not be "
                          "found, Available procedures are: "
                          f"{all_procedure_names}")
-        raise ValueError(f"The procedure {procedure} could not be found")
+        raise ValueError("Procedure could not be found",
+                         procedure, available_procedures)
     return generate_configurations(procedure, calibration, diff)
 
 
@@ -59,8 +60,11 @@ def generate_configurations(procedure: dict, calibration: dict = None,
         for patch in scan_patches:
             run_config = dtu.update_dict(full_system_init_config, patch)
             run_config_diff = dtu.diff_dict(current_state, run_config)
-            dtu.update_dict(current_state, run_config_diff, in_place=True)
-            run_config_diffs.append(run_config_diff)
+            if run_config_diff is not None:
+                dtu.update_dict(current_state, run_config_diff, in_place=True)
+                run_config_diffs.append(run_config_diff)
+            else:
+                run_config_diffs.append({})
         return system_default_config, system_init_config, run_config_diffs
 
     else:

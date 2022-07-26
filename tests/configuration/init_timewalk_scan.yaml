@@ -47,7 +47,7 @@ target:
         EN_HIGH_CAPA: 1
         RunL: 1
         RunR: 1
-        phase_strobe: 3
+        phase_strobe: 0
     ch:
       10:
         HighRange: 1
@@ -105,7 +105,7 @@ target:
         EN_HIGH_CAPA: 1
         RunL: 1
         RunR: 1
-        phase_strobe: 3
+        phase_strobe: 0
     ch:
       10:
         HighRange: 1
@@ -163,7 +163,7 @@ target:
         EN_HIGH_CAPA: 1
         RunL: 1
         RunR: 1
-        phase_strobe: 3
+        phase_strobe: 0
     ch:
       10:
         HighRange: 1

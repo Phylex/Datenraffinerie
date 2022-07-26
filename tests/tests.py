@@ -10,6 +10,7 @@ from datenraffinerie.config_utilities import load_configuration
 from datenraffinerie.config_utilities import build_dimension_patches
 from datenraffinerie.config_utilities import build_scan_patches
 from datenraffinerie.config_utilities import generate_configurations
+from datenraffinerie.config_utilities import get_procedure_configs
 import os
 import yaml
 
@@ -175,27 +176,6 @@ def test_build_dimension_patches(config_file, procedure_name,
     scan_dimension = test_procedure['parameters'][0]
     scan_parameters = build_dimension_patches(scan_dimension)
     assert scan_parameters == parameter_patches
-
-
-@pytest.fixture
-def output_test_1_procedure():
-    return [
-         {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}},
-          'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}},
-          'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}}},
-         {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}},
-          'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}},
-          'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}}},
-         {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 10}, 1: {'Calib': 10}}},
-          'roc_s1': {'ReferenceVoltage': {0: {'Calib': 10}, 1: {'Calib': 10}}},
-          'roc_s2': {'ReferenceVoltage': {0: {'Calib': 10}, 1: {'Calib': 10}}}},
-         {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 15}, 1: {'Calib': 15}}},
-          'roc_s1': {'ReferenceVoltage': {0: {'Calib': 15}, 1: {'Calib': 15}}},
-          'roc_s2': {'ReferenceVoltage': {0: {'Calib': 15}, 1: {'Calib': 15}}}},
-         {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 20}, 1: {'Calib': 20}}},
-          'roc_s1': {'ReferenceVoltage': {0: {'Calib': 20}, 1: {'Calib': 20}}},
-          'roc_s2': {'ReferenceVoltage': {0: {'Calib': 20}, 1: {'Calib': 20}}}}
-     ]
 
 
 @pytest.mark.parametrize("dimensional_patch_sets, outputs", [
@@ -397,3 +377,90 @@ def test_generate_configurations(procedure, patches):
             generate_configurations(procedure)
     for patch, run_c in zip(patches, run_configs):
         assert update_dict(initial_config, patch) == run_c
+
+
+@pytest.mark.parametrize("main_config_file, procedure_name, output", [
+    ('configuration/main_test_config.yaml', 'test_1',
+     [
+      {'target':
+       {'roc_s0': {'ReferenceVoltage':
+                   {0: {'Calib': 0}, 1: {'Calib': 0}}},
+        'roc_s1': {'ReferenceVoltage':
+                   {0: {'Calib': 0}, 1: {'Calib': 0}}},
+        'roc_s2': {'ReferenceVoltage':
+                   {0: {'Calib': 0}, 1: {'Calib': 0}}}},
+       },
+      {'target':
+       {'roc_s0': {'ReferenceVoltage':
+                   {0: {'Calib': 5}, 1: {'Calib': 5}}},
+        'roc_s1': {'ReferenceVoltage':
+                   {0: {'Calib': 5}, 1: {'Calib': 5}}},
+        'roc_s2': {'ReferenceVoltage':
+                   {0: {'Calib': 5}, 1: {'Calib': 5}}}},
+       },
+      {'target':
+       {'roc_s0': {'ReferenceVoltage':
+                   {0: {'Calib': 10}, 1: {'Calib': 10}}},
+        'roc_s1': {'ReferenceVoltage':
+                   {0: {'Calib': 10}, 1: {'Calib': 10}}},
+        'roc_s2': {'ReferenceVoltage':
+                   {0: {'Calib': 10}, 1: {'Calib': 10}}}},
+       },
+      {'target':
+       {'roc_s0': {'ReferenceVoltage':
+                   {0: {'Calib': 15}, 1: {'Calib': 15}}},
+        'roc_s1': {'ReferenceVoltage':
+                   {0: {'Calib': 15}, 1: {'Calib': 15}}},
+        'roc_s2': {'ReferenceVoltage':
+                   {0: {'Calib': 15}, 1: {'Calib': 15}}}},
+       },
+      {'target':
+       {'roc_s0': {'ReferenceVoltage':
+                   {0: {'Calib': 20}, 1: {'Calib': 20}}},
+        'roc_s1': {'ReferenceVoltage':
+                   {0: {'Calib': 20}, 1: {'Calib': 20}}},
+        'roc_s2': {'ReferenceVoltage':
+                   {0: {'Calib': 20}, 1: {'Calib': 20}}}}
+       },
+      ]),
+    ('configuration/main_test_config.yaml', 'test_2',
+     [
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 0}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 0}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 0}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 2}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 2}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 2}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 4}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 4}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 4}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 6}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 6}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 6}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 8}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 8}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 8}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 10}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 10}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 10}}}}
+       },
+     ])
+    ])
+def test_get_procedure_configs(main_config_file, procedure_name, output):
+    system_default_config, systme_init_config, run_configs = \
+            get_procedure_configs(main_config_file, procedure_name, diff=True)
+    output = output[1:]
+    output.insert(0, {})
+    for run, diff in zip(run_configs, output):
+        assert run == diff
