@@ -17,10 +17,11 @@
           - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
   parameters:
     - key:
+      - target
       - ['roc_s0', 'roc_s1', 'roc_s2']
-      - 'ReferenceVoltage'
+      - ReferenceVoltage
       - [0, 1]
-      - 'Calib'
+      - Calib
       values:
         start: 0
         stop: 21
@@ -45,6 +46,7 @@
           - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
   parameters:
     - key:
+      - target
       - ['roc_s0', 'roc_s1', 'roc_s2']
       - Top
       - 0
@@ -97,7 +99,8 @@
     default: 
       - ./defaults/V3LDHexaboard-poweron-default.yaml
       - ./defaults/daq-system-config.yaml
-    init: ./init_timewalk_scan.yaml
+    init: 
+      - ./init_timewalk_scan.yaml
     override:
       daq:
         server:
@@ -109,23 +112,25 @@
           - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
   parameters:
     - key:
+      - target
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - ReferenceVoltage
+      - [0, 1]
+      - Calib
+      values:
+        start: 0
+        stop: 21
+        step: 5
+    - key:
+      - target
       - ['roc_s0', 'roc_s1', 'roc_s2']
       - Top
       - 0
       - phase_strobe
       values:
         start: 0
-        stop: 10
-        step: 1
-    - key:
-      - ['roc_s0', 'roc_s1', 'roc_s2']
-      - 'ReferenceVoltage'
-      - [0, 1]
-      - 'Calib'
-      values:
-        start: 0
-        stop: 21
-        step: 5
+        stop: 5
+        step: 2
   data_columns:
     - HighRange
     - channel

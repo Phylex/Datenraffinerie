@@ -9,14 +9,15 @@ from datenraffinerie.dict_utils import update_dict
 from datenraffinerie.config_utilities import load_configuration
 from datenraffinerie.config_utilities import build_dimension_patches
 from datenraffinerie.config_utilities import build_scan_patches
+from datenraffinerie.config_utilities import generate_configurations
 import os
 import yaml
 
 
 @pytest.mark.parametrize("config_path, iterate, validator", [
-    (Path('configuration/scan_procedures.yaml'), True, procedure_config),
+    (Path('configuration/test_procedures.yaml'), True, procedure_config),
     (Path('configuration/analysis_procedures.yaml'), True, procedure_config),
-    (Path('configuration/main_config.yaml'), False, main_config)
+    (Path('configuration/main_test_config.yaml'), False, main_config)
     ])
 def test_config_validators(config_path, iterate, validator):
     set_current_path(Path(os.path.dirname(config_path)))
@@ -101,6 +102,84 @@ def test_diff_dict(in_1, in_2, diff):
     ('configuration/test_procedures.yaml',
      'test_1',
      [
+      {'target':
+       {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}},
+        'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}},
+        'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}}},
+       },
+      {'target':
+       {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}},
+        'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}},
+        'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}}},
+       },
+      {'target':
+       {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 10}, 1: {'Calib': 10}}},
+        'roc_s1': {'ReferenceVoltage': {0: {'Calib': 10}, 1: {'Calib': 10}}},
+        'roc_s2': {'ReferenceVoltage': {0: {'Calib': 10}, 1: {'Calib': 10}}}},
+       },
+      {'target':
+       {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 15}, 1: {'Calib': 15}}},
+        'roc_s1': {'ReferenceVoltage': {0: {'Calib': 15}, 1: {'Calib': 15}}},
+        'roc_s2': {'ReferenceVoltage': {0: {'Calib': 15}, 1: {'Calib': 15}}}},
+       },
+      {'target':
+       {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 20}, 1: {'Calib': 20}}},
+        'roc_s1': {'ReferenceVoltage': {0: {'Calib': 20}, 1: {'Calib': 20}}},
+        'roc_s2': {'ReferenceVoltage': {0: {'Calib': 20}, 1: {'Calib': 20}}}}
+       },
+     ]
+     ),
+    ('configuration/test_procedures.yaml',
+     'test_2',
+     [
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 0}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 0}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 0}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 2}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 2}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 2}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 4}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 4}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 4}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 6}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 6}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 6}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 8}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 8}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 8}}}}
+       },
+      {'target':
+       {'roc_s0': {'Top': {0: {'phase_strobe': 10}}},
+        'roc_s1': {'Top': {0: {'phase_strobe': 10}}},
+        'roc_s2': {'Top': {0: {'phase_strobe': 10}}}}
+       },
+      ]
+     )
+])
+def test_build_dimension_patches(config_file, procedure_name,
+                                 parameter_patches):
+    config_struct = load_configuration(config_file)
+    validated_configs = [procedure_config.validate(config)
+                         for config in config_struct]
+    test_procedure = list(filter(lambda x: x['name'] == procedure_name,
+                          validated_configs))[0]
+    scan_dimension = test_procedure['parameters'][0]
+    scan_parameters = build_dimension_patches(scan_dimension)
+    assert scan_parameters == parameter_patches
+
+
+@pytest.fixture
+def output_test_1_procedure():
+    return [
          {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}},
           'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}},
           'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}}},
@@ -117,40 +196,6 @@ def test_diff_dict(in_1, in_2, diff):
           'roc_s1': {'ReferenceVoltage': {0: {'Calib': 20}, 1: {'Calib': 20}}},
           'roc_s2': {'ReferenceVoltage': {0: {'Calib': 20}, 1: {'Calib': 20}}}}
      ]
-     ),
-    ('configuration/test_procedures.yaml',
-     'test_2',
-     [
-         {'roc_s0': {'Top': {0: {'phase_strobe': 0}}},
-          'roc_s1': {'Top': {0: {'phase_strobe': 0}}},
-          'roc_s2': {'Top': {0: {'phase_strobe': 0}}}},
-         {'roc_s0': {'Top': {0: {'phase_strobe': 2}}},
-          'roc_s1': {'Top': {0: {'phase_strobe': 2}}},
-          'roc_s2': {'Top': {0: {'phase_strobe': 2}}}},
-         {'roc_s0': {'Top': {0: {'phase_strobe': 4}}},
-          'roc_s1': {'Top': {0: {'phase_strobe': 4}}},
-          'roc_s2': {'Top': {0: {'phase_strobe': 4}}}},
-         {'roc_s0': {'Top': {0: {'phase_strobe': 6}}},
-          'roc_s1': {'Top': {0: {'phase_strobe': 6}}},
-          'roc_s2': {'Top': {0: {'phase_strobe': 6}}}},
-         {'roc_s0': {'Top': {0: {'phase_strobe': 8}}},
-          'roc_s1': {'Top': {0: {'phase_strobe': 8}}},
-          'roc_s2': {'Top': {0: {'phase_strobe': 8}}}},
-         {'roc_s0': {'Top': {0: {'phase_strobe': 10}}},
-          'roc_s1': {'Top': {0: {'phase_strobe': 10}}},
-          'roc_s2': {'Top': {0: {'phase_strobe': 10}}}}]
-     )
-])
-def test_build_dimension_patches(config_file, procedure_name,
-                                 parameter_patches):
-    config_struct = load_configuration(config_file)
-    validated_configs = [procedure_config.validate(config)
-                         for config in config_struct]
-    test_procedure = list(filter(lambda x: x['name'] == procedure_name,
-                          validated_configs))[0]
-    scan_dimension = test_procedure['parameters'][0]
-    scan_parameters = build_dimension_patches(scan_dimension)
-    assert scan_parameters == parameter_patches
 
 
 @pytest.mark.parametrize("dimensional_patch_sets, outputs", [
@@ -173,8 +218,7 @@ def test_build_dimension_patches(config_file, procedure_name,
           'roc_s1': {'Top': {0: {'phase_strobe': 4}}},
           'roc_s2': {'Top': {0: {'phase_strobe': 4}}}},
        ]
-      ],
-     [
+      ], [
          {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
                      'Top': {0: {'phase_strobe': 0}}},
           'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
@@ -222,3 +266,134 @@ def test_build_dimension_patches(config_file, procedure_name,
 ])
 def test_build_scan_patches(dimensional_patch_sets, outputs):
     assert outputs == build_scan_patches(dimensional_patch_sets)
+
+
+@pytest.fixture
+def test_1_procedure():
+    return get_procedure('test_1')
+
+
+@pytest.fixture
+def test_2_procedure():
+    return get_procedure('test_2')
+
+
+def get_procedure(procedure_name):
+    set_current_path('configuration')
+    with open('configuration/main_test_config.yaml', 'r') as cp:
+        root_config = yaml.safe_load(cp.read())
+    root_config = main_config.validate(root_config)
+    available_procedures = root_config['procedures'] + root_config['libraries']
+    available_procedures = available_procedures[0]
+    procedure = list(filter(lambda x: x['name'] == procedure_name,
+                            available_procedures))[0]
+    return procedure
+
+
+@pytest.mark.parametrize(
+        "procedure, patches",
+        [
+         (get_procedure('test_1'), [
+          {'target':
+           {'roc_s0': {'ReferenceVoltage':
+                       {0: {'Calib': 0}, 1: {'Calib': 0}}},
+            'roc_s1': {'ReferenceVoltage':
+                       {0: {'Calib': 0}, 1: {'Calib': 0}}},
+            'roc_s2': {'ReferenceVoltage':
+                       {0: {'Calib': 0}, 1: {'Calib': 0}}}},
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage':
+                       {0: {'Calib': 5}, 1: {'Calib': 5}}},
+            'roc_s1': {'ReferenceVoltage':
+                       {0: {'Calib': 5}, 1: {'Calib': 5}}},
+            'roc_s2': {'ReferenceVoltage':
+                       {0: {'Calib': 5}, 1: {'Calib': 5}}}},
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage':
+                       {0: {'Calib': 10}, 1: {'Calib': 10}}},
+            'roc_s1': {'ReferenceVoltage':
+                       {0: {'Calib': 10}, 1: {'Calib': 10}}},
+            'roc_s2': {'ReferenceVoltage':
+                       {0: {'Calib': 10}, 1: {'Calib': 10}}}},
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage':
+                       {0: {'Calib': 15}, 1: {'Calib': 15}}},
+            'roc_s1': {'ReferenceVoltage':
+                       {0: {'Calib': 15}, 1: {'Calib': 15}}},
+            'roc_s2': {'ReferenceVoltage':
+                       {0: {'Calib': 15}, 1: {'Calib': 15}}}},
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage':
+                       {0: {'Calib': 20}, 1: {'Calib': 20}}},
+            'roc_s1': {'ReferenceVoltage':
+                       {0: {'Calib': 20}, 1: {'Calib': 20}}},
+            'roc_s2': {'ReferenceVoltage':
+                       {0: {'Calib': 20}, 1: {'Calib': 20}}}}
+           },
+          ]),
+         (get_procedure('multidim_scan_test'), [
+          {'target':
+           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 0}}},
+            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 0}}},
+            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 0}}}
+            }
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 2}}},
+            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 2}}},
+            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 2}}}
+            }
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 4}}},
+            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 4}}},
+            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 4}}}
+            }
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 0}}},
+            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 0}}},
+            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 0}}}
+            }
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 2}}},
+            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 2}}},
+            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 2}}}
+            }
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 4}}},
+            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 4}}},
+            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 4}}}
+            }
+           }
+          ])
+         ])
+def test_generate_configurations(procedure, patches):
+    root_config, initial_config, run_configs = \
+            generate_configurations(procedure)
+    for patch, run_c in zip(patches, run_configs):
+        assert update_dict(initial_config, patch) == run_c

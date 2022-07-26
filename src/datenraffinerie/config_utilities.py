@@ -10,8 +10,66 @@ from copy import deepcopy
 from typing import Union
 import yaml
 import jinja2
+import os
 from .config_errors import ConfigFormatError
 from . import dict_utils as dtu
+from . import config_validators as cvd
+import logging
+
+
+def get_procedure_config(main_config_file: str, procedure_name: dict,
+                         calibration: dict = None, diff: bool = False):
+    cvd.set_current_path(os.path.dirname(main_config_file))
+    with open(main_config_file, 'r') as cfp:
+        config = yaml.safe_load(cfp.read())
+    config = cvd.main_config.validate(config)
+    available_procedures = config['procedures'] + config['libraries']
+    available_procedures = available_procedures[0]
+    try:
+        procedure = list(filter(lambda x: x['name'] == procedure,
+                                available_procedures))[0]
+    except IndexError:
+        all_procedure_names = list(map(lambda x: x['name'],
+                                   available_procedures))
+        logging.critical(f"The procedure with name: {procedure} could not be "
+                         "found, Available procedures are: "
+                         f"{all_procedure_names}")
+        raise ValueError(f"The procedure {procedure} could not be found")
+    return generate_configurations(procedure, calibration, diff)
+
+
+def generate_configurations(procedure: dict, calibration: dict = None,
+                            diff: bool = False):
+    """
+    Given a procedure entry loaded from the config file, generate
+    the configurations necessary for every run of the procedure
+    """
+    system_default_config = generate_system_default_config(procedure)
+    system_init_config = generate_init_config(procedure)
+    scan_patches = generate_patches(procedure)
+    if calibration is not None:
+        dtu.update_dict(system_init_config, calibration, in_place=True)
+    if diff:
+        full_system_init_config = dtu.update_dict(system_default_config,
+                                                  system_init_config)
+        system_init_config = dtu.diff_dict(system_default_config,
+                                           full_system_init_config)
+        current_state = full_system_init_config.copy()
+        run_config_diffs = []
+        for patch in scan_patches:
+            run_config = dtu.update_dict(full_system_init_config, patch)
+            run_config_diff = dtu.diff_dict(current_state, run_config)
+            dtu.update_dict(current_state, run_config_diff, in_place=True)
+            run_config_diffs.append(run_config_diff)
+        return system_default_config, system_init_config, run_config_diffs
+
+    else:
+        system_init_config = dtu.update_dict(system_default_config,
+                                             system_init_config)
+        run_configs = []
+        for patch in scan_patches:
+            run_configs.append(dtu.update_dict(system_init_config, patch))
+        return system_default_config, system_init_config, run_configs
 
 
 def load_configuration(config_path):
