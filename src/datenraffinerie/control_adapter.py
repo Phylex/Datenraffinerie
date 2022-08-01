@@ -51,7 +51,7 @@ class DAQAdapter():
     A representation of the DAQ side of the system. It encapsulates the
     zmq-server and zmq-client
     """
-    variant_key_map = {'server': 'daq', 'client': 'global'}
+    variant_key_map = {'server': 'daq', 'client': 'client'}
 
     def __init__(self, variant: str, hostname: str,
                  port: int):
@@ -249,7 +249,8 @@ class DAQSystem:
         self.daq_data_folder = Path('/tmp') / self.procedure_uuid
         client_config['outputDirectory'] = str(self.daq_data_folder)
         client_config['run_type'] = "Datenraffinerie"
-        self.client.update_config({"global": client_config})
+        self.client.update_config(
+            {self.variant_key_map[self.variant]: client_config})
         if not os.path.isdir(self.daq_data_folder):
             os.mkdir(self.daq_data_folder)
         self.client.configure(cache=False)
