@@ -11,6 +11,7 @@ from datenraffinerie.config_utilities import build_dimension_patches
 from datenraffinerie.config_utilities import build_scan_patches
 from datenraffinerie.config_utilities import generate_configurations
 from datenraffinerie.config_utilities import get_procedure_configs
+from datenraffinerie.control_adapter import DAQAdapter
 import os
 import yaml
 
@@ -326,11 +327,29 @@ def get_procedure(procedure_name):
             }
            },
           {'target':
+           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 0}}},
+            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 0}}},
+            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 0}}}
+            }
+           },
+          {'target':
            {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
                        'Top': {0: {'phase_strobe': 2}}},
             'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
                        'Top': {0: {'phase_strobe': 2}}},
             'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
+                       'Top': {0: {'phase_strobe': 2}}}
+            }
+           },
+          {'target':
+           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 2}}},
+            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
+                       'Top': {0: {'phase_strobe': 2}}},
+            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
                        'Top': {0: {'phase_strobe': 2}}}
             }
            },
@@ -341,24 +360,6 @@ def get_procedure(procedure_name):
                        'Top': {0: {'phase_strobe': 4}}},
             'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
                        'Top': {0: {'phase_strobe': 4}}}
-            }
-           },
-          {'target':
-           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
-                       'Top': {0: {'phase_strobe': 0}}},
-            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
-                       'Top': {0: {'phase_strobe': 0}}},
-            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
-                       'Top': {0: {'phase_strobe': 0}}}
-            }
-           },
-          {'target':
-           {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
-                       'Top': {0: {'phase_strobe': 2}}},
-            'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
-                       'Top': {0: {'phase_strobe': 2}}},
-            'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}},
-                       'Top': {0: {'phase_strobe': 2}}}
             }
            },
           {'target':
@@ -464,3 +465,38 @@ def test_get_procedure_configs(main_config_file, procedure_name, output):
     output.insert(0, {})
     for run, diff in zip(run_configs, output):
         assert run == diff
+
+
+@pytest.mark.parametrize("variant, unsanitized_input, cleaned_input", [
+    ('client',
+     {'target': {'roc_s0': 0, 'roc_s1': 1, 'roc_s2': 2},
+      'daq': {'active_menu': 'calibAndL1A'},
+      'client': {'Board_Type': 'LD'}
+      },
+     {'client': {'Board_Type': 'LD'}}
+     ),
+    ('server',
+     {'target': {'roc_s0': 0, 'roc_s1': 1, 'roc_s2': 2},
+      'client': {'Board_Type': 'LD'},
+      'daq': {'active_menu': 'calibAndL1A'}
+      },
+     {'daq': {'active_menu': 'calibAndL1A'}}
+     ),
+    ('server',
+     {'target': {'roc_s0': 0, 'roc_s1': 1, 'roc_s2': 2},
+      'client': {'Board_Type': 'LD'},
+      'server': {'active_menu': 'calibAndL1A'}
+      },
+     {'daq': {'active_menu': 'calibAndL1A'}}
+     ),
+    ('client',
+     {'target': {'roc_s0': 0, 'roc_s1': 1, 'roc_s2': 2},
+      'daq': {'active_menu': 'calibAndL1A'},
+      'global': {'Board_Type': 'LD'}
+      },
+     {'client': {}}
+     )
+    ])
+def test_clean_input(variant, unsanitized_input, cleaned_input):
+    daq_adapter = DAQAdapter(variant, 'hostname', 4444)
+    assert daq_adapter._clean_configuration(unsanitized_input) == cleaned_input

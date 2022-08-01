@@ -16,7 +16,7 @@ from pathlib import Path
 import uuid
 import zmq
 import yaml
-from dict_utils import diff_dict, update_dict
+from .dict_utils import diff_dict, update_dict
 
 module_logger = logging.getLogger(__name__)
 

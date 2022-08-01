@@ -1,0 +1,119 @@
+client:
+  hw_type: LD
+  outputDirectory: data
+  run_type: default
+  serverIP: hc640259
+  zmqPushPull_port: 8888
+daq:
+  active_menu: calibAndL1A
+  elinks_daq:
+  - idcode: 0
+    name: link0
+    polarity: 1
+  - idcode: 1
+    name: link1
+    polarity: 1
+  - idcode: 18
+    name: link4
+    polarity: 1
+  - idcode: 19
+    name: link5
+    polarity: 1
+  - idcode: 36
+    name: link8
+    polarity: 1
+  - idcode: 37
+    name: link9
+    polarity: 1
+  elinks_trg:
+  - idcode: 2
+    name: link0
+    polarity: 1
+  - idcode: 0
+    name: link1
+    polarity: 0
+  - idcode: 1
+    name: link2
+    polarity: 1
+  - idcode: 3
+    name: link3
+    polarity: 0
+  - idcode: 20
+    name: link4
+    polarity: 0
+  - idcode: 21
+    name: link5
+    polarity: 1
+  - idcode: 22
+    name: link6
+    polarity: 0
+  - idcode: 23
+    name: link7
+    polarity: 1
+  - idcode: 40
+    name: link8
+    polarity: 1
+  - idcode: 41
+    name: link9
+    polarity: 1
+  - idcode: 42
+    name: link10
+    polarity: 1
+  - idcode: 43
+    name: link11
+    polarity: 1
+  l1aOffsetFinder:
+    L1A_offset_or_BX: 10
+    fifo_latency: 0
+    method: automatic
+  menus:
+    calibAndL1A:
+      NEvents: 5000
+      bxCalib: 10
+      bxL1A: 32
+      lengthCalib: 1
+      lengthL1A: 1
+      prescale: 0
+      repeatOffset: 200
+    calibAndL1AplusTPG:
+      NEvents: 1000
+      bxCalib: 10
+      bxL1A: 33
+      lengthCalib: 1
+      lengthL1A: 1
+      prescale: 0
+      trg_fifo_latency: 3
+    delayScan:
+      acquireLength: 1000
+      delayStep: 1
+      idlePattern: 0xACCCCCCC
+      maxDelay: 512
+    dummy:
+      NEvents: 10000
+      NEventsPerPush: 200
+    externalL1A:
+      NEvents: 10000
+      bxCalibExt: 10
+      lengthCalibExt: 2
+      loopBack: true
+      prescale: 0
+      trg_fifo_latency: 3
+      trgphase_fifo_latency: 15
+    marsCalibAndL1A:
+      bxCalib: 10
+      bxL1A: 45
+      prescale: 0
+      repeatOffset: 200
+    marsRndL1A:
+      bx_min: 45
+      log2_rand_bx_period: 10
+    randomL1A:
+      NEvents: 10000
+      bx_min: 45
+      log2_rand_bx_period: 10
+    randomL1AplusTPG:
+      NEvents: 10000
+      bx_min: 45
+      log2_rand_bx_period: 10
+      trg_fifo_latency: 3
+  zmqPushPull_port: 8888

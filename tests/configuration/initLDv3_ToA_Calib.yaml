@@ -1,1827 +1,1824 @@
 roc_s0:
-  sc:
-    DigitalHalf:
-      0:
-        IdleFrame: 0xCCCCCCC
-        CalibrationSC: 1
-        Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
-        L1Offset: 10
-      1:
-        IdleFrame: 0xCCCCCCC
-        CalibrationSC: 1
-        Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
-        L1Offset: 10
+  DigitalHalf:
+    0:
+      IdleFrame: 0xCCCCCCC
+      CalibrationSC: 1
+      Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
+      L1Offset: 10
+    1:
+      IdleFrame: 0xCCCCCCC
+      CalibrationSC: 1
+      Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
+      L1Offset: 10
 
-    MasterTdc:
-      0:
-        CTRL_IN_REF_CTDC_P_EN: 1
-        CTRL_IN_SIG_CTDC_P_EN: 1
-        CTRL_IN_REF_CTDC_P_D: 0
-        CTRL_IN_SIG_CTDC_P_D: 0
-        BIAS_I_CTDC_D: 63
-        FOLLOWER_CTDC_EN: 1
-        GLOBAL_EN_BUFFER_CTDC: 1
-        BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
-        BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
-        BIAS_CAL_DAC_CTDC_P_EN: 1
-        BIAS_CAL_DAC_CTDC_P_D: 2
-        GLOBAL_FORCE_EN_CLK: 1
-        GLOBAL_FORCE_EN_OUTPUT_DATA: 1
-        sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
-      1:
-        CTRL_IN_REF_CTDC_P_EN: 1
-        CTRL_IN_SIG_CTDC_P_EN: 1
-        CTRL_IN_REF_CTDC_P_D: 0
-        CTRL_IN_SIG_CTDC_P_D: 0
-        BIAS_I_CTDC_D: 63
-        FOLLOWER_CTDC_EN: 1
-        GLOBAL_EN_BUFFER_CTDC: 1
-        BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
-        BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
-        BIAS_CAL_DAC_CTDC_P_EN: 1
-        BIAS_CAL_DAC_CTDC_P_D: 2
-        GLOBAL_FORCE_EN_CLK: 1
-        GLOBAL_FORCE_EN_OUTPUT_DATA: 1
-        sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
-    GlobalAnalog:
-      0:
-        Delay9: 3
-        Delay87: 3
-        Delay65: 3
-        Delay40: 2
-        En_hyst_tot: 0
-      1:
-        Delay9: 3
-        Delay87: 3
-        Delay65: 3
-        Delay40: 2
-        En_hyst_tot: 0
+  MasterTdc:
+    0:
+      CTRL_IN_REF_CTDC_P_EN: 1
+      CTRL_IN_SIG_CTDC_P_EN: 1
+      CTRL_IN_REF_CTDC_P_D: 0
+      CTRL_IN_SIG_CTDC_P_D: 0
+      BIAS_I_CTDC_D: 63
+      FOLLOWER_CTDC_EN: 1
+      GLOBAL_EN_BUFFER_CTDC: 1
+      BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
+      BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
+      BIAS_CAL_DAC_CTDC_P_EN: 1
+      BIAS_CAL_DAC_CTDC_P_D: 2
+      GLOBAL_FORCE_EN_CLK: 1
+      GLOBAL_FORCE_EN_OUTPUT_DATA: 1
+      sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
+    1:
+      CTRL_IN_REF_CTDC_P_EN: 1
+      CTRL_IN_SIG_CTDC_P_EN: 1
+      CTRL_IN_REF_CTDC_P_D: 0
+      CTRL_IN_SIG_CTDC_P_D: 0
+      BIAS_I_CTDC_D: 63
+      FOLLOWER_CTDC_EN: 1
+      GLOBAL_EN_BUFFER_CTDC: 1
+      BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
+      BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
+      BIAS_CAL_DAC_CTDC_P_EN: 1
+      BIAS_CAL_DAC_CTDC_P_D: 2
+      GLOBAL_FORCE_EN_CLK: 1
+      GLOBAL_FORCE_EN_OUTPUT_DATA: 1
+      sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
+  GlobalAnalog:
+    0:
+      Delay9: 3
+      Delay87: 3
+      Delay65: 3
+      Delay40: 2
+      En_hyst_tot: 0
+    1:
+      Delay9: 3
+      Delay87: 3
+      Delay65: 3
+      Delay40: 2
+      En_hyst_tot: 0
 
-    ReferenceVoltage:
-      0:
-        Vbg_1v: 4
-        Inv_vref: 240
-        Noinv_vref: 50
-        Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
-        Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
-      1:
-        Vbg_1v: 4
-        Inv_vref: 240
-        Noinv_vref: 50
-        Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
-        Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
-    Top:
-      0:
-        BIAS_I_PLL_D: 63
-        EN_HIGH_CAPA: 1
-        EN_probe_pll: 0
-        DIV_PLL: 0
-        EN_LOCK_CONTROL: 1
-        ERROR_LIMIT_SC: 2
-        RunL: 1
-        RunR: 1
-        VOUT_INIT_EN: 0
-        VOUT_INIT_EXT_D: 0
-        VOUT_INIT_EXT_EN: 0
-        #EN: 1 #Current value of the CLPS drivers Data
-        #ENpE: 1 #Current value of the CLPS pre-emphasis driver Data
-        EN_RCG: 1 # Active the RCG:'1'
-        INIT_DAC_EN: 1 # Enable the RCG VCO frequency
-        INIT_D: 0 # Tune VCO frequency
-        rcg_gain: 0 #Choose the OUT_CLK_ RCG output frequency 00 low 11 high
+  ReferenceVoltage:
+    0:
+      Vbg_1v: 4
+      Inv_vref: 240
+      Noinv_vref: 50
+      Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
+      Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
+    1:
+      Vbg_1v: 4
+      Inv_vref: 240
+      Noinv_vref: 50
+      Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
+      Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
+  Top:
+    0:
+      BIAS_I_PLL_D: 63
+      EN_HIGH_CAPA: 1
+      EN_probe_pll: 0
+      DIV_PLL: 0
+      EN_LOCK_CONTROL: 1
+      ERROR_LIMIT_SC: 2
+      RunL: 1
+      RunR: 1
+      VOUT_INIT_EN: 0
+      VOUT_INIT_EXT_D: 0
+      VOUT_INIT_EXT_EN: 0
+      #EN: 1 #Current value of the CLPS drivers Data
+      #ENpE: 1 #Current value of the CLPS pre-emphasis driver Data
+      EN_RCG: 1 # Active the RCG:'1'
+      INIT_DAC_EN: 1 # Enable the RCG VCO frequency
+      INIT_D: 0 # Tune VCO frequency
+      rcg_gain: 0 #Choose the OUT_CLK_ RCG output frequency 00 low 11 high
 
-    calib:
-      1:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
-    cm:
-      2:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
-      3:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
+  calib:
+    1:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
+  cm:
+    2:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
+    3:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
 
-    ch:
-      0:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      1:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      2:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      3:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      4:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      5:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      6:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      7:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      8:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      9:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      10:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      11:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      12:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      13:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      14:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      15:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      16:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      17:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      18:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      19:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      20:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      21:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      22:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      23:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      24:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      25:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      26:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      27:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      28:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      29:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      30:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      31:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      32:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      33:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      34:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      35:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      36:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      37:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      38:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      39:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      40:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      41:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      42:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      43:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      44:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      45:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      46:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      47:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      48:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      49:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      50:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      51:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      52:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      53:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      54:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      55:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      56:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      57:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      58:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      59:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      60:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      61:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      62:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      63:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      64:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      65:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      66:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      67:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      68:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      69:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      70:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      71:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
+  ch:
+    0:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    1:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    2:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    3:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    4:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    5:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    6:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    7:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    8:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    9:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    10:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    11:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    12:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    13:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    14:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    15:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    16:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    17:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    18:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    19:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    20:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    21:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    22:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    23:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    24:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    25:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    26:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    27:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    28:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    29:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    30:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    31:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    32:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    33:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    34:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    35:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    36:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    37:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    38:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    39:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    40:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    41:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    42:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    43:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    44:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    45:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    46:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    47:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    48:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    49:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    50:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    51:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    52:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    53:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    54:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    55:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    56:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    57:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    58:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    59:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    60:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    61:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    62:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    63:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    64:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    65:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    66:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    67:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    68:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    69:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    70:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    71:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
 roc_s1:
-  sc:
-    DigitalHalf:
-      0:
-        IdleFrame: 0xCCCCCCC
-        CalibrationSC: 1
-        Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
-        L1Offset: 10
-      1:
-        IdleFrame: 0xCCCCCCC
-        CalibrationSC: 1
-        Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
-        L1Offset: 10
+  DigitalHalf:
+    0:
+      IdleFrame: 0xCCCCCCC
+      CalibrationSC: 1
+      Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
+      L1Offset: 10
+    1:
+      IdleFrame: 0xCCCCCCC
+      CalibrationSC: 1
+      Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
+      L1Offset: 10
 
-    MasterTdc:
-      0:
-        CTRL_IN_REF_CTDC_P_EN: 1
-        CTRL_IN_SIG_CTDC_P_EN: 1
-        CTRL_IN_REF_CTDC_P_D: 0
-        CTRL_IN_SIG_CTDC_P_D: 0
-        BIAS_I_CTDC_D: 63
-        FOLLOWER_CTDC_EN: 1
-        GLOBAL_EN_BUFFER_CTDC: 1
-        BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
-        BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
-        BIAS_CAL_DAC_CTDC_P_EN: 1
-        BIAS_CAL_DAC_CTDC_P_D: 2
-        GLOBAL_FORCE_EN_CLK: 1
-        GLOBAL_FORCE_EN_OUTPUT_DATA: 1
-        sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
-      1:
-        CTRL_IN_REF_CTDC_P_EN: 1
-        CTRL_IN_SIG_CTDC_P_EN: 1
-        CTRL_IN_REF_CTDC_P_D: 0
-        CTRL_IN_SIG_CTDC_P_D: 0
-        BIAS_I_CTDC_D: 63
-        FOLLOWER_CTDC_EN: 1
-        GLOBAL_EN_BUFFER_CTDC: 1
-        BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
-        BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
-        BIAS_CAL_DAC_CTDC_P_EN: 1
-        BIAS_CAL_DAC_CTDC_P_D: 2
-        GLOBAL_FORCE_EN_CLK: 1
-        GLOBAL_FORCE_EN_OUTPUT_DATA: 1
-        sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
-    GlobalAnalog:
-      0:
-        Delay9: 3
-        Delay87: 3
-        Delay65: 3
-        Delay40: 2
-        En_hyst_tot: 0
-      1:
-        Delay9: 3
-        Delay87: 3
-        Delay65: 3
-        Delay40: 2
-        En_hyst_tot: 0
+  MasterTdc:
+    0:
+      CTRL_IN_REF_CTDC_P_EN: 1
+      CTRL_IN_SIG_CTDC_P_EN: 1
+      CTRL_IN_REF_CTDC_P_D: 0
+      CTRL_IN_SIG_CTDC_P_D: 0
+      BIAS_I_CTDC_D: 63
+      FOLLOWER_CTDC_EN: 1
+      GLOBAL_EN_BUFFER_CTDC: 1
+      BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
+      BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
+      BIAS_CAL_DAC_CTDC_P_EN: 1
+      BIAS_CAL_DAC_CTDC_P_D: 2
+      GLOBAL_FORCE_EN_CLK: 1
+      GLOBAL_FORCE_EN_OUTPUT_DATA: 1
+      sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
+    1:
+      CTRL_IN_REF_CTDC_P_EN: 1
+      CTRL_IN_SIG_CTDC_P_EN: 1
+      CTRL_IN_REF_CTDC_P_D: 0
+      CTRL_IN_SIG_CTDC_P_D: 0
+      BIAS_I_CTDC_D: 63
+      FOLLOWER_CTDC_EN: 1
+      GLOBAL_EN_BUFFER_CTDC: 1
+      BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
+      BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
+      BIAS_CAL_DAC_CTDC_P_EN: 1
+      BIAS_CAL_DAC_CTDC_P_D: 2
+      GLOBAL_FORCE_EN_CLK: 1
+      GLOBAL_FORCE_EN_OUTPUT_DATA: 1
+      sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
+  GlobalAnalog:
+    0:
+      Delay9: 3
+      Delay87: 3
+      Delay65: 3
+      Delay40: 2
+      En_hyst_tot: 0
+    1:
+      Delay9: 3
+      Delay87: 3
+      Delay65: 3
+      Delay40: 2
+      En_hyst_tot: 0
 
-    ReferenceVoltage:
-      0:
-        Vbg_1v: 4
-        Inv_vref: 240
-        Noinv_vref: 50
-        Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
-        Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
-      1:
-        Vbg_1v: 4
-        Inv_vref: 240
-        Noinv_vref: 50
-        Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
-        Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
-    Top:
-      0:
-        BIAS_I_PLL_D: 63
-        EN_HIGH_CAPA: 1
-        EN_probe_pll: 0
-        DIV_PLL: 0
-        EN_LOCK_CONTROL: 1
-        ERROR_LIMIT_SC: 2
-        RunL: 1
-        RunR: 1
-        VOUT_INIT_EN: 0
-        VOUT_INIT_EXT_D: 0
-        VOUT_INIT_EXT_EN: 0
-        #EN: 1 #Current value of the CLPS drivers Data
-        #ENpE: 1 #Current value of the CLPS pre-emphasis driver Data
-        EN_RCG: 1 # Active the RCG:'1'
-        INIT_DAC_EN: 1 # Enable the RCG VCO frequency
-        INIT_D: 0 # Tune VCO frequency
-        rcg_gain: 0 #Choose the OUT_CLK_ RCG output frequency 00 low 11 high
+  ReferenceVoltage:
+    0:
+      Vbg_1v: 4
+      Inv_vref: 240
+      Noinv_vref: 50
+      Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
+      Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
+    1:
+      Vbg_1v: 4
+      Inv_vref: 240
+      Noinv_vref: 50
+      Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
+      Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
+  Top:
+    0:
+      BIAS_I_PLL_D: 63
+      EN_HIGH_CAPA: 1
+      EN_probe_pll: 0
+      DIV_PLL: 0
+      EN_LOCK_CONTROL: 1
+      ERROR_LIMIT_SC: 2
+      RunL: 1
+      RunR: 1
+      VOUT_INIT_EN: 0
+      VOUT_INIT_EXT_D: 0
+      VOUT_INIT_EXT_EN: 0
+      #EN: 1 #Current value of the CLPS drivers Data
+      #ENpE: 1 #Current value of the CLPS pre-emphasis driver Data
+      EN_RCG: 1 # Active the RCG:'1'
+      INIT_DAC_EN: 1 # Enable the RCG VCO frequency
+      INIT_D: 0 # Tune VCO frequency
+      rcg_gain: 0 #Choose the OUT_CLK_ RCG output frequency 00 low 11 high
 
-    calib:
-      1:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
-    cm:
-      2:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
-      3:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
+  calib:
+    1:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
+  cm:
+    2:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
+    3:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
 
-    ch:
-      0:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      1:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      2:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      3:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      4:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      5:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      6:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      7:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      8:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      9:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      10:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      11:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      12:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      13:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      14:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      15:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      16:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      17:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      18:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      19:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      20:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      21:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      22:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      23:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      24:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      25:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      26:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      27:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      28:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      29:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      30:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      31:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      32:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      33:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      34:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      35:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      36:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      37:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      38:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      39:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      40:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      41:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      42:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      43:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      44:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      45:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      46:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      47:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      48:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      49:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      50:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      51:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      52:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      53:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      54:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      55:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      56:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      57:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      58:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      59:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      60:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      61:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      62:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      63:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      64:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      65:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      66:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      67:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      68:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      69:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      70:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      71:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
+  ch:
+    0:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    1:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    2:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    3:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    4:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    5:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    6:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    7:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    8:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    9:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    10:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    11:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    12:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    13:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    14:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    15:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    16:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    17:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    18:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    19:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    20:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    21:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    22:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    23:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    24:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    25:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    26:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    27:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    28:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    29:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    30:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    31:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    32:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    33:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    34:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    35:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    36:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    37:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    38:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    39:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    40:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    41:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    42:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    43:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    44:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    45:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    46:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    47:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    48:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    49:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    50:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    51:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    52:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    53:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    54:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    55:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    56:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    57:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    58:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    59:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    60:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    61:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    62:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    63:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    64:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    65:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    66:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    67:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    68:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    69:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    70:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    71:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
 roc_s2:
-  sc:
-    DigitalHalf:
-      0:
-        IdleFrame: 0xCCCCCCC
-        CalibrationSC: 1
-        Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
-        L1Offset: 10
-      1:
-        IdleFrame: 0xCCCCCCC
-        CalibrationSC: 1
-        Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
-        L1Offset: 10
+  DigitalHalf:
+    0:
+      IdleFrame: 0xCCCCCCC
+      CalibrationSC: 1
+      Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
+      L1Offset: 10
+    1:
+      IdleFrame: 0xCCCCCCC
+      CalibrationSC: 1
+      Bx_offset: 2 # This avoids the ROC bug of doing OCR on BCR
+      L1Offset: 10
 
-    MasterTdc:
-      0:
-        CTRL_IN_REF_CTDC_P_EN: 1
-        CTRL_IN_SIG_CTDC_P_EN: 1
-        CTRL_IN_REF_CTDC_P_D: 0
-        CTRL_IN_SIG_CTDC_P_D: 0
-        BIAS_I_CTDC_D: 63
-        FOLLOWER_CTDC_EN: 1
-        GLOBAL_EN_BUFFER_CTDC: 1
-        BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
-        BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
-        BIAS_CAL_DAC_CTDC_P_EN: 1
-        BIAS_CAL_DAC_CTDC_P_D: 2
-        GLOBAL_FORCE_EN_CLK: 1
-        GLOBAL_FORCE_EN_OUTPUT_DATA: 1
-        sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
-      1:
-        CTRL_IN_REF_CTDC_P_EN: 1
-        CTRL_IN_SIG_CTDC_P_EN: 1
-        CTRL_IN_REF_CTDC_P_D: 0
-        CTRL_IN_SIG_CTDC_P_D: 0
-        BIAS_I_CTDC_D: 63
-        FOLLOWER_CTDC_EN: 1
-        GLOBAL_EN_BUFFER_CTDC: 1
-        BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
-        BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
-        BIAS_CAL_DAC_CTDC_P_EN: 1
-        BIAS_CAL_DAC_CTDC_P_D: 2
-        GLOBAL_FORCE_EN_CLK: 1
-        GLOBAL_FORCE_EN_OUTPUT_DATA: 1
-        sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
-    GlobalAnalog:
-      0:
-        Delay9: 3
-        Delay87: 3
-        Delay65: 3
-        Delay40: 2
-        En_hyst_tot: 0
-      1:
-        Delay9: 3
-        Delay87: 3
-        Delay65: 3
-        Delay40: 2
-        En_hyst_tot: 0
+  MasterTdc:
+    0:
+      CTRL_IN_REF_CTDC_P_EN: 1
+      CTRL_IN_SIG_CTDC_P_EN: 1
+      CTRL_IN_REF_CTDC_P_D: 0
+      CTRL_IN_SIG_CTDC_P_D: 0
+      BIAS_I_CTDC_D: 63
+      FOLLOWER_CTDC_EN: 1
+      GLOBAL_EN_BUFFER_CTDC: 1
+      BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
+      BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
+      BIAS_CAL_DAC_CTDC_P_EN: 1
+      BIAS_CAL_DAC_CTDC_P_D: 2
+      GLOBAL_FORCE_EN_CLK: 1
+      GLOBAL_FORCE_EN_OUTPUT_DATA: 1
+      sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
+    1:
+      CTRL_IN_REF_CTDC_P_EN: 1
+      CTRL_IN_SIG_CTDC_P_EN: 1
+      CTRL_IN_REF_CTDC_P_D: 0
+      CTRL_IN_SIG_CTDC_P_D: 0
+      BIAS_I_CTDC_D: 63
+      FOLLOWER_CTDC_EN: 1
+      GLOBAL_EN_BUFFER_CTDC: 1
+      BIAS_FOLLOWER_CAL_P_CTDC_EN: 1
+      BIAS_FOLLOWER_CAL_P_D: 4 #for CTDC
+      BIAS_CAL_DAC_CTDC_P_EN: 1
+      BIAS_CAL_DAC_CTDC_P_D: 2
+      GLOBAL_FORCE_EN_CLK: 1
+      GLOBAL_FORCE_EN_OUTPUT_DATA: 1
+      sel_clk_rcg: 1 #1?: select clk_rcg to trig1_toa
+  GlobalAnalog:
+    0:
+      Delay9: 3
+      Delay87: 3
+      Delay65: 3
+      Delay40: 2
+      En_hyst_tot: 0
+    1:
+      Delay9: 3
+      Delay87: 3
+      Delay65: 3
+      Delay40: 2
+      En_hyst_tot: 0
 
-    ReferenceVoltage:
-      0:
-        Vbg_1v: 4
-        Inv_vref: 240
-        Noinv_vref: 50
-        Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
-        Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
-      1:
-        Vbg_1v: 4
-        Inv_vref: 240
-        Noinv_vref: 50
-        Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
-        Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
-    Top:
-      0:
-        BIAS_I_PLL_D: 63
-        EN_HIGH_CAPA: 1
-        EN_probe_pll: 0
-        DIV_PLL: 0
-        EN_LOCK_CONTROL: 1
-        ERROR_LIMIT_SC: 2
-        RunL: 1
-        RunR: 1
-        VOUT_INIT_EN: 0
-        VOUT_INIT_EXT_D: 0
-        VOUT_INIT_EXT_EN: 0
-        #EN: 1 #Current value of the CLPS drivers Data
-        #ENpE: 1 #Current value of the CLPS pre-emphasis driver Data
-        EN_RCG: 1 # Active the RCG:'1'
-        INIT_DAC_EN: 1 # Enable the RCG VCO frequency
-        INIT_D: 0 # Tune VCO frequency
-        rcg_gain: 0 #Choose the OUT_CLK_ RCG output frequency 00 low 11 high
+  ReferenceVoltage:
+    0:
+      Vbg_1v: 4
+      Inv_vref: 240
+      Noinv_vref: 50
+      Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
+      Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
+    1:
+      Vbg_1v: 4
+      Inv_vref: 240
+      Noinv_vref: 50
+      Tot_vref: 1023 # disable all channels discriminators: set_tot_threshold(0xff)
+      Toa_vref: 1023 # disable all channels discriminators: set_toa_threshold(0xff)
+  Top:
+    0:
+      BIAS_I_PLL_D: 63
+      EN_HIGH_CAPA: 1
+      EN_probe_pll: 0
+      DIV_PLL: 0
+      EN_LOCK_CONTROL: 1
+      ERROR_LIMIT_SC: 2
+      RunL: 1
+      RunR: 1
+      VOUT_INIT_EN: 0
+      VOUT_INIT_EXT_D: 0
+      VOUT_INIT_EXT_EN: 0
+      #EN: 1 #Current value of the CLPS drivers Data
+      #ENpE: 1 #Current value of the CLPS pre-emphasis driver Data
+      EN_RCG: 1 # Active the RCG:'1'
+      INIT_DAC_EN: 1 # Enable the RCG VCO frequency
+      INIT_D: 0 # Tune VCO frequency
+      rcg_gain: 0 #Choose the OUT_CLK_ RCG output frequency 00 low 11 high
 
-    calib:
-      1:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
-    cm:
-      2:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
-      3:
-        sel_trig_toa: 1
-        sel_trig_tot: 1
+  calib:
+    1:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
+  cm:
+    2:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
+    3:
+      sel_trig_toa: 1
+      sel_trig_tot: 1
 
-    ch:
-      0:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      1:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      2:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      3:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      4:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      5:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      6:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      7:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      8:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      9:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      10:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      11:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      12:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      13:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      14:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      15:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      16:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      17:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      18:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      19:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      20:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      21:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      22:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      23:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      24:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      25:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      26:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      27:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      28:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      29:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      30:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      31:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      32:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      33:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      34:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      35:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      36:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      37:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      38:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      39:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      40:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      41:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      42:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      43:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      44:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      45:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      46:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      47:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      48:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      49:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      50:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      51:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      52:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      53:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      54:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      55:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      56:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      57:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      58:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      59:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      60:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      61:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      62:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      63:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      64:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      65:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      66:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      67:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      68:
-        Channel_off: 0
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      69:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      70:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
-      71:
-        Channel_off: 1
-        sel_trig_toa: 0
-        sel_trig_tot: 1
-        mask_toa: 0
-        probe_toa: 1
-        DAC_CAL_CTDC_TOA: 0
+  ch:
+    0:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    1:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    2:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    3:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    4:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    5:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    6:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    7:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    8:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    9:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    10:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    11:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    12:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    13:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    14:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    15:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    16:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    17:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    18:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    19:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    20:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    21:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    22:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    23:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    24:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    25:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    26:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    27:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    28:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    29:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    30:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    31:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    32:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    33:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    34:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    35:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    36:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    37:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    38:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    39:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    40:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    41:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    42:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    43:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    44:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    45:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    46:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    47:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    48:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    49:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    50:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    51:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    52:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    53:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    54:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    55:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    56:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    57:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    58:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    59:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    60:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    61:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    62:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    63:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    64:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    65:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    66:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    67:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    68:
+      Channel_off: 0
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    69:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    70:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0
+    71:
+      Channel_off: 1
+      sel_trig_toa: 0
+      sel_trig_tot: 1
+      mask_toa: 0
+      probe_toa: 1
+      DAC_CAL_CTDC_TOA: 0

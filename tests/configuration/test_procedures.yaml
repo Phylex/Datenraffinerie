@@ -3,18 +3,15 @@
   system_settings:
     default: 
       - ./defaults/V3LDHexaboard-poweron-default.yaml
-      - ./defaults/daq-system-config.yaml
     init:
+      - ./defaults/initial_config_daq.yaml
       - ./init_timewalk_scan.yaml
     override:
       daq:
-        server:
-          NEvents: 1000
-          l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
-          - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
-          - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
-          - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
-          - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+        active_menu: calibAndL1A
+        menus:
+          calibAndL1A:
+            NEvents: 1000
   parameters:
     - key:
       - target
@@ -32,18 +29,15 @@
   system_settings:
     default: 
       - ./defaults/V3LDHexaboard-poweron-default.yaml
-      - ./defaults/daq-system-config.yaml
     init:
+      - ./defaults/initial_config_daq.yaml
       - ./init_timewalk_scan.yaml
     override:
       daq:
-        server:
-          NEvents: 1000
-          l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
-          - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
-          - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
-          - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
-          - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+        active_menu: calibAndL1A
+        menus:
+          calibAndL1A:
+            NEvents: 5000
   parameters:
     - key:
       - target
@@ -62,16 +56,14 @@
     default: 
       - ./defaults/V3LDHexaboard-poweron-default.yaml
       - ./defaults/daq-system-config.yaml
-    init: ./init_timewalk_scan.yaml
+    init:
+      - ./defaults/initial_config_daq.yaml
     override:
       daq:
-        server:
-          NEvents: 1000
-          l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
-          - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
-          - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
-          - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
-          - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+        active_menu: calibAndL1A
+        menus:
+          calibAndL1A:
+            NEvents: 5000
   parameters:
     - values:
         start: 1
@@ -98,29 +90,16 @@
   system_settings:
     default: 
       - ./defaults/V3LDHexaboard-poweron-default.yaml
-      - ./defaults/daq-system-config.yaml
     init: 
+      - ./defaults/initial_config_daq.yaml
       - ./init_timewalk_scan.yaml
     override:
       daq:
-        server:
-          NEvents: 1000
-          l1a_generator_settings: # type can be 'L1A', 'L1A_NZS', 'CALPULINT' and 'EXTPULSE0' ; followMode can be DISABLE, A, B, C or D 
-          - {name: 'A', enable : 1, BX : 16, length : 1, flavor: CALPULINT, prescale : 0x0, followMode : DISABLE}
-          - {name: 'B', enable : 0, BX : 38, length : 1, flavor : L1A, prescale : 0x0, followMode : A}
-          - {name: 'C', enable : 0, BX : 0x30, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
-          - {name: 'D', enable : 0, BX : 0x40, length : 1, flavor : L1A, prescale : 0x0, followMode : DISABLE}
+        active_menu: calibAndL1A
+        menus:
+          calibAndL1A:
+            NEvents: 10000
   parameters:
-    - key:
-      - target
-      - ['roc_s0', 'roc_s1', 'roc_s2']
-      - ReferenceVoltage
-      - [0, 1]
-      - Calib
-      values:
-        start: 0
-        stop: 21
-        step: 5
     - key:
       - target
       - ['roc_s0', 'roc_s1', 'roc_s2']
@@ -131,6 +110,16 @@
         start: 0
         stop: 5
         step: 2
+    - key:
+      - target
+      - ['roc_s0', 'roc_s1', 'roc_s2']
+      - ReferenceVoltage
+      - [0, 1]
+      - Calib
+      values:
+        start: 0
+        stop: 6
+        step: 5
   data_columns:
     - HighRange
     - channel
@@ -148,7 +137,8 @@
     default: 
       - ./defaults/daq-system-config.yaml
       - ./defaults/V3LDHexaboard-poweron-default.yaml
-    init: ./init_timewalk_scan.yaml
+    init:
+      - ./init_timewalk_scan.yaml
     override:
       daq:
         server:

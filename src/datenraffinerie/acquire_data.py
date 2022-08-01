@@ -67,7 +67,7 @@ def acquire_data(config_directory, diff, log):
     daq_system.setup_data_taking_context()
     for i, run in enumerate(run_configs):
         target.set(run, readback=True)
-        daq_system.configure(run)
+        daq_system.configure(run['target'])
         daq_system.take_data(f'run_data_{i}.raw')
 
 
