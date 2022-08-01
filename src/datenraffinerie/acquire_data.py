@@ -1,5 +1,6 @@
-import control_adapter as ctrla
-import dict_utils as dtu
+from .import control_adapter as ctrla
+from . import dict_utils as dtu
+from .zmq_i2c_client import ROC_configuration_client as sc_client
 import yaml
 import glob
 import click
@@ -54,16 +55,20 @@ def acquire_data(config_directory, diff, log):
             run_configs.append(yaml.safe_load(rcf.read()))
     server_net_config = network_config['server']
     client_net_config = network_config['client']
+    target_net_config = network_config['target']
     daq_system = ctrla.DAQSystem(
             server_hostname=server_net_config['hostname'],
             server_port=server_net_config['port'],
             client_hostname=client_net_config['hostname'],
             client_port=client_net_config['port'])
     # TODO instantiate the client
-
+    target = sc_client(target_net_config['hostname'])
     daq_system.initalize(dtu.diff_dict(default_config, init_config))
-    for run in run_configs:
-        pass
+    daq_system.setup_data_taking_context()
+    for i, run in enumerate(run_configs):
+        target.set(run, readback=True)
+        daq_system.configure(run)
+        daq_system.take_data(f'run_data_{i}.raw')
 
 
 if __name__ == "__main__":

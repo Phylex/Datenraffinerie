@@ -5,6 +5,7 @@ setup(
         'console_scripts': [
             'datenraffinerie = datenraffinerie.datenraffinerie:cli',
             'generate-configs = datenraffinerie.gen_configurations:generate_configuratons',
+            'acquire-data = datenraffinerie.acquire_data:acquire_data',
         ]
     },
     install_requires=[

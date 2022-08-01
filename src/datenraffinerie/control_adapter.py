@@ -106,10 +106,10 @@ class DAQAdapter():
         else:
             self.logger.debug(f"Received reply: {rep}")
 
-    def configure(self, config: dict = {}, use_cache_output=False):
+    def configure(self, config: dict = {}, cache=False):
         self.logger.info('Configuring')
         config = self._clean_configuration(config)
-        if use_cache_output:
+        if cache:
             current_config = self.configuration
             config = update_dict(self.configuration, config)
             write_config = diff_dict(current_config, config)
@@ -226,8 +226,8 @@ class DAQSystem:
         """
         configure the daq system before starting a data-taking run.
         """
-        self.client.configure(daq_config, use_cache_output=True)
-        self.server.configure(daq_config, use_cache_output=True)
+        self.client.configure(daq_config, cache=True)
+        self.server.configure(daq_config, cache=True)
 
     def setup_data_taking_context(self):
         """
@@ -252,6 +252,7 @@ class DAQSystem:
         self.client.update_config({"global": client_config})
         if not os.path.isdir(self.daq_data_folder):
             os.mkdir(self.daq_data_folder)
+        self.client.configure(cache=False)
 
     def take_data(self, output_data_path):
         """
