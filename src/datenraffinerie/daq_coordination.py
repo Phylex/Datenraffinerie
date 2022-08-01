@@ -8,12 +8,6 @@ from .errors import DAQError
 import uuid
 
 
-logging.basicConfig(filename='daq_coordinator.log',
-                    filemode='w',
-                    encoding='utf-8',
-                    level=logging.DEBUG)
-
-
 class DAQCoordCommand():
     valid_commands = ['aquire lock', 'release lock',
                       'load defaults', 'measure', 'shutdown']
@@ -89,7 +83,8 @@ class DAQCoordResponse():
         if self.type == 'error' and self.error is not None:
             return bson.dumps({'type': 'error', 'content': self.error})
         else:
-            raise DAQError('daq error response was attempted but no error was given')
+            raise DAQError('daq error response was attempted but'
+                           'no error was given')
         if self.type == 'data' and self.data is not None:
             return bson.dumps({'type': 'data', 'content': self.data})
         else:
@@ -123,16 +118,19 @@ class DAQCoordinator():
         self.logger.debug('creating zmq context and socket')
         self.io_context = zmq.Context()
         self.command_socket = self.io_context.socket(zmq.REP)
-        socket_address = f"tcp://{self.network_config['daq_coordinator']['hostname']}:" +\
-                         f"{self.network_config['daq_coordinator']['port']}"
+        socket_address = \
+            f"tcp://{self.network_config['daq_coordinator']['hostname']}:" +\
+            f"{self.network_config['daq_coordinator']['port']}"
         self.command_socket.bind(socket_address)
         self.logger.debug('bound to: %s' % socket_address)
-        self.target = ctrl.TargetAdapter(self.network_config['target']['hostname'],
-                                         self.network_config['target']['port'])
-        self.daq_system = ctrl.DAQSystem(self.network_config['server']['hostname'],
-                                         self.network_config['server']['port'],
-                                         self.network_config['client']['hostname'],
-                                         self.network_config['client']['port'])
+        self.target = ctrl.TargetAdapter(
+                self.network_config['target']['hostname'],
+                self.network_config['target']['port'])
+        self.daq_system = ctrl.DAQSystem(
+                self.network_config['server']['hostname'],
+                self.network_config['server']['port'],
+                self.network_config['client']['hostname'],
+                self.network_config['client']['port'])
         while True:
             message = self.command_socket.recv()
             daq_response = None
