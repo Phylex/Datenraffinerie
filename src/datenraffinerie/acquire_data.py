@@ -1,6 +1,5 @@
 from .import control_adapter as ctrla
-from . import dict_utils as dtu
-from .zmq_i2c_client import ROC_configuration_client as sc_client
+from hgcroc_configuration_client import Client as sc_client
 import yaml
 import glob
 import click

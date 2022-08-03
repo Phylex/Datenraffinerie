@@ -25,5 +25,6 @@ setup(
         'numba',
         'jinja2',
         'schema',
+        'hgcroc-configuration-client',
     ]
 )
