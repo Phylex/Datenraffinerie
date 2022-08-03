@@ -37,5 +37,5 @@ def generate_configuratons(config, procedure, output_dir, diff):
     with open(output_dir / 'initial_state_config.yaml', 'w+') as icf:
         icf.write(yaml.safe_dump(system_init_config))
     for i, run_config in enumerate(run_configs):
-        with open(output_dir / f'config_run_{i}.yaml', 'w+') as rcf:
+        with open(output_dir / f'run_{i}_config.yaml', 'w+') as rcf:
             rcf.write(yaml.safe_dump(run_config))
