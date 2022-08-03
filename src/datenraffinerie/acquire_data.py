@@ -1,5 +1,5 @@
 from .import control_adapter as ctrla
-from hgcroc_configuration_client import Client as sc_client
+from hgcroc_configuration_client.client import Client as sc_client
 import yaml
 import glob
 import click
