@@ -19,7 +19,7 @@ cmd_schema_recv = Schema({'type':
 
 class ROC_configuration_client:
     def __init__(self, ip, port="5555"):
-        self.logger = logging.getLogger("client")
+        self.logger = logging.getLogger("slow-control-client")
         self.logger.info(f'Connecting to server at {ip} on port {port}')
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
