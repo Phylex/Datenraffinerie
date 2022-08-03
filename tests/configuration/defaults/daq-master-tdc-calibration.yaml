@@ -1,53 +1,68 @@
 client:
   data_push_port: 8888
-  hw_type: LD
+  hw_type: LDv3
   serverIP: hc640256
 server:
-  IdelayStep: 8
-  NChips: 1
-  NEvents: 50000
-  Number_of_events_per_readout: '-1'
-  zmqPushPull_port: '8888'
-  delayScanData_port: '8889'
+  zmqPushPull_port: 8888
+  active_menu: random_l1a
+  menus:
+    randomL1A:
+      NEvents: 10000
+      bx_min: 45
+      log2_rand_bx_period: 10
   elinks_daq:
-    - {name: 'link0', polarity: 0, idcode: 0}
-    - {name: 'link1', polarity: 1, idcode: 1}
-    - {name: 'link4', polarity: 0, idcode: 4}
-    - {name: 'link5', polarity: 1, idcode: 5}
-    - {name: 'link8', polarity: 0, idcode: 8}
-    - {name: 'link9', polarity: 1, idcode: 9}
+  - idcode: 0
+    name: link0
+    polarity: 1
+  - idcode: 1
+    name: link1
+    polarity: 1
+  - idcode: 18
+    name: link4
+    polarity: 1
+  - idcode: 19
+    name: link5
+    polarity: 1
+  - idcode: 36
+    name: link8
+    polarity: 1
+  - idcode: 37
+    name: link9
+    polarity: 1
   elinks_trg:
-    - {name: 'link0', polarity: 0, idcode: 0}
-    - {name: 'link1', polarity: 1, idcode: 2}
-    - {name: 'link2', polarity: 0, idcode: 3}
-    - {name: 'link3', polarity: 1, idcode: 1}
-    - {name: 'link4', polarity: 0, idcode: 4}
-    - {name: 'link5', polarity: 1, idcode: 6}
-    - {name: 'link6', polarity: 0, idcode: 7}
-    - {name: 'link7', polarity: 1, idcode: 5}
-    - {name: 'link8', polarity: 0, idcode: 8}
-    - {name: 'link9', polarity: 1, idcode: 10}
-    - {name: 'link10', polarity: 0, idcode: 11}
-    - {name: 'link11', polarity: 1, idcode: 9}
-  l1a_enables:
-    random_l1a         : 0x1
-    external_l1as      : 0x0
-    block_sequencer    : 0x0
-  l1a_generator_settings:
-    - {name: A, enable : 0, BX : 0x18, length : 430, flavor : L1A, prescale : 0xa, followMode : DISABLE}
-    - {name: B, enable : 0, BX : 0x20, length :   5, flavor : L1A, prescale : 0x1, followMode : DISABLE}
-    - {name: C, enable : 0, BX : 0x30, length :   6, flavor : L1A, prescale : 0x2, followMode : DISABLE}
-    - {name: D, enable : 0, BX : 0x40, length :   7, flavor : L1A, prescale : 0x3, followMode : DISABLE}
-  l1a_settings:
-    bx_spacing: 1125 # must be larger than 41
-    ext_delay: 0
-    external_debounce: 0x0
-    external_debounced: 0
-    length: 0x5
-    log2_rand_bx_period: 0
-    log_rand_bx_period: 0x0
-    prescale: 0
-  ancillary_settings:
-    bx: 0x10
-    length: 10
-    prescale: 0x0
+  - idcode: 2
+    name: link0
+    polarity: 1
+  - idcode: 0
+    name: link1
+    polarity: 0
+  - idcode: 1
+    name: link2
+    polarity: 1
+  - idcode: 3
+    name: link3
+    polarity: 0
+  - idcode: 20
+    name: link4
+    polarity: 0
+  - idcode: 21
+    name: link5
+    polarity: 1
+  - idcode: 22
+    name: link6
+    polarity: 0
+  - idcode: 23
+    name: link7
+    polarity: 1
+  - idcode: 40
+    name: link8
+    polarity: 1
+  - idcode: 41
+    name: link9
+    polarity: 1
+  - idcode: 42
+    name: link10
+    polarity: 1
+  - idcode: 43
+    name: link11
+    polarity: 1
