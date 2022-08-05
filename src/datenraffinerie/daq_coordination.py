@@ -7,7 +7,7 @@ import click
 from pathlib import Path
 from .control_adapter import DAQSystem
 from hgcroc_configuration_client.client import Client as SCClient
-from Schema import Schema, Or
+from schema import Schema, Or
 from .errors import DAQError
 import uuid
 
