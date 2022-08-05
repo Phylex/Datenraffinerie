@@ -7,11 +7,11 @@ from pathlib import Path
 import logging
 import os
 
-log_level_dict = {'DEBUG': logging.DEBUG,
-                  'INFO': logging.INFO,
-                  'WARNING': logging.WARNING,
-                  'ERROR': logging.ERROR,
-                  'CRITICAL': logging.CRITICAL}
+_log_level_dict = {'DEBUG': logging.DEBUG,
+                   'INFO': logging.INFO,
+                   'WARNING': logging.WARNING,
+                   'ERROR': logging.ERROR,
+                   'CRITICAL': logging.CRITICAL}
 
 
 @click.command()
@@ -25,7 +25,7 @@ log_level_dict = {'DEBUG': logging.DEBUG,
                                 case_sensitive=False))
 def acquire_data(output_directory, diff, log, loglevel):
     if log is not None:
-        logging.basicConfig(filename=log, level=log_level_dict[loglevel],
+        logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
                                    '%(name)-50s %(message)s')
     # get the expected files from the directory
@@ -99,7 +99,7 @@ def acquire_data(output_directory, diff, log, loglevel):
             )
             target.set(target_run_config, readback=True)
         daq_system.configure(run)
-        daq_system.take_data(output_directory / f'run_data_{i}.raw')
+        daq_system.take_data(output_directory / f'run_{i}_data.raw')
 
 
 if __name__ == "__main__":

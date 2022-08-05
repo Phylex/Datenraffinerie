@@ -233,6 +233,7 @@ class DAQSystem:
         """
         # set up the server part of the daq system (zmq-server)
         self.logger = logging.getLogger(__name__+'.DAQSystem')
+        self.client_started = False
         self.server = DAQAdapter('server', server_hostname, server_port)
         # set up the client part of the daq system (zmq-client)
         # the wrapping with the global needs to be done so that the client
@@ -277,7 +278,9 @@ class DAQSystem:
         self.server.configure(config_transition_server_config)
 
     def take_data(self, output_data_path):
-        self.client.start()
+        if not self.client_started:
+            self.client.start()
+            self.client_started = True
         try:
             self.server.take_data()
         except ValueError as err:
@@ -290,9 +293,10 @@ class DAQSystem:
                     f" {self.daq_data_folder.resolve()} folder")
         data_file = data_files[0]
         shutil.move(self.daq_data_folder / data_file, output_data_path)
-        self.client.stop()
 
     def tear_down_data_taking_context(self):
+        if self.client_started:
+            self.client.stop()
         try:
             if os.path.exists(self.daq_data_folder):
                 for file in self.daq_data_folder.iterdir():
