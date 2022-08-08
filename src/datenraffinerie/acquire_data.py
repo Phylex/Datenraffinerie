@@ -74,7 +74,7 @@ def acquire_data(output_directory, diff, log, loglevel):
         client_hostname=client_net_config['hostname'],
         client_port=client_net_config['port'])
     # initialize the daq system
-    daq_system.initalize(init_config)
+    daq_system.initialize(init_config)
     # setup data taking context for the client
     daq_system.setup_data_taking_context()
     print('Initialized DAQ-System')
