@@ -7,6 +7,7 @@ setup(
             'generate-configs = datenraffinerie.gen_configurations:generate_configuratons',
             'acquire-data = datenraffinerie.acquire_data:acquire_data',
             'coordinate-daq-access = datenraffinerie.daq_coordination:main',
+            'acquire-data-daq-coord = datenraffinerie.acquire_data_with_daq_coordinator:acquire_data',
         ]
     },
     install_requires=[
