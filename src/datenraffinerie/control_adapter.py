@@ -63,6 +63,7 @@ class DAQAdapter():
         self.hostname = hostname
         self.port = port
         self.context = zmq.Context()
+        self.logger.info(f'Initializing connection to {variant}')
         self.socket = self.context.socket(zmq.REQ)
         socket_url = f'tcp://{self.hostname}:{self.port}'
         self.logger.debug(f'connecting to {socket_url}')
