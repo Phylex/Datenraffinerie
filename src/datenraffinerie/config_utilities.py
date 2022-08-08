@@ -56,24 +56,28 @@ def generate_configurations(procedure: dict, calibration: dict = None,
         system_init_config = dtu.diff_dict(system_default_config,
                                            full_system_init_config)
         current_state = full_system_init_config.copy()
-        run_config_diffs = []
-        for patch in scan_patches:
-            run_config = dtu.update_dict(full_system_init_config, patch)
-            run_config_diff = dtu.diff_dict(current_state, run_config)
-            if run_config_diff is not None:
-                dtu.update_dict(current_state, run_config_diff, in_place=True)
-                run_config_diffs.append(run_config_diff)
-            else:
-                run_config_diffs.append({})
-        return system_default_config, system_init_config, run_config_diffs
+
+        def run_config_generator():
+            for patch in scan_patches:
+                run_config = dtu.update_dict(full_system_init_config, patch)
+                run_config_diff = dtu.diff_dict(current_state, run_config)
+                if run_config_diff is not None:
+                    dtu.update_dict(current_state,
+                                    run_config_diff,
+                                    in_place=True)
+                    yield run_config_diff
+                else:
+                    yield {}
 
     else:
         system_init_config = dtu.update_dict(system_default_config,
                                              system_init_config)
-        run_configs = []
-        for patch in scan_patches:
-            run_configs.append(dtu.update_dict(system_init_config, patch))
-        return system_default_config, system_init_config, run_configs
+
+        def run_config_generator():
+            for patch in scan_patches:
+                yield dtu.update_dict(system_init_config, patch)
+    return system_default_config, system_init_config, run_config_generator(), \
+        len(scan_patches)
 
 
 def load_configuration(config_path):

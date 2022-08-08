@@ -374,10 +374,13 @@ def get_procedure(procedure_name):
           ])
          ])
 def test_generate_configurations(procedure, patches):
-    root_config, initial_config, run_configs = \
+    root_config, initial_config, run_configs, run_count = \
             generate_configurations(procedure)
+    run_num = 0
     for patch, run_c in zip(patches, run_configs):
+        run_num += 1
         assert update_dict(initial_config, patch) == run_c
+    assert run_num == run_count
 
 
 @pytest.mark.parametrize("main_config_file, procedure_name, output", [
@@ -459,7 +462,7 @@ def test_generate_configurations(procedure, patches):
      ])
     ])
 def test_get_procedure_configs(main_config_file, procedure_name, output):
-    system_default_config, systme_init_config, run_configs = \
+    system_default_config, systme_init_config, run_configs, run_count = \
             get_procedure_configs(main_config_file, procedure_name, diff=True)
     output = output[1:]
     output.insert(0, {})
