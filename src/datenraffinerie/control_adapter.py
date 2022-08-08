@@ -16,6 +16,7 @@ from pathlib import Path
 import uuid
 import zmq
 import yaml
+from time import sleep
 from .dict_utils import diff_dict, update_dict
 
 module_logger = logging.getLogger(__name__)
@@ -244,7 +245,7 @@ class DAQSystem:
     def __del__(self):
         self.tear_down_data_taking_context()
 
-    def initalize(self, initial_config: dict):
+    def initialize(self, initial_config: dict):
         self.client.initialize(initial_config)
         self.server.initialize(initial_config)
 
@@ -287,8 +288,13 @@ class DAQSystem:
         except ValueError as err:
             self.client.stop()
             raise ValueError('Data taking failed') from err
+        wait_cycles = 20
         data_files = os.listdir(self.daq_data_folder)
-        if len(data_files) > 1:
+        while wait_cycles > 0 and len(data_files) == 0:
+            data_files = os.listdir(self.daq_data_folder)
+            sleep(.1)
+            wait_cycles -= 1
+        if len(data_files) != 1:
             raise ValueError(
                     "More than one file was found in the"
                     f" {self.daq_data_folder.resolve()} folder")
@@ -298,6 +304,7 @@ class DAQSystem:
     def tear_down_data_taking_context(self):
         if self.client_started:
             self.client.stop()
+            self.client_started = False
         try:
             if os.path.exists(self.daq_data_folder):
                 for file in self.daq_data_folder.iterdir():

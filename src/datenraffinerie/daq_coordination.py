@@ -10,28 +10,29 @@ from hgcroc_configuration_client.client import Client as SCClient
 from schema import Schema, Or
 from .errors import DAQError
 import uuid
+from time import sleep
 
 
 class DAQCoordCommand():
-    valid_commands = ['aquire lock', 'release lock',
+    valid_commands = ['acquire lock', 'release lock',
                       'initialize', 'measure', 'shutdown']
     schema = Schema(Or({
-        'command': Or('aquire lock', 'shutdown'),
+        'command': Or('acquire lock', 'shutdown'),
         'locking_token': None,
         'config': None
         }, {
-        'command': 'release_lock',
+        'command': 'release lock',
         'locking_token': str,
         'config': None
         }, {
-        'command': Or('load defaults', 'measure'),
+        'command': Or('initialize', 'measure'),
         'locking_token': str,
-        'config': dict
+        'config': str
         }))
 
     def __init__(self, command: str, locking_token=None,
                  config=None):
-        self.command = command if command in self.vaild_commands else None
+        self.command = command if command in self.valid_commands else None
         if command in self.valid_commands[1:] and locking_token is None:
             raise DAQError(f"For a message with the command: {command}, a "
                            "locking token is required")
@@ -42,9 +43,12 @@ class DAQCoordCommand():
         self.config = config
 
     def serialize(self):
+        config = None
+        if self.config is not None:
+            config = yaml.dump(self.config)
         return bson.dumps({'command': self.command,
                            'locking_token': self.locking_token,
-                           'config': self.config})
+                           'config': config})
 
     @staticmethod
     def parse(message: bytes):
@@ -53,9 +57,12 @@ class DAQCoordCommand():
         except:
             raise DAQError('Unable to decode bson message')
         valid_message = DAQCoordCommand.schema.validate(message_dict)
+        parsed_config = None
+        if message_dict['config'] is not None:
+            parsed_config = yaml.safe_load(valid_message['config'])
         return DAQCoordCommand(command=valid_message['command'],
                                locking_token=valid_message['locking_token'],
-                               config=valid_message['config'])
+                               config=parsed_config)
 
 
 class DAQCoordResponse():
@@ -84,18 +91,20 @@ class DAQCoordResponse():
             raise DAQError('The data needs to be of type bytes')
 
     def serialize(self):
-        if self.type == 'error' and self.error is not None:
-            return bson.dumps({'type': 'error', 'content': self.error})
-        else:
-            raise DAQError('daq error response was attempted but'
-                           'no error was given')
-        if self.type == 'data' and self.data is not None:
-            return bson.dumps({'type': 'data', 'content': self.data})
-        else:
-            raise DAQError('No data provided to the daq response')
+        if self.type == 'error':
+            if self.content is None:
+                raise DAQError('daq error response was attempted but'
+                               'no error was given')
+            else:
+                return bson.dumps({'type': 'error', 'content': self.content})
+        if self.type == 'data':
+            if self.content is None:
+                raise DAQError('No data provided to the daq response')
+            else:
+                return bson.dumps({'type': 'data', 'content': self.content})
         if self.type == 'lock':
-            return bson.dumps({'type': 'lock', 'content': self.lock})
-        if type == 'ack':
+            return bson.dumps({'type': 'lock', 'content': self.content})
+        if self.type == 'ack':
             return bson.dumps({'type': 'ack', 'content': None})
 
     @staticmethod
@@ -108,19 +117,90 @@ class DAQCoordResponse():
         return DAQCoordResponse(type=valid_message['type'],
                                 content=valid_message['content'])
 
+    def __str__(self):
+        return f'{self.type}: {self.content}'
+
+
+class DAQCoordClient():
+    def __init__(self, network_config: dict):
+        self.logger = logging.getLogger('daq_coord_client')
+        self.lock = None
+        self.io_context = zmq.Context()
+        self.socket = self.io_context.socket(zmq.REQ)
+        socket_address = \
+            f"tcp://{network_config['daq_coordinator']['hostname']}:" +\
+            f"{network_config['daq_coordinator']['port']}"
+        self.socket.connect(socket_address)
+        self.logger.info('Initializing')
+        response = DAQCoordResponse(type='lock', content=None)
+        try_count = 20
+        while response.content is None and try_count > 0:
+            if try_count != 20:
+                sleep(10)
+            self.logger.debug('attempting to aquire lock')
+            message = DAQCoordCommand(command='acquire lock')
+            self.socket.send(message.serialize())
+            response = DAQCoordResponse.parse(self.socket.recv())
+            self.logger.debug(f'Received response: {response}')
+            try_count -= 1
+        self.logger.info('Acquired lock')
+        self.lock = response.content
+
+    def initialize(self, config: dict):
+        message = DAQCoordCommand(command='initialize',
+                                  locking_token=self.lock,
+                                  config=config)
+        self.logger.info('Sending initial config')
+        self.logger.debug(f'\n{config}')
+        self.socket.send(message.serialize())
+        response = DAQCoordResponse.parse(self.socket.recv())
+        self.logger.debug(f'Received response:\n{response}')
+        if response.type == 'error':
+            self.logger.error(
+                    f"Received error from coordinator: {response.content}")
+            raise ValueError(
+                    'Server responded with an error state: '
+                    f'{response.content}')
+        self.logger.info('initialized')
+
+    def measure(self, run_config: dict):
+        message = DAQCoordCommand(command='measure', locking_token=self.lock,
+                                  config=run_config)
+        self.socket.send(message.serialize())
+        response = DAQCoordResponse.parse(self.socket.recv())
+        if response.type == 'error':
+            self.logger.error(
+                    f"Received error from coordinator: {response.content}")
+            raise ValueError(
+                    'Server responded with an error state: '
+                    f'{response.content}')
+        return response.content
+
+    def __del__(self):
+        if self.lock is not None:
+            message = DAQCoordCommand(
+                    command='release lock', locking_token=self.lock)
+            self.socket.send(message.serialize())
+            response = DAQCoordResponse.parse(self.socket.recv())
+            if response.type == 'error':
+                self.logger.error(
+                        f"Received error from coordinator: {response.content}")
+                raise ValueError(
+                        'Server responded with an error state: '
+                        f'{response.content}')
+        self.socket.close()
+        self.io_context.destroy()
+
 
 class DAQCoordinator():
 
     def __init__(self, network_config):
         self.network_config = network_config
         self.logger = logging.getLogger('daq_coordinator')
-        self.logger.debug('created the target and daq systems')
         self.lock = None
         self.initialized = False
-        self.measurement_data_path = Path('tmp/measurement_data.raw')
-
-    def run(self):
-        self.logger.debug('creating zmq context and socket')
+        self.measurement_data_path = Path('/tmp/measurement_data.raw')
+        self.logger.info('creating ZMQ context and socket for Coordinator')
         self.io_context = zmq.Context()
         self.command_socket = self.io_context.socket(zmq.REP)
         socket_address = \
@@ -128,34 +208,38 @@ class DAQCoordinator():
             f"{self.network_config['daq_coordinator']['port']}"
         self.command_socket.bind(socket_address)
         self.logger.debug('bound to: %s' % socket_address)
+        self.logger.info('Initializing target-adapter')
         self.target = SCClient(
                 self.network_config['target']['hostname'],
                 self.network_config['target']['port'])
+        self.logger.info('Initializing DAQ-System adapter')
         self.daq_system = DAQSystem(
                 self.network_config['server']['hostname'],
                 self.network_config['server']['port'],
                 self.network_config['client']['hostname'],
                 self.network_config['client']['port'])
+
+    def run(self):
         while True:
             message = self.command_socket.recv()
             daq_response = None
             try:
                 daq_command = DAQCoordCommand.parse(message)
-                command = daq_command['command']
+                command = daq_command.command
                 self.logger.info(f'Received a {command} command')
             except DAQError as e:
                 self.logger.info('Received invalid command')
                 daq_response = DAQCoordResponse(
                     type='error',
                     content=f"Parsing of the daq_command "
-                            f"{daq_command['command']} failed with "
+                            f"{daq_command.command} failed with "
                             f"the error: {e}")
                 self.command_socket.send(daq_response.serialize())
                 self.lock = None
                 continue
 
             # check for the different kind of messages
-            if command == 'aquire lock':
+            if command == 'acquire lock':
                 if self.lock is None:
                     self.lock = str(uuid.uuid1())
                     self.logger.info(
@@ -172,8 +256,8 @@ class DAQCoordinator():
 
             # all messages beyond this point need a locking token to work
             # so respond with an error here if no locking token can be found
-            msg_lock = message['locking_token']
-            self.logger.debug('Received lock from cliend: {msg_lock}')
+            msg_lock = daq_command.locking_token
+            self.logger.debug(f'Received lock from cliend: {msg_lock}')
             if self.lock != msg_lock:
                 self.logger.warn(
                         f'Lock in the message does not match {self.lock}'
@@ -196,7 +280,7 @@ class DAQCoordinator():
                 continue
 
             if command == 'initialize':
-                config = daq_command['content']
+                config = daq_command.config
                 self.logger.debug(
                         'Received initialization config:\n' +
                         yaml.dump(config))
@@ -204,7 +288,7 @@ class DAQCoordinator():
                     self.logger.debug(
                             'Initializing DAQ-System and setting up data'
                             'taking context')
-                    self.daq_system.initalize(config)
+                    self.daq_system.initialize(config)
                     self.daq_system.setup_data_taking_context()
                 except ValueError as err:
                     self.logger.warn(
@@ -238,10 +322,14 @@ class DAQCoordinator():
                                 content=error_msg
                                 )
                         self.command_socket.send(daq_response.serialize())
+                        continue
                 else:
                     self.logger.debug('No target config found, '
                                       'target initialization skipped')
                 self.logger.info('DAQ-System and target initialized')
+                response = DAQCoordResponse(type='ack')
+                self.initialized = True
+                self.command_socket.send(response.serialize())
                 continue
 
             if command == 'measure':
@@ -255,7 +343,7 @@ class DAQCoordinator():
                             )
                     self.command_socket.send(daq_response.serialize())
                     continue
-                config = daq_command['content']
+                config = daq_command.config
                 self.logger.debug(
                         'Received run configuration:\n'
                         + yaml.dump(config))
@@ -329,7 +417,7 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.command()
 @click.argument('netcfg', type=click.File('r'),
                 metavar='[network configuration file]')
-@click.option('--log', type=click.File('a+'), default=None,
+@click.option('--log', type=str, default=None,
               help='Enable logging and append logs to the filename passed to '
                    'this option')
 @click.option('--loglevel', default='INFO',
@@ -338,7 +426,9 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
                                 case_sensitive=False))
 def main(netcfg, log, loglevel):
     if log is not None:
-        logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
+        logging.basicConfig(filename=log,
+                            filemode='a+',
+                            level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
                                    '%(name)-50s %(message)s')
     try:
@@ -346,5 +436,7 @@ def main(netcfg, log, loglevel):
     except yaml.YAMLError as err:
         sys.exit('Error reading in the network config:\n' +
                  + str(err) + '\nexiting ..')
+    logging.info('Read in network config, initializing coordinator')
     daq_coordinator = DAQCoordinator(netcfg)
+    logging.info('DAQ-Coordinator initialized')
     daq_coordinator.run()
