@@ -17,7 +17,7 @@ from . import config_utilities as cfu
                 metavar='[Procedure to be run by the datenraffinerie]')
 @click.argument('output_dir', type=click.Path(dir_okay=True),
                 metavar='[Location to write the configuration files to]')
-@click.option('--diff', default=False, type=bool,
+@click.option('--diff/--no-diff', default=True,
               help='only write the differences between the initial config and'
                    'the individual runs to the run config files')
 def generate_configuratons(config, netcfg, procedure, output_dir, diff):
