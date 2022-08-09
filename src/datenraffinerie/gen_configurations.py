@@ -24,11 +24,11 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
     # generate the conifgurations
     config = click.format_filename(config)
     try:
-        system_default_config, system_init_config, run_configs, run_count = \
-            cfu.get_procedure_configs(main_config_file=config,
-                                      procedure_name=procedure,
-                                      calibration=None,
-                                      diff=diff)
+        procedure, system_default_config, system_init_config, run_configs, \
+                run_count = cfu.get_procedure_configs(main_config_file=config,
+                                                      procedure_name=procedure,
+                                                      calibration=None,
+                                                      diff=diff)
     except ValueError as err:
         print(f"The procedure with name: {err.args[1]} could not be found,")
         print("Available procedures are:")
@@ -52,6 +52,8 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
         dcf.write(yaml.safe_dump(system_default_config))
     with open(output_dir / 'initial_state_config.yaml', 'w+') as icf:
         icf.write(yaml.safe_dump(system_init_config))
+    with open(output_dir / 'procedure_config.yaml') as pcf:
+        pcf.write(yaml.safe_dump(procedure))
 
     # generate the configurations for the runs
     num_digits = math.ceil(math.log(run_count, 10))

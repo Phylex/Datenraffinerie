@@ -36,7 +36,7 @@ def get_procedure_configs(main_config_file: str, procedure_name: str,
                          f"{all_procedure_names}")
         raise ValueError("Procedure could not be found",
                          procedure, available_procedures)
-    return generate_configurations(procedure, calibration, diff)
+    return procedure, generate_configurations(procedure, calibration, diff)
 
 
 def generate_configurations(procedure: dict, calibration: dict = None,
