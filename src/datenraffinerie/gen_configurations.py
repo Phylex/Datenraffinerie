@@ -21,6 +21,7 @@ from . import config_utilities as cfu
               help='only write the differences between the initial config and'
                    'the individual runs to the run config files')
 def generate_configuratons(config, netcfg, procedure, output_dir, diff):
+    # generate the conifgurations
     config = click.format_filename(config)
     try:
         system_default_config, system_init_config, run_configs, run_count = \
@@ -34,19 +35,27 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
         for pname in err.args[2]:
             print(f"\t {pname}")
         exit(1)
+
+    # create the output directory and the initial files
+    output_dir = Path(output_dir)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
-    output_dir = Path(output_dir)
-    netcfg = Path(netcfg)
-    shutil.copyfile(netcfg, output_dir / 'network_config.yaml')
+    
+    # clean the output directory of any previous config files
     for file in glob.glob(str(output_dir.absolute() / '*.yaml')):
         os.remove(file)
+
+    # generate the initial, default and network config
+    netcfg = Path(netcfg)
+    shutil.copyfile(netcfg, output_dir / 'network_config.yaml')
     with open(output_dir / 'default_config.yaml', 'w+') as dcf:
         dcf.write(yaml.safe_dump(system_default_config))
     with open(output_dir / 'initial_state_config.yaml', 'w+') as icf:
         icf.write(yaml.safe_dump(system_init_config))
+
+    # generate the configurations for the runs
     num_digits = math.ceil(math.log(run_count, 10))
-    bar = Bar('generating configurations', max=run_count)
+    bar = Bar('generating run configurations', max=run_count)
     for i, run_config in enumerate(run_configs):
         run_file_name = \
                 'run_{0:0>{width}}_config.yaml'.format(i, width=num_digits)
