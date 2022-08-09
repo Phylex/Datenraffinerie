@@ -1,11 +1,11 @@
-from .import control_adapter as ctrla
-from hgcroc_configuration_client.client import Client as sc_client
+from .daq_coordination import DAQCoordClient
 import yaml
 import glob
 import click
 from pathlib import Path
 import logging
 import os
+from progress.bar import Bar
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
                    'INFO': logging.INFO,
@@ -17,13 +17,16 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.command()
 @click.argument('output_directory', type=click.Path(dir_okay=True),
                 metavar='[directory containing the run configurations]')
-@click.option('--diff', default=False, type=bool)
-@click.option('--log', default=None, type=str)
+@click.option('--log', default=None, type=str,
+              help='Enable logging by specifying the output logfile')
 @click.option('--loglevel', default='INFO',
               type=click.Choice(['DEBUG', 'INFO',
                                  'WARNING', 'ERROR', 'CRITICAL'],
-                                case_sensitive=False))
-def acquire_data(output_directory, diff, log, loglevel):
+                                case_sensitive=False),
+              help='specify the logging verbosity')
+@click.option('--keep/--no-keep', default=False,
+              help='Keep the already aquired data, defaults to False')
+def acquire_data(output_directory, diff, log, loglevel, keep):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -49,14 +52,14 @@ def acquire_data(output_directory, diff, log, loglevel):
         str(output_directory.absolute()) + '/' + 'run_*_config.yaml'))
     sorted(run_config_files,
            key=lambda x: int(os.path.basename(x).split('_')[1]))
+    run_indices = list(map(lambda x: os.path.basename(x).split('_')[1],
+                           run_config_files))
     print(f'Found configurations for {len(run_config_files)} runs')
 
     # read in the configurations
     with open(network_config, 'r') as nwcf:
         network_config = yaml.safe_load(nwcf.read())
-    server_net_config = network_config['server']
-    client_net_config = network_config['client']
-    target_net_config = network_config['target']
+    daq_system = DAQCoordClient(network_config)
     with open(default_config, 'r') as dcf:
         default_config = yaml.safe_load(dcf.read())
     with open(init_config, 'r') as icf:
@@ -67,39 +70,27 @@ def acquire_data(output_directory, diff, log, loglevel):
             run_configs.append(yaml.safe_load(rcf.read()))
     print('Finished loading configurations')
     # instantiate client and server
-    target = sc_client(target_net_config['hostname'])
-    daq_system = ctrla.DAQSystem(
-        server_hostname=server_net_config['hostname'],
-        server_port=server_net_config['port'],
-        client_hostname=client_net_config['hostname'],
-        client_port=client_net_config['port'])
     # initialize the daq system
     daq_system.initialize(init_config)
     # setup data taking context for the client
-    daq_system.setup_data_taking_context()
     print('Initialized DAQ-System')
-    # initialize the target
-    try:
-        initial_target_config = init_config['target']
-    except KeyError:
-        initial_target_config = {}
-    target.set(initial_target_config, readback=True)
+
+    # delete the old raw files
+    if not keep:
+        old_raw_files = glob.glob(str(output_directory.absolute()+'/*.raw'))
+        for file in old_raw_files:
+            os.remove(file)
+
     # take the data
-    for i, run in enumerate(run_configs):
-        logging.info(f'Gathering Data for run {i}')
-        print(f'Gathering Data for run {i}')
-        try:
-            logging.debug(f'run config:\n{yaml.dump(run)}')
-            target_run_config = run['target']
-        except KeyError:
-            target_run_config = {}
-        if target_run_config != {}:
-            logging.debug(
-                f'loading run config to target\n{yaml.dump(target_run_config)}'
-            )
-            target.set(target_run_config, readback=True)
-        daq_system.configure(run)
-        daq_system.take_data(output_directory / f'run_{i}_data.raw')
+    bar = Bar('Acquiring Data', max=len(run_indices))
+    for index, run in zip(run_indices, run_configs):
+        output_file = output_directory / f'run_{index}_data.raw'
+        if not keep or not output_file.exists():
+            data = daq_system.measure(run)
+            with open(output_file, 'wb+') as df:
+                df.write(data)
+        bar.next()
+    bar.finish()
 
 
 if __name__ == "__main__":
