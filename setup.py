@@ -28,5 +28,6 @@ setup(
         'jinja2',
         'schema',
         'hgcroc-configuration-client',
+        'progress',
     ]
 )

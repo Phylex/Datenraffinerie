@@ -3,6 +3,8 @@ import yaml
 import os
 import math
 import shutil
+import glob
+from progress.bar import Bar
 from pathlib import Path
 from . import config_utilities as cfu
 
@@ -37,14 +39,19 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
     output_dir = Path(output_dir)
     netcfg = Path(netcfg)
     shutil.copyfile(netcfg, output_dir / 'network_config.yaml')
+    for file in glob.glob(str(output_dir.absolute() / '*.yaml')):
+        os.remove(file)
     with open(output_dir / 'default_config.yaml', 'w+') as dcf:
         dcf.write(yaml.safe_dump(system_default_config))
     with open(output_dir / 'initial_state_config.yaml', 'w+') as icf:
         icf.write(yaml.safe_dump(system_init_config))
-    num_digits = math.ceil(math.log(len(run_configs), 10))
+    num_digits = math.ceil(math.log(run_count, 10))
+    bar = Bar('generating configurations', max=run_count)
     for i, run_config in enumerate(run_configs):
         run_file_name = \
-                'run_{0:>{width}}_config.yaml'.format(i, width=num_digits)
+                'run_{0:0>{width}}_config.yaml'.format(i, width=num_digits)
         with open(output_dir / run_file_name, 'w+') \
                 as rcf:
             rcf.write(yaml.safe_dump(run_config))
+        bar.next()
+    bar.finish()
