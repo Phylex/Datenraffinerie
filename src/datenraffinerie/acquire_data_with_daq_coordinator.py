@@ -1,11 +1,11 @@
 from .daq_coordination import DAQCoordClient
 import yaml
-import math
 import glob
 import click
 from pathlib import Path
 import logging
 import os
+from progress.bar import Bar
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
                    'INFO': logging.INFO,
@@ -17,13 +17,16 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.command()
 @click.argument('output_directory', type=click.Path(dir_okay=True),
                 metavar='[directory containing the run configurations]')
-@click.option('--diff', default=False, type=bool)
-@click.option('--log', default=None, type=str)
+@click.option('--log', default=None, type=str,
+              help='Enable logging by specifying the output logfile')
 @click.option('--loglevel', default='INFO',
               type=click.Choice(['DEBUG', 'INFO',
                                  'WARNING', 'ERROR', 'CRITICAL'],
-                                case_sensitive=False))
-def acquire_data(output_directory, diff, log, loglevel):
+                                case_sensitive=False),
+              help='specify the logging verbosity')
+@click.option('--keep/--no-keep', default=False,
+              help='Keep the already aquired data, defaults to False')
+def acquire_data(output_directory, diff, log, loglevel, keep):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -49,7 +52,8 @@ def acquire_data(output_directory, diff, log, loglevel):
         str(output_directory.absolute()) + '/' + 'run_*_config.yaml'))
     sorted(run_config_files,
            key=lambda x: int(os.path.basename(x).split('_')[1]))
-    run_indices = list(map(lambda x: os.path.basename(x).split('_')[1]))
+    run_indices = list(map(lambda x: os.path.basename(x).split('_')[1],
+                           run_config_files))
     print(f'Found configurations for {len(run_config_files)} runs')
 
     # read in the configurations
@@ -70,16 +74,23 @@ def acquire_data(output_directory, diff, log, loglevel):
     daq_system.initialize(init_config)
     # setup data taking context for the client
     print('Initialized DAQ-System')
+
+    # delete the old raw files
+    if not keep:
+        old_raw_files = glob.glob(str(output_directory.absolute()+'/*.raw'))
+        for file in old_raw_files:
+            os.remove(file)
+
     # take the data
-    old_raw_files = glob.glob(output_directory.absolute()+'/*.raw')
-    for file in old_raw_files:
-        os.remove(file)
+    bar = Bar('Acquiring Data', max=len(run_indices))
     for index, run in zip(run_indices, run_configs):
-        data = daq_system.measure(run)
         output_file = output_directory / f'run_{index}_data.raw'
-        with open(output_file, 'wb+') as df:
-            df.write(data)
-        print('Acuired Data for run {int(index)}', end='\r')
+        if not keep or not output_file.exists():
+            data = daq_system.measure(run)
+            with open(output_file, 'wb+') as df:
+                df.write(data)
+        bar.next()
+    bar.finish()
 
 
 if __name__ == "__main__":
