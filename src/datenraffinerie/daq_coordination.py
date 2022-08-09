@@ -125,6 +125,8 @@ class DAQCoordClient():
     def __init__(self, network_config: dict):
         self.logger = logging.getLogger('daq_coord_client')
         self.lock = None
+        self.zmq_transaction_running = False
+        self.raw_response = None
         self.io_context = zmq.Context()
         self.socket = self.io_context.socket(zmq.REQ)
         socket_address = \
@@ -153,7 +155,10 @@ class DAQCoordClient():
         self.logger.info('Sending initial config')
         self.logger.debug(f'\n{config}')
         self.socket.send(message.serialize())
-        response = DAQCoordResponse.parse(self.socket.recv())
+        self.zmq_transaction_running = True
+        self.raw_response = self.socket.recv()
+        self.zmq_transaction_running = False
+        response = DAQCoordResponse.parse(self.raw_response)
         self.logger.debug(f'Received response:\n{response}')
         if response.type == 'error':
             self.logger.error(
@@ -166,8 +171,12 @@ class DAQCoordClient():
     def measure(self, run_config: dict):
         message = DAQCoordCommand(command='measure', locking_token=self.lock,
                                   config=run_config)
-        self.socket.send(message.serialize())
-        response = DAQCoordResponse.parse(self.socket.recv())
+        raw_msg = message.serialize()
+        self.socket.send(raw_msg)
+        self.zmq_transaction_running = True
+        self.raw_response = self.socket.recv()
+        self.zmq_transaction_running = False
+        response = DAQCoordResponse.parse(self.raw_response)
         if response.type == 'error':
             self.logger.error(
                     f"Received error from coordinator: {response.content}")
@@ -177,6 +186,16 @@ class DAQCoordClient():
         return response.content
 
     def __del__(self):
+        if self.zmq_transaction_running:
+            response = self.socket.recv()
+            response = DAQCoordResponse.parse(response)
+            if response.type != 'error':
+                self.logger.info(
+                        f"Receive message of type {response.type}"
+                        "from coordinator, discarding")
+            if response.type == 'error':
+                self.logger.error(
+                        f"Received error from coordinator: {response.content}")
         if self.lock is not None:
             message = DAQCoordCommand(
                     command='release lock', locking_token=self.lock)
@@ -285,6 +304,8 @@ class DAQCoordinator():
                         'Received initialization config:\n' +
                         yaml.dump(config))
                 try:
+                    self.logger.info('Resetting ROCs')
+                    self.target.reset()
                     self.logger.debug(
                             'Initializing DAQ-System and setting up data'
                             'taking context')
@@ -293,7 +314,7 @@ class DAQCoordinator():
                 except ValueError as err:
                     self.logger.warn(
                             'initialization of the daq system failed, received'
-                            f'error: {err.argss[0]}')
+                            f'error: {err.args[0]}')
                     error_msg = 'During initialization of the daq system ' + \
                                 f'an error ocurred: {err.args[0]}'
                     daq_response = DAQCoordResponse(
@@ -309,6 +330,9 @@ class DAQCoordinator():
                 if initial_target_config != {}:
                     self.logger.debug('Initializing target system')
                     try:
+                        self.logger.debug(
+                            'Initializing Rocs\n'
+                            f'{yaml.dump(initial_target_config)}')
                         self.target.set(initial_target_config, readback=True)
                     except ValueError as err:
                         self.logger.warn(
