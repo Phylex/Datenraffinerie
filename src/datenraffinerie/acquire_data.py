@@ -26,7 +26,7 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
               help='specify the logging verbosity')
 @click.option('--keep/--no-keep', default=False,
               help='Keep the already aquired data, defaults to False')
-def acquire_data(output_directory, diff, log, loglevel, keep):
+def acquire_data(output_directory, log, loglevel, keep):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -54,30 +54,31 @@ def acquire_data(output_directory, diff, log, loglevel, keep):
            key=lambda x: int(os.path.basename(x).split('_')[1]))
     run_indices = list(map(lambda x: os.path.basename(x).split('_')[1],
                            run_config_files))
-    print(f'Found configurations for {len(run_config_files)} runs')
 
     # read in the configurations
     with open(network_config, 'r') as nwcf:
         network_config = yaml.safe_load(nwcf.read())
-    daq_system = DAQCoordClient(network_config)
     with open(default_config, 'r') as dcf:
         default_config = yaml.safe_load(dcf.read())
     with open(init_config, 'r') as icf:
         init_config = yaml.safe_load(icf.read())
     run_configs = []
+    bar = Bar('reading run configurations from disk', max=len(run_indices))
     for rcfp in run_config_files:
         with open(rcfp, 'r') as rcf:
             run_configs.append(yaml.safe_load(rcf.read()))
-    print('Finished loading configurations')
+        bar.next()
+    bar.finish()
     # instantiate client and server
     # initialize the daq system
+    daq_system = DAQCoordClient(network_config)
     daq_system.initialize(init_config)
     # setup data taking context for the client
     print('Initialized DAQ-System')
 
     # delete the old raw files
     if not keep:
-        old_raw_files = glob.glob(str(output_directory.absolute()+'/*.raw'))
+        old_raw_files = glob.glob(str(output_directory.absolute())+'/*.raw')
         for file in old_raw_files:
             os.remove(file)
 
@@ -85,7 +86,7 @@ def acquire_data(output_directory, diff, log, loglevel, keep):
     bar = Bar('Acquiring Data', max=len(run_indices))
     for index, run in zip(run_indices, run_configs):
         output_file = output_directory / f'run_{index}_data.raw'
-        if not keep or not output_file.exists():
+        if not keep or (keep and not output_file.exists()):
             data = daq_system.measure(run)
             with open(output_file, 'wb+') as df:
                 df.write(data)
