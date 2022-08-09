@@ -1,6 +1,8 @@
 from . import analysis_utilities as anu
 from uproot.exceptions import KeyInFileError
 from . import dict_utils as dcu
+from progress.bar import Bar
+import glob
 import os
 import shutil
 import logging
@@ -86,7 +88,9 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
               type=click.Choice(['DEBUG', 'INFO',
                                  'WARNING', 'ERROR', 'CRITICAL'],
                                 case_sensitive=False))
-def main(output_dir, log, loglevel):
+@click.option('--root/--no-root', default=False,
+              help='keep the rootfile generated as intermediary')
+def main(output_dir, log, loglevel, root):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -99,11 +103,29 @@ def main(output_dir, log, loglevel):
         except KeyError:
             print('The procedure needs to specify data columns')
             sys.exit(1)
+        try:
+            mode = procedure['mode']
+        except KeyError:
+            mode = 'summary'
     default_config_file = output_dir / 'default_config.yaml'
     with open(default_config_file, 'r') as dfc:
         default_config = yaml.safe_load(dfc.read())
     initial_config_file = output_dir / 'initial_state_config.yaml'
     with open(initial_config_file, 'r') as icf:
         initial_config = yaml.safe_load(icf.read())
-    full_initial_config = dcu.update_dict(default_config, initial_config)
-
+    full_config = dcu.update_dict(default_config, initial_config)
+    run_config_files = glob.glob(
+            str(output_dir.absolute()) + '/run_*_config.yaml')
+    run_raw_data_files = glob.glob(
+            str(output_dir.absolute()) + '/run_*_data.raw')
+    sorted(run_config_files, key=lambda x: int(x.split('_')[-2]))
+    sorted(run_raw_data_files, key=lambda x: int(x.split('_')[-2]))
+    bar = Bar('postprocessing data', max=len(run_config_files))
+    for run_config_file, run_raw_data_file in \
+            zip(run_config_files, run_raw_data_files):
+        with open(run_config_file, 'r') as rcfgf:
+            run_config_patch = yaml.safe_load(rcfgf.read())
+        dcu.update_dict(full_config, run_config_patch, in_place=True)
+        frack_data(run_raw_data_file, full_config, mode, data_columns, root)
+        bar.next()
+    bar.finish()
