@@ -28,14 +28,14 @@ add_library(
 
 add_library(hdf-utils hdf-utils.cc ${CMAKE_CURRENT_BINARY_DIR}/roc_param_description.hpp)
 target_link_libraries(hdf-utils
-	PUBLIC HDF5::HDF5 
-	root-tools
+  PUBLIC HDF5::HDF5 
+  root-tools
 )
 
 add_library(root-tools
 	root-tools.cc )
 target_link_libraries(root-tools
-	ROOT::Core
+	PUBLIC ROOT::Core
 	ROOT::Tree 
 	ROOT::RIO)
 
