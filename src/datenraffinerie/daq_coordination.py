@@ -4,6 +4,8 @@ import bson
 import yaml
 import logging
 import click
+import shutil
+import subprocess as sp
 from pathlib import Path
 from .control_adapter import DAQSystem
 from hgcroc_configuration_client.client import Client as SCClient
@@ -11,6 +13,7 @@ from schema import Schema, Or
 from .errors import DAQError
 import uuid
 from time import sleep
+from time import ctime
 
 
 class DAQCoordCommand():
@@ -446,19 +449,43 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
               type=click.Choice(['DEBUG', 'INFO',
                                  'WARNING', 'ERROR', 'CRITICAL'],
                                 case_sensitive=False))
-def main(netcfg, log, loglevel):
+@click.option('--client_output', default=None,
+              help='file to place the output of the client into, by default'
+                   ' the output of the daq-client is not captured')
+def main(netcfg, log, loglevel, client_output):
+    client_output = Path(client_output)
     if log is not None:
         logging.basicConfig(filename=log,
                             filemode='a+',
                             level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
                                    '%(name)-50s %(message)s')
+    logging.info('Read in network config')
     try:
         netcfg = yaml.safe_load(netcfg.read())
     except yaml.YAMLError as err:
         sys.exit('Error reading in the network config:\n' +
                  + str(err) + '\nexiting ..')
-    logging.info('Read in network config, initializing coordinator')
+
+    logging.info('Starting daq-client')
+    daq_client_path = shutil.which('daq-client')
+    if daq_client_path is None:
+        logging.error('daq-client executable not found, exiting')
+        print('daq-client executable not found, exiting')
+        sys.exit(1)
+    if client_output is None:
+        logging.info('discarding client output')
+        client_process_out = sp.DEVNULL
+    else:
+        logging.info(f'Writing client output into {client_output.absolute()}')
+        client_process_out = open(client_output, 'a+')
+        client_process_out.write(f'Started daq-client on {ctime()}')
+    client_process = sp.Popen(
+            [daq_client_path, '-p', str(netcfg['client']['port'])],
+            stdout=client_process_out)
     daq_coordinator = DAQCoordinator(netcfg)
     logging.info('DAQ-Coordinator initialized')
     daq_coordinator.run()
+    client_process.terminate()
+    if client_output is not None:
+        client_process_out.close()
