@@ -31,6 +31,7 @@ def acquire_data(output_directory, log, loglevel, keep):
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
                                    '%(name)-50s %(message)s')
+    logger = logging.getLogger('main')
     # get the expected files from the directory
     output_directory = Path(output_directory)
     network_config = output_directory / 'network_config.yaml'
@@ -56,6 +57,7 @@ def acquire_data(output_directory, log, loglevel, keep):
                            run_config_files))
 
     # read in the configurations
+    logger.info('Reading in configurations')
     with open(network_config, 'r') as nwcf:
         network_config = yaml.safe_load(nwcf.read())
     with open(default_config, 'r') as dcf:
@@ -71,14 +73,16 @@ def acquire_data(output_directory, log, loglevel, keep):
     bar.finish()
     # instantiate client and server
     # initialize the daq system
+    print('Initializing DAQ-System')
     daq_system = DAQCoordClient(network_config)
     daq_system.initialize(init_config)
     # setup data taking context for the client
-    print('Initialized DAQ-System')
 
     # delete the old raw files
     if not keep:
         old_raw_files = glob.glob(str(output_directory.absolute())+'/*.raw')
+        if len(old_raw_files):
+            print('Deleting old Data')
         for file in old_raw_files:
             os.remove(file)
 
