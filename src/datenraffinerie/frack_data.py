@@ -16,8 +16,9 @@ def frack_data(raw_data_file_path, full_run_config, mode,
                columns, keep_root: bool):
     logger = logging.getLogger(f'fracker-{raw_data_file_path}')
     # generate the paths for the output files
-    unpacked_file_path = os.path.splitext(raw_data_file_path)[0] + '.root'
-    formatted_data_path = os.path.splitext(raw_data_file_path)[0] + '.h5'
+    unpacked_file_path = Path(
+            os.path.splitext(raw_data_file_path)[0] + '.root')
+    formatted_data_path = Path(os.path.splitext(raw_data_file_path)[0] + '.h5')
 
     # generate the intermediary root file
     result = anu.unpack_raw_data_into_root(
@@ -96,7 +97,7 @@ def main(output_dir, log, loglevel, root):
                             format='[%(asctime)s] %(levelname)s:'
                                    '%(name)-50s %(message)s')
     output_dir = Path(output_dir)
-    with open(output_dir / 'procedure_config.yaml') as pcf:
+    with open(output_dir / 'postprocessing_config.yaml') as pcf:
         procedure = yaml.safe_load(pcf.read())
         try:
             data_columns = procedure['data_columns']
