@@ -77,7 +77,8 @@ parameter_range = Schema(
             And(dict, Use(generate_values,
                           error='values field is not a range description')),
             [dict, int], error="values is neither a list values nor a "
-                               "range description"))
+                               "range description")
+         )
 
 parameter = Schema(
         Or({'key': [list, str, int],
@@ -86,7 +87,7 @@ parameter = Schema(
             'values': parameter_range},
            error="A parameter must have a 'template' and 'values'"
                  " or 'key' and 'values' field")
-)
+         )
 
 daq_config = Schema(
         {'name': str,
