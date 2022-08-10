@@ -214,7 +214,6 @@ class DAQCoordClient():
 class DAQCoordinator():
 
     def __init__(self, network_config):
-        self.network_config = network_config
         self.logger = logging.getLogger('daq_coordinator')
         self.lock = None
         self.initialized = False
@@ -233,10 +232,9 @@ class DAQCoordinator():
                 self.network_config['target']['port'])
         self.logger.info('Initializing DAQ-System adapter')
         self.daq_system = DAQSystem(
-                self.network_config['server']['hostname'],
-                self.network_config['server']['port'],
-                self.network_config['client']['hostname'],
-                self.network_config['client']['port'])
+                server_hostname=network_config['server']['hostname'],
+                server_port=network_config['server']['port'],
+                data_port=network_config['server']['data_port'])
 
     def run(self):
         while True:
@@ -309,7 +307,7 @@ class DAQCoordinator():
                     self.logger.debug(
                             'Initializing DAQ-System and setting up data'
                             'taking context')
-                    self.daq_system.initialize(config)
+                    self.daq_system.initialize(initial_config=config)
                     self.daq_system.setup_data_taking_context()
                 except ValueError as err:
                     self.logger.warn(

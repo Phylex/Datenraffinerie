@@ -55,18 +55,19 @@ class DAQAdapter():
     variant_key_map = {'server': 'daq', 'client': 'client'}
 
     def __init__(self, variant: str, hostname: str,
-                 port: int):
+                 port: int, data_port: int):
         # set up the logger for this object
         self.logger = logging.getLogger(
                 __name__+f'.{variant}')
 
         # initialize the connection to the target server
         self.hostname = hostname
-        self.port = port
+        self.ctrl_port = port
+        self.data_port = data_port
         self.context = zmq.Context()
         self.logger.info(f'Initializing connection to {variant}')
         self.socket = self.context.socket(zmq.REQ)
-        socket_url = f'tcp://{self.hostname}:{self.port}'
+        socket_url = f'tcp://{self.hostname}:{self.ctrl_port}'
         self.logger.debug(f'connecting to {socket_url}')
         self.socket.connect(socket_url)
         self.variant = variant
@@ -74,6 +75,10 @@ class DAQAdapter():
 
         # initialize the configuration properly
         self.configuration = {self.variant_key_map[self.variant]: {}}
+
+    def __del__(self):
+        self.socket.close()
+        self.context.destroy()
 
     def _clean_configuration(self, config):
         config, _, _ = \
@@ -85,6 +90,8 @@ class DAQAdapter():
                 config = config[self.variant]
             except KeyError:
                 config = {}
+        # include the data port in the configuration
+        config['zmqPushPull_port'] = self.data_port
         config = {self.variant_key_map[self.variant]: config}
         return config
 
@@ -94,7 +101,6 @@ class DAQAdapter():
                     in_place=True)
 
     def initialize(self, initial_config: dict):
-        initial_config, _, _ = _filter_out_network_config(initial_config)
         self.logger.debug("initializing")
         update_dict(self.configuration,
                     self._clean_configuration(initial_config), in_place=True)
@@ -227,25 +233,29 @@ class DAQSystem:
     function that
     """
 
-    def __init__(self, server_hostname: str, server_port: int,
+    def __init__(self, server_hostname: str, server_port: int, data_port: int,
                  client_hostname: str, client_port: int):
         """
-        initialise the daq system by initializing it's components (the client
-        and server)
+        initialise the daq system by initializing it's static components
+        (and server)
         """
         # set up the server part of the daq system (zmq-server)
         self.logger = logging.getLogger(__name__+'.DAQSystem')
         self.client_started = False
-        self.server = DAQAdapter('server', server_hostname, server_port)
+        self.data_port = data_port
+        self.server = DAQAdapter('server', server_hostname,
+                                 server_port, data_port)
+        self.client = DAQAdapter('client', client_hostname, client_port,
+                                 self.data_port)
         # set up the client part of the daq system (zmq-client)
         # the wrapping with the global needs to be done so that the client
         # accepts the configuration
-        self.client = DAQAdapter('client', client_hostname, client_port)
 
     def __del__(self):
         self.tear_down_data_taking_context()
 
     def initialize(self, initial_config: dict):
+        initial_config['client']['serverIP'] = self.server.hostname
         self.client.initialize(initial_config)
         self.server.initialize(initial_config)
 
