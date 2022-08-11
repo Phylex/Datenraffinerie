@@ -9,6 +9,8 @@
 
 int main() {
 	YAML::Node config = YAML::LoadFile("../../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml");
+	if(config["target"])
+		config = config["target"];
 	YAML::Node overlay = YAML::LoadFile("../../tests/configuration/defaults/initLDV3.yaml");
 	YAML::Node channel_overlay = YAML::LoadFile("../../tests/configuration/defaults/channel_settings.yaml");
 	update<int>(config, overlay);
