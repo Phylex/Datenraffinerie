@@ -1,5 +1,4 @@
 from . import analysis_utilities as anu
-from uproot.exceptions import KeyInFileError
 from . import dict_utils as dcu
 from progress.bar import Bar
 from time import sleep
@@ -18,13 +17,16 @@ def unpack_in_parallel(waiting_tasks, parallel_tasks,
     failed_tasks = []
     successful_tasks = []
     if bar:
-        prog_bar = Bar('creating intermediary root files',
+        prog_bar = Bar('creating intermediary root files'.ljust(50, ' '),
                        max=len(waiting_tasks))
-    while len(waiting_tasks) > 0:
+    while len(waiting_tasks) > 0 or len(running_tasks) > 0:
         # check whether there another task can be run
         while parallel_tasks > len(running_tasks):
-            (raw_path, unpacked_path, formatted_path, full_config_path) = \
-                    waiting_tasks.pop()
+            try:
+                (raw_path, unpacked_path, formatted_path, full_config_path) = \
+                        waiting_tasks.pop()
+            except IndexError:
+                break
             if mode == 'full':
                 raw_data = True
             else:
@@ -63,25 +65,29 @@ def unpack_in_parallel(waiting_tasks, parallel_tasks,
         del_indices = sorted(del_indices, reverse=True)
         for i in del_indices:
             del running_tasks[i]
-        sleep(.5)
+        sleep(.2)
     if bar:
         prog_bar.finish()
     return successful_tasks, failed_tasks
 
 
 def frack_in_parallel(waiting_tasks, parallel_tasks,
-                      logger, bar, mode: str, columns):
+                      logger, bar, mode: str, columns,
+                      compression):
     running_tasks = []
     failed_tasks = []
     successful_tasks = []
     if bar:
-        prog_bar = Bar('creating intermediary root files',
+        prog_bar = Bar('creating hdf files'.ljust(50, ' '),
                        max=len(waiting_tasks))
-    while len(waiting_tasks) > 0:
+    while len(waiting_tasks) > 0 or len(running_tasks) > 0:
         # check whether there another task can be run
         while parallel_tasks > len(running_tasks):
-            (unpacked_path, formatted_path, full_config_path) = \
-                    waiting_tasks.pop()
+            try:
+                (unpacked_path, formatted_path, full_config_path) = \
+                        waiting_tasks.pop()
+            except IndexError:
+                break
             if mode == 'full':
                 raw_data = True
             else:
@@ -89,8 +95,10 @@ def frack_in_parallel(waiting_tasks, parallel_tasks,
             running_tasks.append((
                 anu.start_compiled_fracker(unpacked_path, formatted_path,
                                            full_config_path, raw_data,
-                                           columns),
+                                           columns, compression, logger),
+                unpacked_path,
                 formatted_path,
+                full_config_path
                 )
             )
         del_indices = []
@@ -119,14 +127,15 @@ def frack_in_parallel(waiting_tasks, parallel_tasks,
         del_indices = sorted(del_indices, reverse=True)
         for i in del_indices:
             del running_tasks[i]
-        sleep(.5)
+        sleep(.2)
     if bar:
         prog_bar.finish()
     return successful_tasks, failed_tasks
 
 
 def frack_data(raw_data_paths, full_run_config_paths, mode, columns,
-               keep_root: bool, parallel_tasks: int = 2, bar: bool = False):
+               parallel_tasks: int = 2,
+               bar: bool = False, compression: bool = 3):
     logger = logging.getLogger('fracker')
     # generate the paths for the output files
     unpacked_data_paths = [Path(os.path.splitext(rdfp)[0] + '.root')
@@ -139,7 +148,8 @@ def frack_data(raw_data_paths, full_run_config_paths, mode, columns,
     unpack_tasks = list(
             zip(raw_data_paths, unpacked_data_paths,
                 formatted_data_paths, full_run_config_paths)
-    ).reverse()
+    )
+    unpack_tasks.reverse()
     try:
         successful_tasks, failed_tasks = \
             unpack_in_parallel(unpack_tasks, parallel_tasks, logger, bar, mode)
@@ -158,7 +168,7 @@ def frack_data(raw_data_paths, full_run_config_paths, mode, columns,
     try:
         successful_fracker_tasks, failed_fracker_tasks = \
             frack_in_parallel(fracker_tasks, parallel_tasks,
-                              logger, bar, mode, columns)
+                              logger, bar, mode, columns, compression)
     except FileNotFoundError as err:
         logger.critical(err.args[0])
         print('Unable to find compiled fracker, exiting ...')
@@ -171,11 +181,6 @@ def frack_data(raw_data_paths, full_run_config_paths, mode, columns,
             os.remove(formatted_path)
         except FileNotFoundError:
             pass
-    if not keep_root:
-        for (unpacked_path, formatted_path) in successful_tasks:
-            os.remove(unpacked_path)
-    for config_file in full_run_config_paths:
-        os.remove(full_run_config_paths)
 
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
@@ -199,7 +204,10 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
               help='keep the rootfile generated as intermediary')
 @click.option('--parallel_tasks', default=2, type=int,
               help='number of unpackers/frackers to run in parallel')
-def main(output_dir, log, loglevel, root, parallel_tasks):
+@click.option('--compression', '-c', default=3, type=int,
+              help='Set the compression for the hdf file, 0 = no compression'
+                   ' 9 = best compression')
+def main(output_dir, log, loglevel, root, parallel_tasks, compression):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -234,33 +242,38 @@ def main(output_dir, log, loglevel, root, parallel_tasks):
     full_run_config_paths = []
     full_run_config_dir = os.path.dirname(run_config_paths[0])
     if procedure['diff']:
-        bar = Bar('generating fully qualified configurations',
+        bar = Bar('generating fully qualified configurations'.ljust(50, ' '),
                   max=len(run_config_paths))
         for run_config_file in run_config_paths:
             with open(run_config_file, 'r') as rcfgf:
                 run_config_patch = yaml.safe_load(rcfgf.read())
             dcu.update_dict(full_config, run_config_patch, in_place=True)
-            full_run_config_path = full_run_config_dir + '/full_' + \
-                os.path.basename(run_config_file)
+            full_run_config_path = full_run_config_dir + '/' + \
+                os.path.splitext(os.path.basename(run_config_file))[0] + \
+                '_full.yaml'
             with open(full_run_config_path, 'w+') as frcf:
                 frcf.write(yaml.dump(full_config))
-            full_run_config_paths.append(full_run_config_path)
+            full_run_config_paths.append(Path(full_run_config_path))
             bar.next()
         bar.finish()
     else:
         full_run_config_paths = run_config_paths
 
     # actually do the postprocessing
-    for run_config_file, run_raw_data_file in \
-            zip(run_config_paths, run_raw_data_files):
-        with open(run_config_file, 'r') as rcfgf:
-            run_config_patch = yaml.safe_load(rcfgf.read())
-        dcu.update_dict(full_config, run_config_patch, in_place=True)
-        frack_data(run_raw_data_file,
-                   full_run_config_paths,
-                   mode,
-                   data_columns,
-                   root,
-                   parallel_tasks,
-                   bar=True
-                   )
+    frack_data(run_raw_data_files,
+               full_run_config_paths,
+               mode,
+               data_columns,
+               parallel_tasks,
+               bar=True,
+               compression=compression
+               )
+    if not root:
+        root_files = glob.glob(str(output_dir.absolute()) + '/*.root')
+        for rf in root_files:
+            logging.info(f'Deleting unneeded rootfile {rf}')
+            os.remove(rf)
+    for config_file in full_run_config_paths:
+        logging.info(f'Deleting unneeded full_config_file {config_file}')
+        os.remove(config_file)
+    print('Done')

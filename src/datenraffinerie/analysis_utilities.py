@@ -13,6 +13,7 @@ import uproot
 import tables
 import yaml
 import uuid
+import logging
 
 
 class AnalysisError(Exception):
@@ -142,9 +143,11 @@ def fill_block(file, group_name, block, data: np.ndarray):
 
 def start_compiled_fracker(rootfile: Path,
                            hdf_file: Path,
-                           complete_config: dict,
+                           full_config_path: Path,
                            raw_data: bool,
                            columns: list,
+                           compression: int,
+                           logger: logging.Logger,
                            block_size: int = 2000000):
     """
     Assuming there is a fracker command that merges in the configuration
@@ -161,24 +164,21 @@ def start_compiled_fracker(rootfile: Path,
             columns = data_columns.copy()
         columns += expected_columns
 
-    # dump the complete config so that the fracker can use it
-    run_yaml = yaml.dump(complete_config)
-    run_yaml_path = Path('.tmp_run_yaml_' + str(uuid.uuid1()))
-    with open(run_yaml_path, 'w+') as run_yaml_file:
-        run_yaml_file.write(run_yaml)
-
     # assemble the fracker command string passed to the system
     fracker_command_tokens = [compiled_fracker_path]
     fracker_command_tokens.append('-c')
-    fracker_command_tokens.append(run_yaml_path)
+    fracker_command_tokens.append(str(full_config_path.absolute()))
     fracker_command_tokens.append('-i')
-    fracker_command_tokens.append(rootfile)
+    fracker_command_tokens.append(str(rootfile.absolute()))
     fracker_command_tokens.append('-o')
-    fracker_command_tokens.append(hdf_file)
+    fracker_command_tokens.append(str(hdf_file.absolute()))
     fracker_command_tokens.append('-b')
     fracker_command_tokens.append(str(block_size))
     fracker_command_tokens.append('-s')
     fracker_command_tokens += [str(col) for col in columns]
+    fracker_command_tokens.append('-p')
+    fracker_command_tokens.append(str(compression))
+    logger.info('Ran fracker with command: ' + ''.join(fracker_command_tokens))
     return sp.Popen(fracker_command_tokens, stdout=sp.PIPE)
 
 
