@@ -102,8 +102,7 @@ class DAQAdapter():
 
     def initialize(self, initial_config: dict):
         self.logger.debug("initializing")
-        update_dict(self.configuration,
-                    self._clean_configuration(initial_config), in_place=True)
+        self.configuration = self._clean_configuration(initial_config)
         self.socket.send_string("initialize", zmq.SNDMORE)
         config_string = yaml.dump(self.configuration)
         self.logger.debug("sending config:\n" + config_string)
@@ -113,7 +112,7 @@ class DAQAdapter():
         if rep != "initialized":
             self.logger.critical(
                     "Server not successfully initialized."
-                    f" Received {rep}")
+                    f" Received: {rep}")
             raise ValueError("Server not successfully initialized")
         else:
             self.logger.debug(f"Received reply: {rep}")
@@ -123,6 +122,7 @@ class DAQAdapter():
         config = self._clean_configuration(config)
         if cache:
             current_config = self.configuration
+            self.logger.debug(f'Updating config with:\n{config}')
             config = update_dict(self.configuration, config)
             write_config = diff_dict(current_config, config)
             self.configuration = config
@@ -132,7 +132,8 @@ class DAQAdapter():
 
         # if the config is empty we don't have to write anything
         if write_config == {} or write_config is None:
-            self.logger.debug("No new configuration to transmit")
+            self.logger.debug("Configuration did not change, "
+                              "skipping configuration of the backend")
             return
         config_string = yaml.dump(write_config)
         self.logger.debug(f"Sending config:\n{config_string}")
@@ -140,6 +141,10 @@ class DAQAdapter():
         self.socket.send_string(config_string)
         reply = self.socket.recv_string()
         if "configured" != reply:
+            self.logger.error(
+                    "The configuration cannot be "
+                    f" written to {self.hostname}. The daq component"
+                    f"responded with {reply}")
             raise ValueError(
                     "The configuration cannot be "
                     f" written to {self.hostname}. The daq component"
