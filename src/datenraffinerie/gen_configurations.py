@@ -62,7 +62,7 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
 
     # generate the configurations for the runs
     num_digits = math.ceil(math.log(run_count, 10))
-    bar = Bar('generating run configurations', max=run_count)
+    bar = Bar('generating run configurations'.ljust(50, ' '), max=run_count)
     for i, run_config in enumerate(run_configs):
         run_file_name = \
                 'run_{0:0>{width}}_config.yaml'.format(i, width=num_digits)

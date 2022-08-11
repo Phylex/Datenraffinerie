@@ -65,7 +65,8 @@ def acquire_data(output_directory, log, loglevel, keep):
     with open(init_config, 'r') as icf:
         init_config = yaml.safe_load(icf.read())
     run_configs = []
-    bar = Bar('reading run configurations from disk', max=len(run_indices))
+    bar = Bar('reading run configurations from disk'.ljust(50, ' '),
+              max=len(run_indices))
     for rcfp in run_config_files:
         with open(rcfp, 'r') as rcf:
             run_configs.append(yaml.safe_load(rcf.read()))
@@ -87,7 +88,7 @@ def acquire_data(output_directory, log, loglevel, keep):
             os.remove(file)
 
     # take the data
-    bar = Bar('Acquiring Data', max=len(run_indices))
+    bar = Bar('Acquiring Data'.ljust(50, ' '), max=len(run_indices))
     for index, run in zip(run_indices, run_configs):
         output_file = output_directory / f'run_{index}_data.raw'
         if not keep or (keep and not output_file.exists()):
