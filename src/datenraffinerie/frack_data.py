@@ -2,9 +2,9 @@ from . import analysis_utilities as anu
 from uproot.exceptions import KeyInFileError
 from . import dict_utils as dcu
 from progress.bar import Bar
+from time import sleep
 import glob
 import os
-import shutil
 import logging
 from pathlib import Path
 import yaml
@@ -12,64 +12,170 @@ import click
 import sys
 
 
-def frack_data(raw_data_file_path, full_run_config, mode,
-               columns, keep_root: bool):
-    logger = logging.getLogger(f'fracker-{raw_data_file_path}')
+def unpack_in_parallel(waiting_tasks, parallel_tasks,
+                       logger, bar: bool, mode: str):
+    running_tasks = []
+    failed_tasks = []
+    successful_tasks = []
+    if bar:
+        prog_bar = Bar('creating intermediary root files',
+                       max=len(waiting_tasks))
+    while len(waiting_tasks) > 0:
+        # check whether there another task can be run
+        while parallel_tasks > len(running_tasks):
+            (raw_path, unpacked_path, formatted_path, full_config_path) = \
+                    waiting_tasks.pop()
+            if mode == 'full':
+                raw_data = True
+            else:
+                raw_data = False
+            running_tasks.append((
+                anu.start_unpack(raw_path, unpacked_path, raw_data=raw_data),
+                raw_path,
+                unpacked_path,
+                formatted_path,
+                full_config_path
+                )
+            )
+        del_indices = []
+        for i, (task, raw_path, unpacked_path,
+                formatted_path, full_config_path) \
+                in enumerate(running_tasks):
+            returncode = task.poll()
+            if returncode is None:
+                continue
+            del_indices.append(i)
+            if returncode == 0:
+                logger.info(f'created root file from {raw_path}')
+                successful_tasks.append(
+                        (unpacked_path, formatted_path, full_config_path)
+                )
+            if returncode > 0:
+                logger.error(f'failed to created root file from {raw_path}, '
+                             f'unpacker returned error code {returncode}')
+                failed_tasks.append((raw_path, unpacked_path))
+            if returncode < 0:
+                logger.error(f'failed to created root file from {raw_path}, '
+                             'unpacker got terminated')
+                failed_tasks.append((raw_path, unpacked_path))
+            if bar:
+                prog_bar.next()
+        del_indices = sorted(del_indices, reverse=True)
+        for i in del_indices:
+            del running_tasks[i]
+        sleep(.5)
+    if bar:
+        prog_bar.finish()
+    return successful_tasks, failed_tasks
+
+
+def frack_in_parallel(waiting_tasks, parallel_tasks,
+                      logger, bar, mode: str, columns):
+    running_tasks = []
+    failed_tasks = []
+    successful_tasks = []
+    if bar:
+        prog_bar = Bar('creating intermediary root files',
+                       max=len(waiting_tasks))
+    while len(waiting_tasks) > 0:
+        # check whether there another task can be run
+        while parallel_tasks > len(running_tasks):
+            (unpacked_path, formatted_path, full_config_path) = \
+                    waiting_tasks.pop()
+            if mode == 'full':
+                raw_data = True
+            else:
+                raw_data = False
+            running_tasks.append((
+                anu.start_compiled_fracker(unpacked_path, formatted_path,
+                                           full_config_path, raw_data,
+                                           columns),
+                formatted_path,
+                )
+            )
+        del_indices = []
+        for i, (task, unpacked_path, formatted_path, full_config_path) \
+                in enumerate(running_tasks):
+            returncode = task.poll()
+            if returncode is None:
+                continue
+            del_indices.append(i)
+            if returncode == 0:
+                logger.info(
+                        f'created {formatted_path} file from {unpacked_path}')
+                successful_tasks.append((unpacked_path, formatted_path))
+            if returncode > 0:
+                logger.error(
+                        f'failed to created hdf file from {formatted_path}, '
+                        f'fracker returned error code {returncode}')
+                failed_tasks.append((unpacked_path, formatted_path))
+            if returncode < 0:
+                logger.error(
+                        f'failed to created hdf file from {formatted_path}, '
+                        'fracker got terminated')
+                failed_tasks.append((unpacked_path, formatted_path))
+            if bar:
+                prog_bar.next()
+        del_indices = sorted(del_indices, reverse=True)
+        for i in del_indices:
+            del running_tasks[i]
+        sleep(.5)
+    if bar:
+        prog_bar.finish()
+    return successful_tasks, failed_tasks
+
+
+def frack_data(raw_data_paths, full_run_config_paths, mode, columns,
+               keep_root: bool, parallel_tasks: int = 2, bar: bool = False):
+    logger = logging.getLogger('fracker')
     # generate the paths for the output files
-    unpacked_file_path = Path(
-            os.path.splitext(raw_data_file_path)[0] + '.root')
-    formatted_data_path = Path(os.path.splitext(raw_data_file_path)[0] + '.h5')
+    unpacked_data_paths = [Path(os.path.splitext(rdfp)[0] + '.root')
+                           for rdfp in raw_data_paths]
+    formatted_data_paths = [Path(os.path.splitext(rdfp)[0] + '.h5')
+                            for rdfp in raw_data_paths]
 
-    # generate the intermediary root file
-    result = anu.unpack_raw_data_into_root(
-            raw_data_file_path,
-            unpacked_file_path,
-    )
-
-    # if the unpaack command failed remove the raw file to
-    # trigger the Datafield to rerun the data taking
-    if result != 0 and unpacked_file_path.exists():
-        logger.error('unpack falied, removing raw data')
-        os.remove(unpacked_file_path)
-        os.remove(raw_data_file_path)
-        return
-    if not unpacked_file_path.exists():
-        logger.error('unpack falied, removing raw data')
-        os.remove(raw_data_file_path)
-        return
-
-    # if the fracker can be found run it
-    logger.info('Converting Root file to HDF5')
-    if shutil.which('fracker') is not None:
-        logger.debug('fracker cmd-tool found')
-        retval = anu.run_compiled_fracker(
-                str(unpacked_file_path.absolute()),
-                str(formatted_data_path.absolute()),
-                full_run_config,
-                mode,
-                columns)
-        if retval != 0:
-            logger.error("The fracker failed")
-            if formatted_data_path.exists():
-                logger.error("removing hdf file, keeping ")
-                os.remove(formatted_data_path)
-    # otherwise fall back to the python code
-    else:
-        logger.debug('fracker cmd not found, running python code')
+    # generate the intermediary root files
+    logger.info('Converting raw files into root files')
+    unpack_tasks = list(
+            zip(raw_data_paths, unpacked_data_paths,
+                formatted_data_paths, full_run_config_paths)
+    ).reverse()
+    try:
+        successful_tasks, failed_tasks = \
+            unpack_in_parallel(unpack_tasks, parallel_tasks, logger, bar, mode)
+    except FileNotFoundError as err:
+        logger.critical(err.args[0])
+        sys.exit(1)
+    for (raw_path, unpacked_path) in failed_tasks:
+        print(f'The creation of the root file failed for {raw_path}, '
+              'removing {raw_path}')
+        os.remove(raw_path)
         try:
-            anu.reformat_data(unpacked_file_path,
-                              formatted_data_path,
-                              full_run_config,
-                              mode,
-                              columns)
-        except KeyInFileError:
-            os.remove(unpacked_file_path)
-            os.remove(raw_data_file_path)
+            os.remove(unpacked_path)
         except FileNotFoundError:
-            logger.error('Python reformatting code failed')
-            return
+            pass
+    fracker_tasks = successful_tasks
+    try:
+        successful_fracker_tasks, failed_fracker_tasks = \
+            frack_in_parallel(fracker_tasks, parallel_tasks,
+                              logger, bar, mode, columns)
+    except FileNotFoundError as err:
+        logger.critical(err.args[0])
+        print('Unable to find compiled fracker, exiting ...')
+        sys.exit(2)
+    for (unpacked_path, formatted_path) in failed_fracker_tasks:
+        print(f'The creation of the hdf file failed for {unpacked_path}, '
+              'removing {unpacked_path}')
+        os.remove(unpacked_path)
+        try:
+            os.remove(formatted_path)
+        except FileNotFoundError:
+            pass
     if not keep_root:
-        os.remove(unpacked_file_path)
+        for (unpacked_path, formatted_path) in successful_tasks:
+            os.remove(unpacked_path)
+    for config_file in full_run_config_paths:
+        os.remove(full_run_config_paths)
 
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
@@ -81,7 +187,7 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 
 @click.command
 @click.argument('output_dir', type=click.Path(dir_okay=True),
-                metavar='[Location to write the configuration files to]')
+                metavar='[Location containing the config and data]')
 @click.option('--log', type=str, default=None,
               help='Enable logging and append logs to the filename passed to '
                    'this option')
@@ -91,7 +197,9 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
                                 case_sensitive=False))
 @click.option('--root/--no-root', default=False,
               help='keep the rootfile generated as intermediary')
-def main(output_dir, log, loglevel, root):
+@click.option('--parallel_tasks', default=2, type=int,
+              help='number of unpackers/frackers to run in parallel')
+def main(output_dir, log, loglevel, root, parallel_tasks):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -115,18 +223,44 @@ def main(output_dir, log, loglevel, root):
     with open(initial_config_file, 'r') as icf:
         initial_config = yaml.safe_load(icf.read())
     full_config = dcu.update_dict(default_config, initial_config)
-    run_config_files = glob.glob(
+    run_config_paths = glob.glob(
             str(output_dir.absolute()) + '/run_*_config.yaml')
     run_raw_data_files = glob.glob(
             str(output_dir.absolute()) + '/run_*_data.raw')
-    sorted(run_config_files, key=lambda x: int(x.split('_')[-2]))
+    sorted(run_config_paths, key=lambda x: int(x.split('_')[-2]))
     sorted(run_raw_data_files, key=lambda x: int(x.split('_')[-2]))
-    bar = Bar('postprocessing data', max=len(run_config_files))
+
+    # prepare the data so that we can launch the conversions in parallel
+    full_run_config_paths = []
+    full_run_config_dir = os.path.dirname(run_config_paths[0])
+    if procedure['diff']:
+        bar = Bar('generating fully qualified configurations',
+                  max=len(run_config_paths))
+        for run_config_file in run_config_paths:
+            with open(run_config_file, 'r') as rcfgf:
+                run_config_patch = yaml.safe_load(rcfgf.read())
+            dcu.update_dict(full_config, run_config_patch, in_place=True)
+            full_run_config_path = full_run_config_dir + '/full_' + \
+                os.path.basename(run_config_file)
+            with open(full_run_config_path, 'w+') as frcf:
+                frcf.write(yaml.dump(full_config))
+            full_run_config_paths.append(full_run_config_path)
+            bar.next()
+        bar.finish()
+    else:
+        full_run_config_paths = run_config_paths
+
+    # actually do the postprocessing
     for run_config_file, run_raw_data_file in \
-            zip(run_config_files, run_raw_data_files):
+            zip(run_config_paths, run_raw_data_files):
         with open(run_config_file, 'r') as rcfgf:
             run_config_patch = yaml.safe_load(rcfgf.read())
         dcu.update_dict(full_config, run_config_patch, in_place=True)
-        frack_data(run_raw_data_file, full_config, mode, data_columns, root)
-        bar.next()
-    bar.finish()
+        frack_data(run_raw_data_file,
+                   full_run_config_paths,
+                   mode,
+                   data_columns,
+                   root,
+                   parallel_tasks,
+                   bar=True
+                   )

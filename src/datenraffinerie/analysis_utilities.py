@@ -2,6 +2,7 @@
 Utilities for the use with the handling of the gathered data
 in the datenraffinerie.
 """
+import subprocess as sp
 from . import config_utilities as cfu
 import numpy as np
 from pathlib import Path
@@ -77,22 +78,6 @@ def extract_data(rootfile: str, raw_data=False):
         return pd.DataFrame(run_data)
 
 
-def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False):
-    """
-    'unpack' the data from the raw data gathered into a root file that
-    can then be merged with the configuration into a large table
-    """
-    if raw_data:
-        output_type = ' > /dev/null'
-    else:
-        output_type = ' -t unpacked'
-    unpack_command = 'unpack'
-    input_file = ' -i ' + str(in_file_path)
-    output_command = ' -o ' + str(out_file_path)
-    full_unpack_command = unpack_command + input_file + output_command\
-        + output_type
-    return os.system(full_unpack_command)
-
 
 def create_empty_hdf_file(filename: str,
                           expectedrows: int,
@@ -155,13 +140,19 @@ def fill_block(file, group_name, block, data: np.ndarray):
         axis1.append(np.arange(maxindex, len(block)))
 
 
-def run_compiled_fracker(rootfile, hdf_file,
-                         complete_config, raw_data, columns):
+def start_compiled_fracker(rootfile: Path,
+                           hdf_file: Path,
+                           complete_config: dict,
+                           raw_data: bool,
+                           columns: list,
+                           block_size: int = 2000000):
     """
     Assuming there is a fracker command that merges in the configuration
     and transforms the root into the hdf file call it with the proper arguments
     """
     compiled_fracker_path = shutil.which('fracker')
+    if compiled_fracker_path is None:
+        raise FileNotFoundError('The compiled fracker could not be found')
     # build the column list if none has been provided
     if columns is None:
         if raw_data:
@@ -169,27 +160,26 @@ def run_compiled_fracker(rootfile, hdf_file,
         else:
             columns = data_columns.copy()
         columns += expected_columns
+
     # dump the complete config so that the fracker can use it
     run_yaml = yaml.dump(complete_config)
     run_yaml_path = Path('.tmp_run_yaml_' + str(uuid.uuid1()))
     with open(run_yaml_path, 'w+') as run_yaml_file:
         run_yaml_file.write(run_yaml)
+
     # assemble the fracker command string passed to the system
-    fracker_input = f'-c {run_yaml_path} -i {rootfile} '
-    fracker_output = f'-o {hdf_file} '
-    fracker_options = '-b 2000000 '
-    fracker_columns = ' -s '
-    for col in columns:
-        fracker_columns += f'{col} '
-    full_fracker_command = compiled_fracker_path + ' ' +\
-        fracker_input + fracker_output +\
-        fracker_options + fracker_columns
-    # run the compiled fracker
-    print(f"Running: {full_fracker_command}")
-    retval = os.system(full_fracker_command)
-    # remove the temporary file
-    os.remove(run_yaml_path)
-    return retval
+    fracker_command_tokens = [compiled_fracker_path]
+    fracker_command_tokens.append('-c')
+    fracker_command_tokens.append(run_yaml_path)
+    fracker_command_tokens.append('-i')
+    fracker_command_tokens.append(rootfile)
+    fracker_command_tokens.append('-o')
+    fracker_command_tokens.append(hdf_file)
+    fracker_command_tokens.append('-b')
+    fracker_command_tokens.append(str(block_size))
+    fracker_command_tokens.append('-s')
+    fracker_command_tokens += [str(col) for col in columns]
+    return sp.Popen(fracker_command_tokens, stdout=sp.PIPE)
 
 
 def run_turbo_pump(output_file: str, input_files: list):
@@ -203,6 +193,40 @@ def run_turbo_pump(output_file: str, input_files: list):
         tp_input += " " + str(inp)
     full_turbo_p_command = turbo_pump_path + tp_output + tp_input
     return os.system(full_turbo_p_command)
+
+
+def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False):
+    """
+    'unpack' the data from the raw data gathered into a root file that
+    can then be merged with the configuration into a large table
+    """
+    if raw_data:
+        output_type = ' > /dev/null'
+    else:
+        output_type = ' -t unpacked'
+    unpack_command = 'unpack'
+    input_file = ' -i ' + str(in_file_path)
+    output_command = ' -o ' + str(out_file_path)
+    full_unpack_command = unpack_command + input_file + output_command\
+        + output_type
+    return os.system(full_unpack_command)
+
+
+def start_unpack(raw_path, unpacked_path, raw_data: bool = False):
+    unpack_command_path = shutil.which('unpack')
+    if unpack_command_path is None:
+        raise FileNotFoundError('Unable to find the unpack command')
+    unpack_command_tokens = ['unpack']
+    # add the input file to the token list
+    unpack_command_tokens.append('-i')
+    unpack_command_tokens.append(str(raw_path))
+    # add the output file to the token list
+    unpack_command_tokens.append('-o')
+    unpack_command_tokens.append(str(unpacked_path))
+    if not raw_data:
+        unpack_command_tokens.append('-t')
+        unpack_command_tokens.append('unpacked')
+    return sp.Popen(unpack_command_tokens, stdout=sp.PIPE)
 
 
 def reformat_data(rootfile: str,
@@ -586,6 +610,7 @@ daq_columns = ['Bx_trigger',
                'D_prescale',
                ]
 
+
 def test_extract_data():
     test_root_path = Path('../../tests/data/test_run_1.root')
     unpack_raw_data_into_root('../../tests/data/test_run_1.raw', test_root_path)
@@ -599,7 +624,6 @@ def test_reformat_data():
     column in the dataframe
     """
     from . import config_utilities as cfu
-    
     raw_data_path = Path('../../tests/data/test_run_1.raw')
     root_data_path = Path('./test_run_1.root')
     unpack_raw_data_into_root(raw_data_path, root_data_path, False)
