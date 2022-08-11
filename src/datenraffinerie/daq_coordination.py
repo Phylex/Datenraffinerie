@@ -217,6 +217,7 @@ class DAQCoordClient():
 class DAQCoordinator():
 
     def __init__(self, network_config):
+        self.network_config = network_config
         self.logger = logging.getLogger('daq_coordinator')
         self.lock = None
         self.initialized = False
@@ -231,12 +232,14 @@ class DAQCoordinator():
         self.logger.debug('bound to: %s' % socket_address)
         self.logger.info('Initializing target-adapter')
         self.target = SCClient(
-                self.network_config['target']['hostname'],
-                self.network_config['target']['port'])
+                self.network_config['server']['hostname'],
+                self.network_config['server']['sc_ctrl_port'])
         self.logger.info('Initializing DAQ-System adapter')
         self.daq_system = DAQSystem(
+                client_hostname=network_config['client']['hostname'],
+                client_port=network_config['client']['port'],
                 server_hostname=network_config['server']['hostname'],
-                server_port=network_config['server']['port'],
+                server_port=network_config['server']['daq_ctrl_port'],
                 data_port=network_config['server']['data_port'])
 
     def run(self):
@@ -453,7 +456,8 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
               help='file to place the output of the client into, by default'
                    ' the output of the daq-client is not captured')
 def main(netcfg, log, loglevel, client_output):
-    client_output = Path(client_output)
+    if client_output is not None:
+        client_output = Path(client_output)
     if log is not None:
         logging.basicConfig(filename=log,
                             filemode='a+',
@@ -463,6 +467,9 @@ def main(netcfg, log, loglevel, client_output):
     logging.info('Read in network config')
     try:
         netcfg = yaml.safe_load(netcfg.read())
+        netcfg['client'] = {}
+        netcfg['client']['hostname'] = 'localhost'
+        netcfg['client']['port'] = 6001
     except yaml.YAMLError as err:
         sys.exit('Error reading in the network config:\n' +
                  + str(err) + '\nexiting ..')
@@ -485,7 +492,13 @@ def main(netcfg, log, loglevel, client_output):
             stdout=client_process_out)
     daq_coordinator = DAQCoordinator(netcfg)
     logging.info('DAQ-Coordinator initialized')
-    daq_coordinator.run()
-    client_process.terminate()
+    try:
+        daq_coordinator.run()
+    except KeyboardInterrupt:
+        client_process.kill()
+        if client_output is not None:
+            client_process_out.close()
+        sys.exit(1)
+    client_process.kill()
     if client_output is not None:
         client_process_out.close()

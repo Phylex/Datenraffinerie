@@ -41,7 +41,7 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
     output_dir = Path(output_dir)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
-    
+
     # clean the output directory of any previous config files
     for file in glob.glob(str(output_dir.absolute() / '*.yaml')):
         os.remove(file)
@@ -57,6 +57,7 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
         post_config = {}
         post_config['data_columns'] = procedure['data_columns']
         post_config['mode'] = procedure['mode']
+        post_config['diff'] = diff
         pcf.write(yaml.safe_dump(post_config))
 
     # generate the configurations for the runs
