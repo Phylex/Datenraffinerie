@@ -105,7 +105,7 @@ class DAQCoordResponse():
             if self.content is None:
                 raise DAQError('No data provided to the daq response')
             else:
-                logging.debug(f'binary Data is {len(self.cotent)} bytes long')
+                logging.debug(f'binary Data is {len(self.content)} bytes long')
                 return bson.encode(
                         {'type': 'data',
                          'content': bson.Binary(self.content, subtype=0)})
