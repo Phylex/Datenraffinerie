@@ -105,8 +105,10 @@ class DAQCoordResponse():
             if self.content is None:
                 raise DAQError('No data provided to the daq response')
             else:
+                logging.debug(f'binary Data is {len(self.cotent)} bytes long')
                 return bson.encode(
-                        {'type': 'data', 'content': bson.Binary(self.content)})
+                        {'type': 'data',
+                         'content': bson.Binary(self.content, subtype=0)})
         if self.type == 'lock':
             return bson.encode(
                     {'type': 'lock', 'content': str(self.content)})
@@ -117,6 +119,8 @@ class DAQCoordResponse():
     def parse(message: bytes):
         try:
             dict = bson.decode(message)
+            if dict['type'] == 'data':
+                logging.debug(f'Received {len["data"]} bytes of data')
         except:
             raise DAQError('Unable to decode bson message')
         valid_message = DAQCoordResponse.schema.validate(dict)
