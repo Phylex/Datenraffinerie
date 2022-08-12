@@ -165,7 +165,7 @@ class DAQCoordClient():
         self.zmq_transaction_running = True
         self.raw_response = self.socket.recv()
         self.zmq_transaction_running = False
-        response = DAQCoordResponse.parse(self.raw_response)
+        response = DAQCoordResponse.parse(self.raw_response, self.logger)
         self.logger.debug(f'Received response:\n{response}')
         if response.type == 'error':
             self.logger.error(
@@ -183,7 +183,7 @@ class DAQCoordClient():
         self.zmq_transaction_running = True
         self.raw_response = self.socket.recv()
         self.zmq_transaction_running = False
-        response = DAQCoordResponse.parse(self.raw_response)
+        response = DAQCoordResponse.parse(self.raw_response, self.logger)
         if response.type == 'error':
             self.logger.error(
                     f"Received error from coordinator: {response.content}")
@@ -195,7 +195,7 @@ class DAQCoordClient():
     def __del__(self):
         if self.zmq_transaction_running:
             response = self.socket.recv()
-            response = DAQCoordResponse.parse(response)
+            response = DAQCoordResponse.parse(response, self.logger)
             if response.type != 'error':
                 self.logger.info(
                         f"Receive message of type {response.type}"
@@ -207,7 +207,7 @@ class DAQCoordClient():
             message = DAQCoordCommand(
                     command='release lock', locking_token=self.lock)
             self.socket.send(message.serialize())
-            response = DAQCoordResponse.parse(self.socket.recv())
+            response = DAQCoordResponse.parse(self.socket.recv(), self.logger)
             if response.type == 'error':
                 self.logger.error(
                         f"Received error from coordinator: {response.content}")
