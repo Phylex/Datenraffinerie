@@ -90,8 +90,6 @@ class DAQAdapter():
                 config = config[self.variant]
             except KeyError:
                 config = {}
-        # include the data port in the configuration
-        config['zmqPushPull_port'] = self.data_port
         config = {self.variant_key_map[self.variant]: config}
         return config
 
@@ -103,6 +101,8 @@ class DAQAdapter():
     def initialize(self, initial_config: dict):
         self.logger.debug("initializing")
         self.configuration = self._clean_configuration(initial_config)
+        # include the data port in the configuration
+        self.configuration['zmqPushPull_port'] = self.data_port
         self.socket.send_string("initialize", zmq.SNDMORE)
         config_string = yaml.dump(self.configuration)
         self.logger.debug("sending config:\n" + config_string)

@@ -93,7 +93,7 @@ class DAQCoordResponse():
         if type == 'data' and not isinstance(content, bytes):
             raise DAQError('The data needs to be of type bytes')
 
-    def serialize(self):
+    def serialize(self, logger):
         if self.type == 'error':
             if self.content is None:
                 raise DAQError('daq error response was attempted but'
@@ -105,7 +105,7 @@ class DAQCoordResponse():
             if self.content is None:
                 raise DAQError('No data provided to the daq response')
             else:
-                logging.debug(f'binary Data is {len(self.content)} bytes long')
+                logger.debug(f'binary Data is {len(self.content)} bytes long')
                 return bson.encode(
                         {'type': 'data',
                          'content': bson.Binary(self.content, subtype=0)})
@@ -116,10 +116,10 @@ class DAQCoordResponse():
             return bson.encode({'type': 'ack', 'content': None})
 
     @staticmethod
-    def parse(message: bytes):
+    def parse(message: bytes, logger):
         rsp_dict = bson.decode(message)
         if rsp_dict['type'] == 'data':
-            logging.debug(f'Received {len[rsp_dict["content"]]} bytes of data')
+            logger.debug(f'Received {len[rsp_dict["content"]]} bytes of data')
         valid_message = DAQCoordResponse.schema.validate(rsp_dict)
         return DAQCoordResponse(type=valid_message['type'],
                                 content=valid_message['content'])
@@ -220,11 +220,13 @@ class DAQCoordClient():
 
 class DAQCoordinator():
 
-    def __init__(self, network_config):
+    def __init__(self, network_config, capture_data):
+        self.capture_data = capture_data
         self.network_config = network_config
         self.logger = logging.getLogger('daq_coordinator')
         self.lock = None
         self.initialized = False
+        self.run_counter = 0
         self.measurement_data_path = Path('/tmp/measurement_data.raw')
         self.logger.info('creating ZMQ context and socket for Coordinator')
         self.io_context = zmq.Context()
@@ -261,7 +263,7 @@ class DAQCoordinator():
                     content=f"Parsing of the daq_command "
                             f"{daq_command.command} failed with "
                             f"the error: {e}")
-                self.command_socket.send(daq_response.serialize())
+                self.command_socket.send(daq_response.serialize(self.logger))
                 self.lock = None
                 continue
 
@@ -278,7 +280,7 @@ class DAQCoordinator():
                             'DAQ-System is locked, sending empty response')
                     daq_response = DAQCoordResponse(type='lock',
                                                     content=None)
-                self.command_socket.send(daq_response.serialize())
+                self.command_socket.send(daq_response.serialize(self.logger))
                 continue
 
             # all messages beyond this point need a locking token to work
@@ -290,7 +292,7 @@ class DAQCoordinator():
                         f'Lock in the message does not match {self.lock}'
                         'responing with access denied')
                 daq_response = DAQCoordResponse(type='access denied')
-                self.command_socket.send(daq_response.serialize())
+                self.command_socket.send(daq_response.serialize(self.logger))
                 continue
 
             if command == 'release lock':
@@ -299,11 +301,12 @@ class DAQCoordinator():
                         content=None)
                 self.lock = None
                 self.logger.info('releasing lock')
-                self.command_socket.send(daq_response.serialize())
+                self.command_socket.send(daq_response.serialize(self.logger))
                 if self.initialized:
                     self.logger.info('Deinitializing DAQ system')
                     self.daq_system.tear_down_data_taking_context()
                     self.initialized = False
+                    self.run_counter = 0
                 continue
 
             if command == 'initialize':
@@ -329,7 +332,8 @@ class DAQCoordinator():
                             type='error',
                             content=error_msg
                             )
-                    self.command_socket.send(daq_response.serialize())
+                    self.command_socket.send(
+                            daq_response.serialize(self.logger))
                     continue
                 try:
                     initial_target_config = config['target']
@@ -353,7 +357,8 @@ class DAQCoordinator():
                                 type='error',
                                 content=error_msg
                                 )
-                        self.command_socket.send(daq_response.serialize())
+                        self.command_socket.send(
+                                daq_response.serialize(self.logger))
                         continue
                 else:
                     self.logger.debug('No target config found, '
@@ -361,7 +366,7 @@ class DAQCoordinator():
                 self.logger.info('DAQ-System and target initialized')
                 response = DAQCoordResponse(type='ack')
                 self.initialized = True
-                self.command_socket.send(response.serialize())
+                self.command_socket.send(response.serialize(self.logger))
                 continue
 
             if command == 'measure':
@@ -373,7 +378,8 @@ class DAQCoordinator():
                             content='The daq coordinator must be initialized'
                                     ' before measurements can be taken'
                             )
-                    self.command_socket.send(daq_response.serialize())
+                    self.command_socket.send(
+                            daq_response.serialize(self.logger))
                     continue
                 config = daq_command.config
                 self.logger.debug(
@@ -398,7 +404,8 @@ class DAQCoordinator():
                                 type='error',
                                 content=error_msg
                                 )
-                        self.command_socket.send(daq_response.serialize())
+                        self.command_socket.send(
+                                daq_response.serialize(self.logger))
                         continue
                 else:
                     self.logger.debug('No target config found, '
@@ -419,7 +426,8 @@ class DAQCoordinator():
                             type='error',
                             content=error_msg
                             )
-                    self.command_socket.send(daq_response.serialize())
+                    self.command_socket.send(
+                            daq_response.serialize(self.logger))
                     continue
                 with open(self.measurement_data_path, 'rb') as data_file:
                     self.logger.info('Sending Acquired data to clinet')
@@ -427,7 +435,14 @@ class DAQCoordinator():
                         type='data',
                         content=data_file.read()
                     )
-                    self.command_socket.send(daq_response.serialize())
+                    if self.capture_data:
+                        with open(f'run_{self.run_counter}_data.raw', 'wb+') \
+                                as lrf:
+                            lrf.write(daq_response.content)
+                    self.run_counter += 1
+                    self.command_socket.send(
+                            daq_response.serialize(self.logger))
+
                 continue
 
             if command == 'shutdown':
@@ -459,7 +474,8 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.option('--client_output', default=None,
               help='file to place the output of the client into, by default'
                    ' the output of the daq-client is not captured')
-def main(netcfg, log, loglevel, client_output):
+@click.option('--capture_data/--dont_capture_data', default=False)
+def main(netcfg, log, loglevel, client_output, capture_data):
     if client_output is not None:
         client_output = Path(client_output)
     if log is not None:
@@ -494,7 +510,7 @@ def main(netcfg, log, loglevel, client_output):
     client_process = sp.Popen(
             [daq_client_path, '-p', str(netcfg['client']['port'])],
             stdout=client_process_out)
-    daq_coordinator = DAQCoordinator(netcfg)
+    daq_coordinator = DAQCoordinator(netcfg, capture_data)
     logging.info('DAQ-Coordinator initialized')
     try:
         daq_coordinator.run()
