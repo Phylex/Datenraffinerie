@@ -119,7 +119,7 @@ class DAQCoordResponse():
     def parse(message: bytes, logger):
         rsp_dict = bson.decode(message)
         if rsp_dict['type'] == 'data':
-            logger.debug(f'Received {len[rsp_dict["content"]]} bytes of data')
+            logger.debug(f'Received {len(rsp_dict["content"])} bytes of data')
         valid_message = DAQCoordResponse.schema.validate(rsp_dict)
         return DAQCoordResponse(type=valid_message['type'],
                                 content=valid_message['content'])
