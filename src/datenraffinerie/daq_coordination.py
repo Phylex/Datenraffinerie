@@ -149,7 +149,7 @@ class DAQCoordClient():
             self.logger.debug('attempting to aquire lock')
             message = DAQCoordCommand(command='acquire lock')
             self.socket.send(message.serialize())
-            response = DAQCoordResponse.parse(self.socket.recv())
+            response = DAQCoordResponse.parse(self.socket.recv(), self.logger)
             self.logger.debug(f'Received response: {response}')
             try_count -= 1
         self.logger.info('Acquired lock')
