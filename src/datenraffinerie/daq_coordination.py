@@ -49,14 +49,14 @@ class DAQCoordCommand():
         config = None
         if self.config is not None:
             config = yaml.dump(self.config)
-        return bson.dumps({'command': self.command,
-                           'locking_token': self.locking_token,
-                           'config': config})
+        return bson.encode({'command': self.command,
+                            'locking_token': self.locking_token,
+                            'config': config})
 
     @staticmethod
     def parse(message: bytes):
         try:
-            message_dict = bson.loads(message)
+            message_dict = bson.decode(message)
         except:
             raise DAQError('Unable to decode bson message')
         valid_message = DAQCoordCommand.schema.validate(message_dict)
@@ -99,21 +99,24 @@ class DAQCoordResponse():
                 raise DAQError('daq error response was attempted but'
                                'no error was given')
             else:
-                return bson.dumps({'type': 'error', 'content': self.content})
+                return bson.encode(
+                        {'type': 'error', 'content': self.content})
         if self.type == 'data':
             if self.content is None:
                 raise DAQError('No data provided to the daq response')
             else:
-                return bson.dumps({'type': 'data', 'content': self.content})
+                return bson.encode(
+                        {'type': 'data', 'content': bson.Binary(self.content)})
         if self.type == 'lock':
-            return bson.dumps({'type': 'lock', 'content': self.content})
+            return bson.encode(
+                    {'type': 'lock', 'content': str(self.content)})
         if self.type == 'ack':
-            return bson.dumps({'type': 'ack', 'content': None})
+            return bson.encode({'type': 'ack', 'content': None})
 
     @staticmethod
     def parse(message: bytes):
         try:
-            dict = bson.loads(message)
+            dict = bson.decode(message)
         except:
             raise DAQError('Unable to decode bson message')
         valid_message = DAQCoordResponse.schema.validate(dict)
@@ -410,7 +413,7 @@ class DAQCoordinator():
                             f'{err.args[0]} from the DAQ-system')
                     error_msg = \
                         'During the Data taking the DAQ system encountered' \
-                        f' an error: ocurred an error ocurred: {err.args[0]}'
+                        f' an error: {err.args[0]}'
                     daq_response = DAQCoordResponse(
                             type='error',
                             content=error_msg

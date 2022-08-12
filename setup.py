@@ -29,6 +29,6 @@ setup(
         'schema',
         'hgcroc-configuration-client',
         'progress',
-        'bson',
+        'pymongo',
     ]
 )
