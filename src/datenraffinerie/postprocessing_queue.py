@@ -145,12 +145,15 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
                                 case_sensitive=False))
 @click.option('--root/--no-root', default=False,
               help='keep the rootfile generated as intermediary')
-@click.option('--parallel_tasks', default=2, type=int,
+@click.option('--unpack_tasks', default=1, type=int,
+              help='number of unpackers/frackers to run in parallel')
+@click.option('--fracker_tasks', default=3, type=int,
               help='number of unpackers/frackers to run in parallel')
 @click.option('--compression', '-c', default=3, type=int,
               help='Set the compression for the hdf file, 0 = no compression'
                    ' 9 = best compression')
-def main(output_dir, log, loglevel, root, parallel_tasks, compression):
+def main(output_dir, log, loglevel, root, unpack_tasks,
+         fracker_tasks, compression):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -179,7 +182,7 @@ def main(output_dir, log, loglevel, root, parallel_tasks, compression):
             args=(unpack_queue,
                   frack_queue,
                   stop_threads,
-                  max(1, int(parallel_tasks/2)),
+                  max(1, unpack_tasks),
                   logging.getLogger('unpack-coordinator'),
                   raw_data
                   )
@@ -188,7 +191,7 @@ def main(output_dir, log, loglevel, root, parallel_tasks, compression):
             target=frack_data,
             args=(frack_queue,
                   stop_threads,
-                  max(1, int(parallel_tasks/2)),
+                  max(1, fracker_tasks),
                   logging.getLogger('fracking-coordinator'),
                   raw_data,
                   root,
