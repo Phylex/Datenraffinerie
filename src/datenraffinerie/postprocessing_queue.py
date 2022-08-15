@@ -108,14 +108,16 @@ def frack_data(frack_data_queue: queue.Queue,
                 continue
             del_indices.append(i)
             if returncode == 0:
-                logger.info(f'created root file from {raw_path}')
+                logger.info(
+                    f'created hdf file from {os.path.basename(unpack_path)}')
 
             if returncode > 0:
-                logger.error(f'failed to created root file from {raw_path}, '
-                             f'unpacker returned error code {returncode}')
+                logger.error(
+                    f'failed to created root file from {os.path.basename(unpack_path)}, '
+                    f'unpacker returned error code {returncode}')
                 os.remove(raw_path)
             if returncode < 0:
-                logger.error(f'failed to created root file from {raw_path}, '
+                logger.error(f'failed to created hdf file from {os.path.basename(raw_path)}, '
                              'unpacker got terminated')
                 os.remove(raw_path)
             if not keep_root:
