@@ -25,9 +25,11 @@ def unpack_data(raw_data_queue: queue.Queue,
             try:
                 raw_path, unpack_path, fracked_path, full_config_path = \
                         raw_data_queue.get(block=False)
-                logger.info(f'Received data to unpack, {raw_path}')
+                logger.info(f'Received data to unpack, {os.path.basename(raw_path)}')
                 running_tasks.append((
-                        anu.start_unpack(raw_path, unpack_path,
+                        anu.start_unpack(raw_path,
+                                         unpack_path,
+                                         logging.getLogger(f'unpack-{os.path.basename(raw_path)}'),
                                          raw_data=raw_data
                                          ),
                         raw_path,
@@ -46,7 +48,8 @@ def unpack_data(raw_data_queue: queue.Queue,
                 continue
             del_indices.append(i)
             if returncode == 0:
-                logger.info(f'created root file from {raw_path}')
+                logger.info(f'created root file from {os.path.basename(raw_path)}')
+                logger.info(f'putting fracker task on the queue')
                 frack_data_queue.put(
                         (raw_path, unpack_path, fracked_path, full_config_path)
                 )
@@ -79,7 +82,7 @@ def frack_data(frack_data_queue: queue.Queue,
             try:
                 raw_path, unpack_path, fracked_path, full_config_path = \
                         frack_data_queue.get(block=False)
-                logger.info(f'Received data to unpack, {raw_path}')
+                logger.info(f'Received data to frack, {os.path.basename(unpack_path)}')
                 running_tasks.append((
                         anu.start_compiled_fracker(
                             unpack_path,
@@ -202,14 +205,14 @@ def main(output_dir, log, loglevel, root, parallel_tasks, compression):
     run_raw_data_paths = glob.glob(
             str(output_dir.absolute()) + '/run_*_data.raw')
     full_run_config_dir = os.path.dirname(run_config_paths[0])
+    run_config_paths = sorted(run_config_paths, key=lambda x: int(x.split('_')[-2]))
+    run_raw_data_paths = sorted(run_raw_data_paths, key=lambda x: int(x.split('_')[-2]))
     run_root_data_paths = list(
             map(lambda x: os.path.splitext(x)[0] + '.root',
                 run_raw_data_paths))
     run_hdf_data_paths = list(
             map(lambda x: os.path.splitext(x)[0] + '.h5',
                 run_raw_data_paths))
-    sorted(run_config_paths, key=lambda x: int(x.split('_')[-2]))
-    sorted(run_raw_data_paths, key=lambda x: int(x.split('_')[-2]))
     if procedure['diff']:
         initial_config_file = output_dir / 'initial_state_config.yaml'
         with open(initial_config_file, 'r') as icf:
@@ -233,7 +236,7 @@ def main(output_dir, log, loglevel, root, parallel_tasks, compression):
                     (Path(raw_data_path),
                      Path(root_data_path),
                      Path(hdf_data_path),
-                     Path(run_config_path)))
+                     Path(full_run_config_path)))
     else:
         for run_config_path, raw_data_path, root_data_path, hdf_data_path in \
                 zip(run_config_paths, run_raw_data_paths,

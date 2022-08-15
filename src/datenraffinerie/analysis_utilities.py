@@ -178,7 +178,7 @@ def start_compiled_fracker(rootfile: Path,
     fracker_command_tokens += [str(col) for col in columns]
     fracker_command_tokens.append('-p')
     fracker_command_tokens.append(str(compression))
-    logger.info('Ran fracker with command: ' + ''.join(fracker_command_tokens))
+    logger.info('Ran fracker with command: ' + ' '.join(fracker_command_tokens))
     return sp.Popen(fracker_command_tokens, stdout=sp.PIPE)
 
 
@@ -212,7 +212,10 @@ def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False)
     return os.system(full_unpack_command)
 
 
-def start_unpack(raw_path, unpacked_path, raw_data: bool = False):
+def start_unpack(raw_path,
+                 unpacked_path,
+                 logger: logging.Logger,
+                 raw_data: bool = False):
     unpack_command_path = shutil.which('unpack')
     if unpack_command_path is None:
         raise FileNotFoundError('Unable to find the unpack command')
@@ -226,6 +229,7 @@ def start_unpack(raw_path, unpacked_path, raw_data: bool = False):
     if not raw_data:
         unpack_command_tokens.append('-t')
         unpack_command_tokens.append('unpacked')
+    logger.info('starting unpack command: ' + ' '.join(unpack_command_tokens))
     return sp.Popen(unpack_command_tokens, stdout=sp.PIPE)
 
 

@@ -32,7 +32,10 @@ def unpack_in_parallel(waiting_tasks, parallel_tasks,
             else:
                 raw_data = False
             running_tasks.append((
-                anu.start_unpack(raw_path, unpacked_path, raw_data=raw_data),
+                anu.start_unpack(raw_path,
+                                 unpacked_path,
+                                 logging.getLogger(f'unpack-{raw_path'),
+                                 raw_data=raw_data),
                 raw_path,
                 unpacked_path,
                 formatted_path,
