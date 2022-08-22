@@ -11,6 +11,8 @@ import queue
 import tqdm
 from . import config_utilities as cfu
 from . import dict_utils as dctu
+from itertools import tee
+from time import sleep
 
 
 @click.command()
@@ -34,6 +36,7 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
                             procedure_name=procedure,
                             calibration=None,
                             diff=diff)
+        run_configs_1, run_configs_2 = tee(run_configs)
     except ValueError as err:
         print(f"The procedure with name: {err.args[1]} could not be found,")
         print("Available procedures are:")
@@ -75,7 +78,7 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
     config_gen_thread = threading.Thread(
             target=pipelined_generate_run_params,
             args=(output_dir,
-                  run_configs,
+                  run_configs_1,
                   run_param_queue,
                   param_gen_progress_queue,
                   run_config_generation_done,
@@ -85,7 +88,7 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
     full_config_gen_proc = mp.Process(
             target=generate_full_configs,
             args=(output_dir,
-                  run_configs,
+                  run_configs_2,
                   full_config,
                   num_digits,
                   full_configs_generated,
@@ -123,16 +126,19 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
             full_progress_bar.update(1)
         except queue.Empty:
             pass
+        sleep(.05)
+    run_progress_bar.close()
+    full_progress_bar.close()
     config_gen_thread.join()
     full_config_gen_proc.join()
 
 
 def generate_full_configs(output_dir: Path,
-                          run_configs: list,
+                          run_configs: mp.Queue,
                           full_init_config: dict,
                           num_digits: int,
-                          generated_configs_queue: mp.Queue,
-                          config_generation_done: mp.Event):
+                          generated_configs_full_queue: mp.Queue,
+                          config_generation_full_done: mp.Event):
     full_config = full_init_config
     for i, config in enumerate(run_configs):
         dctu.update_dict(full_config, config, in_place=True)
@@ -140,8 +146,8 @@ def generate_full_configs(output_dir: Path,
                 i, width=num_digits)
         with open(output_dir / full_run_conf_file_name, 'w+') as frcf:
             frcf.write(yaml.safe_dump(full_config))
-        generated_configs_queue.put(output_dir / full_run_conf_file_name)
-    config_generation_done.set()
+        generated_configs_full_queue.put(output_dir / full_run_conf_file_name)
+    config_generation_full_done.set()
 
 
 def pipelined_generate_run_params(output_dir: Path,

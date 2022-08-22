@@ -8,6 +8,7 @@ from pathlib import Path
 import glob
 import click
 from . import analysis_utilities as anu
+from time import sleep
 
 
 def unpack_data(raw_data_queue: queue.Queue,
@@ -70,6 +71,7 @@ def unpack_data(raw_data_queue: queue.Queue,
             raw_data_queue.task_done()
         running_tasks = list(filter(lambda x: running_tasks.index(x)
                                     not in del_indices, running_tasks))
+        sleep(.05)
     unpacking_done.set()
 
 
@@ -138,6 +140,7 @@ def frack_data(frack_data_queue: queue.Queue,
             frack_data_queue.task_done()
         running_tasks = list(filter(lambda x: running_tasks.index(x)
                                     not in del_indices, running_tasks))
+        sleep(.05)
     fracking_done.set()
 
 
