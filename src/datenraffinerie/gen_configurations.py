@@ -138,6 +138,8 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
         except queue.Empty:
             pass
         sleep(.05)
+    run_progress_bar.close()
+    full_progress_bar.close()
     config_gen_thread.join()
     full_config_gen_proc.join()
 
