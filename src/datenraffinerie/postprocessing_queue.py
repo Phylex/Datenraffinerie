@@ -25,13 +25,16 @@ def unpack_data(raw_data_queue: queue.Queue,
             try:
                 raw_path, unpack_path, fracked_path, full_config_path = \
                         raw_data_queue.get(block=False)
-                logger.info(f'Received data to unpack, {os.path.basename(raw_path)}')
+                logger.info('Received data to unpack,'
+                            f'{os.path.basename(raw_path)}')
                 running_tasks.append((
-                        anu.start_unpack(raw_path,
-                                         unpack_path,
-                                         logging.getLogger(f'unpack-{os.path.basename(raw_path)}'),
-                                         raw_data=raw_data
-                                         ),
+                        anu.start_unpack(
+                            raw_path,
+                            unpack_path,
+                            logging.getLogger(
+                                f'unpack-{os.path.basename(raw_path)}'),
+                            raw_data=raw_data
+                            ),
                         raw_path,
                         unpack_path,
                         fracked_path,
@@ -48,8 +51,9 @@ def unpack_data(raw_data_queue: queue.Queue,
                 continue
             del_indices.append(i)
             if returncode == 0:
-                logger.info(f'created root file from {os.path.basename(raw_path)}')
-                logger.info(f'putting fracker task on the queue')
+                logger.info('created root file from '
+                            f'{os.path.basename(raw_path)}')
+                logger.info('putting fracker task on the queue')
                 frack_data_queue.put(
                         (raw_path, unpack_path, fracked_path, full_config_path)
                 )
@@ -64,7 +68,6 @@ def unpack_data(raw_data_queue: queue.Queue,
             raw_data_queue.task_done()
         running_tasks = list(filter(lambda x: running_tasks.index(x)
                                     not in del_indices, running_tasks))
-        sleep(.2)
 
 
 def frack_data(frack_data_queue: queue.Queue,
@@ -82,7 +85,8 @@ def frack_data(frack_data_queue: queue.Queue,
             try:
                 raw_path, unpack_path, fracked_path, full_config_path = \
                         frack_data_queue.get(block=False)
-                logger.info(f'Received data to frack, {os.path.basename(unpack_path)}')
+                logger.info('Received data to frack, '
+                            f'{os.path.basename(unpack_path)}')
                 running_tasks.append((
                         anu.start_compiled_fracker(
                             unpack_path,
@@ -113,19 +117,21 @@ def frack_data(frack_data_queue: queue.Queue,
 
             if returncode > 0:
                 logger.error(
-                    f'failed to created root file from {os.path.basename(unpack_path)}, '
+                    'failed to created root file from '
+                    f'{os.path.basename(unpack_path)}, '
                     f'unpacker returned error code {returncode}')
                 os.remove(raw_path)
             if returncode < 0:
-                logger.error(f'failed to created hdf file from {os.path.basename(raw_path)}, '
+                logger.error('failed to created hdf file from '
+                             f'{os.path.basename(raw_path)}, '
                              'unpacker got terminated')
                 os.remove(raw_path)
             if not keep_root:
                 os.remove(unpack_path)
+            os.remove(full_config_path)
             frack_data_queue.task_done()
         running_tasks = list(filter(lambda x: running_tasks.index(x)
                                     not in del_indices, running_tasks))
-        sleep(.2)
 
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
@@ -210,8 +216,10 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
     run_raw_data_paths = glob.glob(
             str(output_dir.absolute()) + '/run_*_data.raw')
     full_run_config_dir = os.path.dirname(run_config_paths[0])
-    run_config_paths = sorted(run_config_paths, key=lambda x: int(x.split('_')[-2]))
-    run_raw_data_paths = sorted(run_raw_data_paths, key=lambda x: int(x.split('_')[-2]))
+    run_config_paths = sorted(
+            run_config_paths, key=lambda x: int(x.split('_')[-2]))
+    run_raw_data_paths = sorted(
+            run_raw_data_paths, key=lambda x: int(x.split('_')[-2]))
     run_root_data_paths = list(
             map(lambda x: os.path.splitext(x)[0] + '.root',
                 run_raw_data_paths))
@@ -251,7 +259,6 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
                      Path(root_data_path),
                      Path(hdf_data_path),
                      Path(run_config_path)))
-    sleep(10)
     stop_threads.set()
     unpack_thread.join()
     frack_thread.join()
