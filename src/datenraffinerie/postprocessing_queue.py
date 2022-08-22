@@ -4,7 +4,6 @@ import logging
 import os
 import sys
 import yaml
-from time import sleep
 from pathlib import Path
 import glob
 import click
@@ -13,13 +12,15 @@ from . import analysis_utilities as anu
 
 
 def unpack_data(raw_data_queue: queue.Queue,
-                frack_data_queue: queue.Queue,
-                stop_event: threading.Event,
+                unpack_reporting_queue: queue.Queue,
+                root_data_queue: queue.Queue,
+                data_taking_done: threading.Event,
+                unpacking_done: threading.Event,
                 max_parallel_unpackers: int,
-                logger: logging.Logger,
                 raw_data: bool):
+    logger = logging.getLogger('unpack-data-thread')
     running_tasks = []
-    while not stop_event.is_set() or not raw_data_queue.empty() \
+    while not data_taking_done.is_set() or not raw_data_queue.empty() \
             or not len(running_tasks) == 0:
         if len(running_tasks) < max_parallel_unpackers:
             try:
@@ -49,12 +50,13 @@ def unpack_data(raw_data_queue: queue.Queue,
             returncode = task.poll()
             if returncode is None:
                 continue
+            unpack_reporting_queue.put(1)
             del_indices.append(i)
             if returncode == 0:
                 logger.info('created root file from '
                             f'{os.path.basename(raw_path)}')
                 logger.info('putting fracker task on the queue')
-                frack_data_queue.put(
+                root_data_queue.put(
                         (raw_path, unpack_path, fracked_path, full_config_path)
                 )
             if returncode > 0:
@@ -68,18 +70,21 @@ def unpack_data(raw_data_queue: queue.Queue,
             raw_data_queue.task_done()
         running_tasks = list(filter(lambda x: running_tasks.index(x)
                                     not in del_indices, running_tasks))
+    unpacking_done.set()
 
 
 def frack_data(frack_data_queue: queue.Queue,
-               stop_event: threading.Event,
+               frack_report_queue: queue.Queue,
+               previous_task_complete: threading.Event,
+               fracking_done: threading.Event,
                max_parallel_frackers: int,
-               logger: logging.Logger,
                raw_data: bool,
                keep_root: bool,
                compression: int,
                columns: list):
     running_tasks = []
-    while not stop_event.is_set() or not frack_data_queue.empty() \
+    logger = logging.getLogger('data-fracking-thread')
+    while not previous_task_complete.is_set() or not frack_data_queue.empty() \
             or not len(running_tasks) == 0:
         if len(running_tasks) < max_parallel_frackers:
             try:
@@ -110,6 +115,7 @@ def frack_data(frack_data_queue: queue.Queue,
             returncode = task.poll()
             if returncode is None:
                 continue
+            frack_report_queue.put(1)
             del_indices.append(i)
             if returncode == 0:
                 logger.info(
@@ -132,6 +138,39 @@ def frack_data(frack_data_queue: queue.Queue,
             frack_data_queue.task_done()
         running_tasks = list(filter(lambda x: running_tasks.index(x)
                                     not in del_indices, running_tasks))
+    fracking_done.set()
+
+
+def synchronize_with_config_generation(
+        unpack_out_queue: queue.Queue,
+        synced_with_config_generation: queue.Queue,
+        generated_full_configurations: list,
+        previous_task_complete: threading.Event,
+        current_task_complete: threading.Event):
+    tasks_waiting_for_config = []
+    while not previous_task_complete.is_set() \
+            and not unpack_out_queue.empty() \
+            and not len(tasks_waiting_for_config) == 0:
+        try:
+            task = unpack_out_queue.get(block=False)
+            raw_path, unpack_path, fracked_path, full_config_path = task
+            if full_config_path in generated_full_configurations:
+                synced_with_config_generation.put(task)
+            else:
+                tasks_waiting_for_config.append(task)
+        except queue.Empty:
+            pass
+        del_indices = []
+        for i, task in enumerate(tasks_waiting_for_config):
+            raw_path, unpack_path, fracked_path, full_config_path = task
+            if full_config_path in generated_full_configurations:
+                synced_with_config_generation.put(task)
+                del_indices.append(i)
+            else:
+                tasks_waiting_for_config.append(task)
+        tasks_waiting_for_config = list(
+                filter(lambda x: tasks_waiting_for_config.index(x)
+                       not in del_indices, tasks_waiting_for_config))
 
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
@@ -182,31 +221,40 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
         raw_data = True if mode == 'full' else False
 
     # prepare the threading environment
-    unpack_queue = queue.Queue()
-    frack_queue = queue.Queue()
-    stop_threads = threading.Event()
+    raw_data_queue = queue.Queue()
+    root_data_queue = queue.Queue()
+    unpack_reporting_queue = queue.Queue()
+    fracker_reporting_queue = queue.Queu()
+    data_taking_done = threading.Event()
+    unpack_done = threading.Event()
+    fracking_done = threading.Event()
+
+    # initilize the threads
     unpack_thread = threading.Thread(
             target=unpack_data,
-            args=(unpack_queue,
-                  frack_queue,
-                  stop_threads,
+            args=(raw_data_queue,
+                  unpack_reporting_queue,
+                  root_data_queue,
+                  data_taking_done,
+                  unpack_done,
                   max(1, unpack_tasks),
-                  logging.getLogger('unpack-coordinator'),
                   raw_data
                   )
             )
     frack_thread = threading.Thread(
             target=frack_data,
-            args=(frack_queue,
-                  stop_threads,
+            args=(root_data_queue,
+                  fracker_reporting_queue,
+                  unpack_done,
+                  fracking_done,
                   max(1, fracker_tasks),
-                  logging.getLogger('fracking-coordinator'),
                   raw_data,
                   root,
                   compression,
-                  data_columns
+                  data_columns,
                   )
             )
+
     unpack_thread.start()
     frack_thread.start()
 
@@ -245,7 +293,7 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
                 '_full.yaml'
             with open(full_run_config_path, 'w+') as frcf:
                 frcf.write(yaml.dump(full_config))
-            unpack_queue.put(
+            raw_data_queue.put(
                     (Path(raw_data_path),
                      Path(root_data_path),
                      Path(hdf_data_path),
@@ -254,11 +302,10 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
         for run_config_path, raw_data_path, root_data_path, hdf_data_path in \
                 zip(run_config_paths, run_raw_data_paths,
                     run_root_data_paths, run_hdf_data_paths):
-            unpack_queue.put(
+            raw_data_queue.put(
                     (Path(raw_data_path),
                      Path(root_data_path),
                      Path(hdf_data_path),
                      Path(run_config_path)))
-    stop_threads.set()
     unpack_thread.join()
     frack_thread.join()
