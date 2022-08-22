@@ -7,7 +7,6 @@ import yaml
 from pathlib import Path
 import glob
 import click
-from . import dict_utils as dctu
 from . import analysis_utilities as anu
 
 
@@ -50,6 +49,7 @@ def unpack_data(raw_data_queue: queue.Queue,
             returncode = task.poll()
             if returncode is None:
                 continue
+            logger.debug(f'currently running tasks {running_tasks}')
             unpack_reporting_queue.put(1)
             del_indices.append(i)
             if returncode == 0:
@@ -115,15 +115,16 @@ def frack_data(frack_data_queue: queue.Queue,
             returncode = task.poll()
             if returncode is None:
                 continue
+            logger.debug(f'currently running tasks {running_tasks}')
             frack_report_queue.put(1)
             del_indices.append(i)
             if returncode == 0:
                 logger.info(
-                    f'created hdf file from {os.path.basename(unpack_path)}')
+                    f'created {os.path.basename(fracked_path)}')
 
             if returncode > 0:
                 logger.error(
-                    'failed to created root file from '
+                    'failed to created hdf file from '
                     f'{os.path.basename(unpack_path)}, '
                     f'unpacker returned error code {returncode}')
                 os.remove(raw_path)
@@ -134,7 +135,6 @@ def frack_data(frack_data_queue: queue.Queue,
                 os.remove(raw_path)
             if not keep_root:
                 os.remove(unpack_path)
-            os.remove(full_config_path)
             frack_data_queue.task_done()
         running_tasks = list(filter(lambda x: running_tasks.index(x)
                                     not in del_indices, running_tasks))
@@ -224,7 +224,7 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
     raw_data_queue = queue.Queue()
     root_data_queue = queue.Queue()
     unpack_reporting_queue = queue.Queue()
-    fracker_reporting_queue = queue.Queu()
+    fracker_reporting_queue = queue.Queue()
     data_taking_done = threading.Event()
     unpack_done = threading.Event()
     fracking_done = threading.Event()
@@ -263,7 +263,6 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
             str(output_dir.absolute()) + '/run_*_config.yaml')
     run_raw_data_paths = glob.glob(
             str(output_dir.absolute()) + '/run_*_data.raw')
-    full_run_config_dir = os.path.dirname(run_config_paths[0])
     run_config_paths = sorted(
             run_config_paths, key=lambda x: int(x.split('_')[-2]))
     run_raw_data_paths = sorted(
@@ -274,38 +273,24 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
     run_hdf_data_paths = list(
             map(lambda x: os.path.splitext(x)[0] + '.h5',
                 run_raw_data_paths))
-    if procedure['diff']:
-        initial_config_file = output_dir / 'initial_state_config.yaml'
-        with open(initial_config_file, 'r') as icf:
-            initial_config = yaml.safe_load(icf.read())
-        default_config_file = output_dir / 'default_config.yaml'
-        with open(default_config_file, 'r') as dfc:
-            default_config = yaml.safe_load(dfc.read())
-        full_config = dctu.update_dict(default_config, initial_config)
-        for run_config_path, raw_data_path, root_data_path, hdf_data_path in \
-                zip(run_config_paths, run_raw_data_paths,
-                    run_root_data_paths, run_hdf_data_paths):
-            with open(run_config_path, 'r') as rcfgf:
-                run_config_patch = yaml.safe_load(rcfgf.read())
-            dctu.update_dict(full_config, run_config_patch, in_place=True)
-            full_run_config_path = full_run_config_dir + '/' + \
-                os.path.splitext(os.path.basename(run_config_path))[0] + \
-                '_full.yaml'
-            with open(full_run_config_path, 'w+') as frcf:
-                frcf.write(yaml.dump(full_config))
-            raw_data_queue.put(
-                    (Path(raw_data_path),
-                     Path(root_data_path),
-                     Path(hdf_data_path),
-                     Path(full_run_config_path)))
-    else:
-        for run_config_path, raw_data_path, root_data_path, hdf_data_path in \
-                zip(run_config_paths, run_raw_data_paths,
-                    run_root_data_paths, run_hdf_data_paths):
-            raw_data_queue.put(
-                    (Path(raw_data_path),
-                     Path(root_data_path),
-                     Path(hdf_data_path),
-                     Path(run_config_path)))
+    full_config_paths = list(
+            map(lambda x: Path(os.path.splitext(x)[0] + '_full.yaml'),
+                run_config_paths))
+    for full_config_path, raw_data_path, root_data_path, hdf_data_path in \
+            zip(full_config_paths, run_raw_data_paths,
+                run_root_data_paths, run_hdf_data_paths):
+        if not full_config_path.exists():
+            print(f"Full config file {full_config_path} not found")
+            data_taking_done.set()
+            unpack_done.set()
+            unpack_thread.join()
+            frack_thread.join()
+            sys.exit(1)
+        raw_data_queue.put(
+                (Path(raw_data_path),
+                 Path(root_data_path),
+                 Path(hdf_data_path),
+                 Path(full_config_path)))
+    data_taking_done.set()
     unpack_thread.join()
     frack_thread.join()
