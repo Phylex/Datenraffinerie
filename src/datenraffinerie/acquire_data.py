@@ -5,6 +5,9 @@ import click
 from pathlib import Path
 import logging
 import os
+import queue
+import threading
+import math
 from progress.bar import Bar
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
@@ -99,5 +102,43 @@ def acquire_data(output_directory, log, loglevel, keep):
     bar.finish()
 
 
-if __name__ == "__main__":
-    acquire_data()
+def pipelined_acquire_data(configurations: queue.Queue,
+                           data_acquisition_progress: queue.Queue,
+                           acquired_data: queue.Queue,
+                           config_generation_done: threading.Event,
+                           network_configuration: dict,
+                           initial_config: dict,
+                           run_count: int,
+                           keep: bool):
+    # info needed for the generation of the filenames
+    num_digits = math.ceil(math.log(run_count, 10))
+    logger = logging.getLogger('data-acquisitor')
+    logger.info('Initializing DAQ system')
+    daq_system = DAQCoordClient(network_configuration)
+    daq_system.initialize(initial_config)
+    i = 0
+    while not config_generation_done.is_set() or not configurations.empty():
+        run_config, full_run_config_path = configurations.get()
+        run_file_name = \
+            'run_{0:0>{width}}_data.raw'.format(i, width=num_digits)
+        run_file_path = output_dir / run_file_name
+        root_file_name = \
+            'run_{0:0>{width}}_data.root'.format(i, width=num_digits)
+        hdf_file_name = \
+            'run_{0:0>{width}}_data.h5'.format(i, width=num_digits)
+        if not keep or (keep and not run_file_path.exists()):
+            logger.info(f'gathering Data for run {i}')
+            data = daq_system.measure(run_config)
+            with open(output_dir / run_file_name, 'wb+') as rdf:
+                rdf.write(data)
+        else:
+            logger.info('found existing run data, skipping')
+        acquired_data.put(
+            (
+                run_file_path,
+                output_dir / root_file_name,
+                output_dir / hdf_file_name,
+                full_run_config_path,
+                )
+        )
+        data_acquisition_progress.put(i)
