@@ -6,6 +6,7 @@ import shutil
 import glob
 from pathlib import Path
 import threading
+import multiprocessing as mp
 import queue
 import tqdm
 from . import config_utilities as cfu
@@ -68,46 +69,87 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
     full_config = dctu.update_dict(system_default_config, system_init_config)
     run_param_queue = queue.Queue()
     param_gen_progress_queue = queue.Queue()
-    config_generation_done = threading.Event()
+    run_config_generation_done = threading.Event()
+    full_config_generation_done = mp.Event()
+    full_configs_generated = mp.Queue()
     config_gen_thread = threading.Thread(
             target=pipelined_generate_run_params,
             args=(output_dir,
                   run_configs,
-                  full_config,
                   run_param_queue,
                   param_gen_progress_queue,
-                  config_generation_done,
+                  run_config_generation_done,
                   num_digits
                   )
             )
+    full_config_gen_proc = mp.Process(
+            target=generate_full_configs,
+            args=(output_dir,
+                  run_configs,
+                  full_config,
+                  num_digits,
+                  full_configs_generated,
+                  full_config_generation_done
+                  )
+            )
     config_gen_thread.start()
-    progress_bar = tqdm.tqdm(
+    full_config_gen_proc.start()
+    run_progress_bar = tqdm.tqdm(
             total=run_count,
+            position=1,
             desc='Generating run configurations',
             unit=' Configurations')
-    while not config_generation_done.is_set() \
+    full_progress_bar = tqdm.tqdm(
+            total=run_count,
+            position=2,
+            desc='Generating full config for fracker',
+            unit=' Configurations')
+    while not run_config_generation_done.is_set() \
             or not param_gen_progress_queue.empty() \
-            or not run_param_queue.empty():
+            or not run_param_queue.empty() \
+            or not full_config_generation_done.is_set()\
+            or not full_configs_generated.empty():
         try:
             _ = run_param_queue.get(block=False)
         except queue.Empty:
             pass
         try:
             _ = param_gen_progress_queue.get(block=False)
-            progress_bar.update(1)
+            run_progress_bar.update(1)
+        except queue.Empty:
+            pass
+        try:
+            _ = full_configs_generated.get(block=False)
+            full_progress_bar.update(1)
         except queue.Empty:
             pass
     config_gen_thread.join()
+    full_config_gen_proc.join()
+
+
+def generate_full_configs(output_dir: Path,
+                          run_configs: list,
+                          full_init_config: dict,
+                          num_digits: int,
+                          generated_configs_queue: mp.Queue,
+                          config_generation_done: mp.Event):
+    full_config = full_init_config
+    for i, config in enumerate(run_configs):
+        dctu.update_dict(full_config, config, in_place=True)
+        full_run_conf_file_name = 'run_{0:0>{width}}_config_full.yaml'.format(
+                i, width=num_digits)
+        with open(output_dir / full_run_conf_file_name, 'w+') as frcf:
+            frcf.write(yaml.safe_dump(full_config))
+        generated_configs_queue.put(output_dir / full_run_conf_file_name)
+    config_generation_done.set()
 
 
 def pipelined_generate_run_params(output_dir: Path,
                                   run_configs: list,
-                                  full_init_config: dict,
                                   config_queue: queue.Queue,
                                   config_gen_progress_queue: queue.Queue,
                                   config_generation_done: threading.Event,
                                   num_digits: int):
-    full_config = full_init_config
     for i, run_config in enumerate(run_configs):
         run_conf_file_name = \
                 'run_{0:0>{width}}_config.yaml'.format(i, width=num_digits)
@@ -124,11 +166,8 @@ def pipelined_generate_run_params(output_dir: Path,
         root_file_path = output_dir / root_file_name
         hdf_file_path = output_dir / hdf_file_name
         full_run_conf_path = output_dir / full_run_conf_file_name
-        dctu.update_dict(full_config, run_config, in_place=True)
         with open(run_conf_path, 'w+') as rcf:
             rcf.write(yaml.safe_dump(run_config))
-        with open(full_run_conf_path, 'w+') as frcf:
-            frcf.write(yaml.safe_dump(full_config))
         config_queue.put(
                 (run_config,
                  raw_file_path,
