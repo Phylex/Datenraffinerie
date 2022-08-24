@@ -300,12 +300,12 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
     unpack_progress_bar = tqdm.tqdm(
             total=run_count,
             position=1,
-            desc='Unpacking data',
+            desc='Unpacking data'.center(40, ' '),
             unit=' Runs')
     frack_progress_bar = tqdm.tqdm(
             total=run_count,
             position=2,
-            desc='fracking data',
+            desc='fracking data'.center(40, ' '),
             unit=' Runs')
     while not fracking_done.is_set():
         try:

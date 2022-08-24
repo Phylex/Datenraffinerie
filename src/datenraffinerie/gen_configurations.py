@@ -107,12 +107,12 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
     run_progress_bar = tqdm.tqdm(
             total=run_count,
             position=1,
-            desc='Generating run configurations',
+            desc='Generating run configurations'.center(40, ' '),
             unit=' Configurations')
     full_progress_bar = tqdm.tqdm(
             total=run_count,
             position=2,
-            desc='Generating full config for fracker',
+            desc='Generating full config for fracker'.center(40, ' '),
             unit=' Configurations')
     while not run_config_generation_done.is_set() \
             or not param_gen_progress_queue.empty() \
