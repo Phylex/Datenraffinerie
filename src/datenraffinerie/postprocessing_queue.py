@@ -314,7 +314,7 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
         except queue.Empty:
             pass
         try:
-            fracked_file = fracker_reporting_queue.get()
+            fracked_file = fracker_reporting_queue.get(block=False)
             frack_progress_bar.update(fracked_file)
         except queue.Empty:
             pass
