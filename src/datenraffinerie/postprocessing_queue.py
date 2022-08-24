@@ -6,6 +6,7 @@ import sys
 import yaml
 from pathlib import Path
 import glob
+import tqdm
 import click
 from . import analysis_utilities as anu
 from time import sleep
@@ -279,6 +280,7 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
     full_config_paths = list(
             map(lambda x: Path(os.path.splitext(x)[0] + '_full.yaml'),
                 run_config_paths))
+    run_count = len(run_config_paths)
     for full_config_path, raw_data_path, root_data_path, hdf_data_path in \
             zip(full_config_paths, run_raw_data_paths,
                 run_root_data_paths, run_hdf_data_paths):
@@ -295,5 +297,27 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
                  Path(hdf_data_path),
                  Path(full_config_path)))
     data_taking_done.set()
+    unpack_progress_bar = tqdm.tqdm(
+            total=run_count,
+            position=1,
+            desc='Unpacking data',
+            unit=' Runs')
+    frack_progress_bar = tqdm.tqdm(
+            total=run_count,
+            position=2,
+            desc='fracking data',
+            unit=' Runs')
+    while not fracking_done.is_set():
+        try:
+            unpacked_file = unpack_reporting_queue.get(block=False)
+            unpack_progress_bar.update(unpacked_file)
+        except queue.Empty:
+            pass
+        try:
+            fracked_file = fracker_reporting_queue.get()
+            frack_progress_bar.update(fracked_file)
+        except queue.Empty:
+            pass
+        sleep(0.05)
     unpack_thread.join()
     frack_thread.join()
