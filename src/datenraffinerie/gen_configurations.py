@@ -25,10 +25,7 @@ from typing import Union
                 metavar='[Procedure to be run by the datenraffinerie]')
 @click.argument('output_dir', type=click.Path(dir_okay=True),
                 metavar='[Location to write the configuration files to]')
-@click.option('--diff/--no-diff', default=True,
-              help='only write the differences between the initial config and'
-                   'the individual runs to the run config files')
-def generate_configuratons(config, netcfg, procedure, output_dir, diff):
+def generate_configuratons(config, netcfg, procedure, output_dir):
     # generate the conifgurations
     logging.basicConfig(filename='gen_config.log', level='INFO',
                         format='[%(asctime)s] %(levelname)s:'
@@ -40,7 +37,7 @@ def generate_configuratons(config, netcfg, procedure, output_dir, diff):
                             main_config_file=config,
                             procedure_name=procedure,
                             calibration=None,
-                            diff=diff)
+                            diff=True)
         run_configs_1, run_configs_2 = tee(run_configs)
     except ValueError as err:
         print(f"The procedure with name: {err.args[1]} could not be found,")
