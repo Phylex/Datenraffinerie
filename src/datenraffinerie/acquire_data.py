@@ -112,6 +112,7 @@ def pipelined_acquire_data(configurations: queue.Queue,
                            acquired_data: queue.Queue,
                            config_generation_done: threading.Event,
                            daq_initialized: threading.Event,
+                           data_acquisition_done: threading.Event,
                            network_configuration: dict,
                            initial_config: dict,
                            output_dir: Path,
@@ -127,26 +128,31 @@ def pipelined_acquire_data(configurations: queue.Queue,
     i = 0
     while not config_generation_done.is_set() or not configurations.empty():
         run_config, full_run_config_path = configurations.get()
-        run_file_name = \
+        raw_file_name = \
             'run_{0:0>{width}}_data.raw'.format(i, width=num_digits)
-        run_file_path = output_dir / run_file_name
+        raw_file_path = output_dir / raw_file_name
         root_file_name = \
             'run_{0:0>{width}}_data.root'.format(i, width=num_digits)
         hdf_file_name = \
             'run_{0:0>{width}}_data.h5'.format(i, width=num_digits)
-        if not keep or (keep and not run_file_path.exists()):
+        logger.info(f'acquiring data for run {i}')
+        if not keep or (keep and not raw_file_path.exists()):
             logger.info(f'gathering Data for run {i}')
             data = daq_system.measure(run_config)
-            with open(output_dir / run_file_name, 'wb+') as rdf:
+            with open(output_dir / raw_file_name, 'wb+') as rdf:
                 rdf.write(data)
         else:
-            logger.info('found existing run data, skipping')
+            logger.info('found existing data for run {i},'
+                        'skipping acquisition')
+        logger.info(f'data acquisition for run {i} done')
+        data_acquisition_progress.put(i)
         acquired_data.put(
             (
-                run_file_path,
+                raw_file_path,
                 output_dir / root_file_name,
                 output_dir / hdf_file_name,
                 full_run_config_path,
                 )
         )
-        data_acquisition_progress.put(i)
+        i += 1
+    data_acquisition_done.set()
