@@ -135,6 +135,7 @@ def pipelined_acquire_data(configurations: queue.Queue,
     daq_system = DAQCoordClient(network_configuration)
     daq_system.initialize(initial_config)
     daq_initialized.set()
+    logger.info('DAQ-System initialized')
     i = 0
     while not config_generation_done.is_set() or not configurations.empty():
         run_config, full_run_config_path = configurations.get()
@@ -152,9 +153,11 @@ def pipelined_acquire_data(configurations: queue.Queue,
             with open(output_dir / raw_file_name, 'wb+') as rdf:
                 rdf.write(data)
         else:
-            logger.info('found existing data for run {i},'
+            logger.info(f'found existing data for run {i}, '
                         'skipping acquisition')
         logger.info(f'data acquisition for run {i} done')
+        logger.info(f'There are still {configurations.qsize()} '
+                    'items in the Queue')
         data_acquisition_progress.put(i)
         acquired_data.put(
             (
