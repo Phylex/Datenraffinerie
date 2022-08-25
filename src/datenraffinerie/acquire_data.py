@@ -9,8 +9,9 @@ import queue
 import threading
 import math
 from rich.progress import Progress
-from rich.progress import SpinnerColumn
-from rich.progress import MofNCompleteColumn
+from rich.progress import MofNCompleteColumn, SpinnerColumn
+from rich.progress import TextColumn, BarColumn
+from rich.progress import TimeRemainingColumn, TimeElapsedColumn
 
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
@@ -73,9 +74,11 @@ def acquire_data(output_directory, log, loglevel, keep):
     run_configs = []
     with Progress(
             SpinnerColumn(),
-            Progress.get_default_columns(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(bar_width=None),
             MofNCompleteColumn(),
-            ) as progress:
+            TimeElapsedColumn(),
+            TimeRemainingColumn()) as progress:
         read_configurations = progress.add_task(
                 "[cyan] Read run configurations from disk",
                 total=len(run_indices))
@@ -245,9 +248,11 @@ def pipelined_main(output_directory, log, loglevel, keep):
     daq_thread.start()
     with Progress(
             SpinnerColumn(),
-            Progress.get_default_columns(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(bar_width=None),
             MofNCompleteColumn(),
-            ) as progress:
+            TimeElapsedColumn(),
+            TimeRemainingColumn()) as progress:
         read_configurations = progress.add_task(
                 "[cyan] Read run configurations from disk",
                 total=len(run_indices))
