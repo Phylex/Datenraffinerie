@@ -6,7 +6,12 @@ import sys
 import yaml
 from pathlib import Path
 import glob
-import tqdm
+from rich.progress import Progress
+from rich.progress import SpinnerColumn
+from rich.progress import MofNCompleteColumn
+from rich.progress import TextColumn
+from rich.progress import BarColumn
+from rich.progress import TimeElapsedColumn, TimeRemainingColumn
 import click
 from . import analysis_utilities as anu
 from time import sleep
@@ -297,27 +302,30 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
                  Path(hdf_data_path),
                  Path(full_config_path)))
     data_taking_done.set()
-    unpack_progress_bar = tqdm.tqdm(
-            total=run_count,
-            position=1,
-            desc='Unpacking data'.center(40, ' '),
-            unit=' Runs')
-    frack_progress_bar = tqdm.tqdm(
-            total=run_count,
-            position=2,
-            desc='fracking data'.center(40, ' '),
-            unit=' Runs')
-    while not fracking_done.is_set():
-        try:
-            unpacked_file = unpack_reporting_queue.get(block=False)
-            unpack_progress_bar.update(unpacked_file)
-        except queue.Empty:
-            pass
-        try:
-            fracked_file = fracker_reporting_queue.get(block=False)
-            frack_progress_bar.update(fracked_file)
-        except queue.Empty:
-            pass
-        sleep(0.05)
-    unpack_thread.join()
-    frack_thread.join()
+    with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(bar_width=None),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn()) as progress:
+        unpack_progress_bar = progress.add_task(
+                'Unpacking data',
+                total=run_count)
+        frack_progress_bar = progress.add_task(
+                'fracking data',
+                total=run_count)
+        while not fracking_done.is_set():
+            try:
+                _ = unpack_reporting_queue.get(block=False)
+                progress.update(unpack_progress_bar, advance=1)
+            except queue.Empty:
+                pass
+            try:
+                _ = fracker_reporting_queue.get(block=False)
+                progress.update(frack_progress_bar, advance=1)
+            except queue.Empty:
+                pass
+            sleep(0.05)
+        unpack_thread.join()
+        frack_thread.pjoin()
