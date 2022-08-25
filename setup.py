@@ -31,5 +31,6 @@ setup(
         'hgcroc-configuration-client',
         'progress',
         'pymongo',
+        'rich',
     ]
 )

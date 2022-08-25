@@ -8,7 +8,7 @@ import os
 import queue
 import threading
 import math
-from progress.bar import Bar
+from rich.progress import Progress
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
                    'INFO': logging.INFO,
@@ -68,46 +68,53 @@ def acquire_data(output_directory, log, loglevel, keep):
     with open(init_config, 'r') as icf:
         init_config = yaml.safe_load(icf.read())
     run_configs = []
-    bar = Bar('reading run configurations from disk'.ljust(50, ' '),
-              max=len(run_indices))
-    for rcfp in run_config_files:
-        with open(rcfp, 'r') as rcf:
-            run_configs.append(yaml.safe_load(rcf.read()))
-        bar.next()
-    bar.finish()
-    # instantiate client and server
-    # initialize the daq system
-    print('Initializing DAQ-System')
-    daq_system = DAQCoordClient(network_config)
-    daq_system.initialize(init_config)
-    # setup data taking context for the client
+    with Progress() as progress:
+        read_configurations = progress.add_task(
+                "[cyan] Read run configurations from disk",
+                total=len(run_indices))
+        for rcfp in run_config_files:
+            with open(rcfp, 'r') as rcf:
+                run_configs.append(yaml.safe_load(rcf.read()))
+            progress.update(read_configurations, advance=1)
+        # instantiate client and server
+        # initialize the daq system
+        acquire_data_progbar = progress.add_task(
+                "[blue]Acquiring Data from the Hexacontroller",
+                total=len(run_indices),
+                start=False
+                )
+        daq_system = DAQCoordClient(network_config)
+        daq_system.initialize(init_config)
+        # setup data taking context for the client
 
-    # delete the old raw files
-    if not keep:
-        old_raw_files = glob.glob(str(output_directory.absolute())+'/*.raw')
-        if len(old_raw_files):
-            print('Deleting old Data')
-        for file in old_raw_files:
-            os.remove(file)
+        # delete the old raw files
+        if not keep:
+            old_raw_files = glob.glob(
+                    str(output_directory.absolute())+'/*.raw')
+            if len(old_raw_files):
+                print('Deleting old Data')
+            for file in old_raw_files:
+                os.remove(file)
 
-    # take the data
-    bar = Bar('Acquiring Data'.ljust(50, ' '), max=len(run_indices))
-    for index, run in zip(run_indices, run_configs):
-        output_file = output_directory / f'run_{index}_data.raw'
-        if not keep or (keep and not output_file.exists()):
-            data = daq_system.measure(run)
-            with open(output_file, 'wb+') as df:
-                df.write(data)
-        bar.next()
-    bar.finish()
+        # take the data
+        progress.start_task(acquire_data_progbar)
+        for index, run in zip(run_indices, run_configs):
+            output_file = output_directory / f'run_{index}_data.raw'
+            if not keep or (keep and not output_file.exists()):
+                data = daq_system.measure(run)
+                with open(output_file, 'wb+') as df:
+                    df.write(data)
+            progress.update(acquire_data_progbar, advance=1)
 
 
 def pipelined_acquire_data(configurations: queue.Queue,
                            data_acquisition_progress: queue.Queue,
                            acquired_data: queue.Queue,
                            config_generation_done: threading.Event,
+                           daq_initialized: threading.Event,
                            network_configuration: dict,
                            initial_config: dict,
+                           output_dir: Path,
                            run_count: int,
                            keep: bool):
     # info needed for the generation of the filenames
@@ -116,6 +123,7 @@ def pipelined_acquire_data(configurations: queue.Queue,
     logger.info('Initializing DAQ system')
     daq_system = DAQCoordClient(network_configuration)
     daq_system.initialize(initial_config)
+    daq_initialized.set()
     i = 0
     while not config_generation_done.is_set() or not configurations.empty():
         run_config, full_run_config_path = configurations.get()
