@@ -123,6 +123,7 @@ def pipelined_acquire_data(configurations: queue.Queue,
                            config_generation_done: threading.Event,
                            daq_initialized: threading.Event,
                            data_acquisition_done: threading.Event,
+                           stop: threading.Event,
                            network_configuration: dict,
                            initial_config: dict,
                            output_dir: Path,
@@ -137,7 +138,8 @@ def pipelined_acquire_data(configurations: queue.Queue,
     daq_initialized.set()
     logger.info('DAQ-System initialized')
     i = 0
-    while not config_generation_done.is_set() or not configurations.empty():
+    while (not config_generation_done.is_set() or not configurations.empty()) \
+            and not stop.is_set():
         run_config, full_run_config_path = configurations.get()
         raw_file_name = \
             'run_{0:0>{width}}_data.raw'.format(i, width=num_digits)
@@ -229,6 +231,7 @@ def pipelined_main(output_directory, log, loglevel, keep):
     all_run_configs_generated = threading.Event()
     daq_system_initialized = threading.Event()
     daq_done = threading.Event()
+    stop = threading.Event()
 
     # set up the queues to pass the data around
     run_configuration_queue = queue.Queue()
@@ -242,6 +245,7 @@ def pipelined_main(output_directory, log, loglevel, keep):
                   all_run_configs_generated,
                   daq_system_initialized,
                   daq_done,
+                  stop,
                   network_config,
                   init_config,
                   output_directory,
@@ -293,5 +297,5 @@ def pipelined_main(output_directory, log, loglevel, keep):
                 except queue.Empty:
                     pass
     except KeyboardInterrupt:
-        all_run_configs_generated.set()
+        stop.set()
         daq_thread.join()
