@@ -328,4 +328,4 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
                 pass
             sleep(0.05)
         unpack_thread.join()
-        frack_thread.pjoin()
+        frack_thread.join()
