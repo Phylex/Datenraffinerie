@@ -281,8 +281,8 @@ def pipelined_main(output_directory, log, loglevel, keep):
                     all_run_configs_generated.set()
                     pass
                 try:
-                    daq_tasks_completed = daq_progress_queue.get(block=False)
-                    progress.update(daq_progbar, advance=daq_tasks_completed)
+                    _ = daq_progress_queue.get(block=False)
+                    progress.update(daq_progbar, advance=1)
                 except queue.Empty:
                     pass
                 try:
