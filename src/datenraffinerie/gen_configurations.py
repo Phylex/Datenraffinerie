@@ -66,7 +66,7 @@ def generate_configuratons(config, netcfg, procedure, output_dir):
         post_config = {}
         post_config['data_columns'] = procedure['data_columns']
         post_config['mode'] = procedure['mode']
-        post_config['diff'] = diff
+        post_config['procedure'] = procedure['name']
         pcf.write(yaml.safe_dump(post_config))
 
     # generate the configurations for the runs
