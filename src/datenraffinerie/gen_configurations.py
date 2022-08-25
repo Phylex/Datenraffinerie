@@ -11,6 +11,9 @@ import queue
 from rich.progress import Progress
 from rich.progress import SpinnerColumn
 from rich.progress import MofNCompleteColumn
+from rich.progress import TextColumn
+from rich.progress import BarColumn
+from rich.progress import TimeElapsedColumn, TimeRemainingColumn
 from . import config_utilities as cfu
 from . import dict_utils as dctu
 from itertools import tee
@@ -103,42 +106,43 @@ def generate_configuratons(config, netcfg, procedure, output_dir):
             )
     config_gen_thread.start()
     full_config_gen_proc.start()
-    progress = Progress(
+    with Progress(
             SpinnerColumn(),
-            Progress.get_default_columns(),
-            MofNCompleteColumn())
-    progress.open()
-    run_progress_bar = progress.add_task(
-            'Generating run configurations',
-            total=run_count)
-    full_progress_bar = progress.add_task(
-            'Generating full config for fracker',
-            total=run_count)
-    while not run_config_generation_done.is_set() \
-            or not param_gen_progress_queue.empty() \
-            or not run_param_queue.empty() \
-            or not full_config_generation_done.is_set()\
-            or not full_configs_generated.empty():
-        try:
-            run_config_queue.put(next(run_configs_2))
-        except StopIteration:
-            pass
-        try:
-            _ = run_param_queue.get(block=False)
-        except queue.Empty:
-            pass
-        try:
-            _ = param_gen_progress_queue.get(block=False)
-            progress.update(run_progress_bar, 1)
-        except queue.Empty:
-            pass
-        try:
-            _ = full_configs_generated.get(block=False)
-            progress.update(full_progress_bar, 1)
-        except queue.Empty:
-            pass
-        sleep(.05)
-    progress.close()
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(bar_width=None),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn()) as progress:
+        run_progress_bar = progress.add_task(
+                'Generating run configurations',
+                total=run_count)
+        full_progress_bar = progress.add_task(
+                'Generating full config for fracker',
+                total=run_count)
+        while not run_config_generation_done.is_set() \
+                or not param_gen_progress_queue.empty() \
+                or not run_param_queue.empty() \
+                or not full_config_generation_done.is_set()\
+                or not full_configs_generated.empty():
+            try:
+                run_config_queue.put(next(run_configs_2))
+            except StopIteration:
+                pass
+            try:
+                _ = run_param_queue.get(block=False)
+            except queue.Empty:
+                pass
+            try:
+                _ = param_gen_progress_queue.get(block=False)
+                progress.update(run_progress_bar, advance=1)
+            except queue.Empty:
+                pass
+            try:
+                _ = full_configs_generated.get(block=False)
+                progress.update(full_progress_bar, advance=1)
+            except queue.Empty:
+                pass
+            sleep(.05)
     config_gen_thread.join()
     full_config_gen_proc.join()
 
