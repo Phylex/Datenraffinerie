@@ -238,6 +238,7 @@ def pipelined_main(output_directory, log, loglevel, keep):
                   acquired_data_queue,
                   all_run_configs_generated,
                   daq_system_initialized,
+                  daq_done,
                   network_config,
                   init_config,
                   output_directory,
