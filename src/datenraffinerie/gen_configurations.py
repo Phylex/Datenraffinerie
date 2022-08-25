@@ -8,7 +8,9 @@ from pathlib import Path
 import threading
 import multiprocessing as mp
 import queue
-import tqdm
+from rich.progress import Progress
+from rich.progress import SpinnerColumn
+from rich.progress import MofNCompleteColumn
 from . import config_utilities as cfu
 from . import dict_utils as dctu
 from itertools import tee
@@ -101,16 +103,17 @@ def generate_configuratons(config, netcfg, procedure, output_dir):
             )
     config_gen_thread.start()
     full_config_gen_proc.start()
-    run_progress_bar = tqdm.tqdm(
-            total=run_count,
-            position=1,
-            desc='Generating run configurations'.center(40, ' '),
-            unit=' Configurations')
-    full_progress_bar = tqdm.tqdm(
-            total=run_count,
-            position=2,
-            desc='Generating full config for fracker'.center(40, ' '),
-            unit=' Configurations')
+    progress = Progress(
+            SpinnerColumn(),
+            Progress.get_default_columns(),
+            MofNCompleteColumn())
+    progress.open()
+    run_progress_bar = progress.add_task(
+            'Generating run configurations',
+            total=run_count)
+    full_progress_bar = progress.add_task(
+            'Generating full config for fracker',
+            total=run_count)
     while not run_config_generation_done.is_set() \
             or not param_gen_progress_queue.empty() \
             or not run_param_queue.empty() \
@@ -126,17 +129,16 @@ def generate_configuratons(config, netcfg, procedure, output_dir):
             pass
         try:
             _ = param_gen_progress_queue.get(block=False)
-            run_progress_bar.update(1)
+            progress.update(run_progress_bar, 1)
         except queue.Empty:
             pass
         try:
             _ = full_configs_generated.get(block=False)
-            full_progress_bar.update(1)
+            progress.update(full_progress_bar, 1)
         except queue.Empty:
             pass
         sleep(.05)
-    run_progress_bar.close()
-    full_progress_bar.close()
+    progress.close()
     config_gen_thread.join()
     full_config_gen_proc.join()
 
