@@ -9,6 +9,9 @@ import queue
 import threading
 import math
 from rich.progress import Progress
+from rich.progress import SpinnerColumn
+from rich.progress import MofNCompleteColumn
+
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
                    'INFO': logging.INFO,
@@ -68,7 +71,11 @@ def acquire_data(output_directory, log, loglevel, keep):
     with open(init_config, 'r') as icf:
         init_config = yaml.safe_load(icf.read())
     run_configs = []
-    with Progress() as progress:
+    with Progress(
+            SpinnerColumn(),
+            Progress.get_default_columns(),
+            MofNCompleteColumn(),
+            ) as progress:
         read_configurations = progress.add_task(
                 "[cyan] Read run configurations from disk",
                 total=len(run_indices))
@@ -236,7 +243,11 @@ def pipelined_main(output_directory, log, loglevel, keep):
                   )
             )
     daq_thread.start()
-    with Progress() as progress:
+    with Progress(
+            SpinnerColumn(),
+            Progress.get_default_columns(),
+            MofNCompleteColumn(),
+            ) as progress:
         read_configurations = progress.add_task(
                 "[cyan] Read run configurations from disk",
                 total=len(run_indices))
