@@ -148,7 +148,6 @@ def pipelined_acquire_data(configurations: queue.Queue,
             'run_{0:0>{width}}_data.root'.format(i, width=num_digits)
         hdf_file_name = \
             'run_{0:0>{width}}_data.h5'.format(i, width=num_digits)
-        logger.info(f'acquiring data for run {i}')
         if not keep or (keep and not raw_file_path.exists()):
             logger.info(f'gathering Data for run {i}')
             data = daq_system.measure(run_config)
