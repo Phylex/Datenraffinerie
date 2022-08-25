@@ -247,40 +247,48 @@ def pipelined_main(output_directory, log, loglevel, keep):
                   )
             )
     daq_thread.start()
-    with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(bar_width=None),
-            MofNCompleteColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn()) as progress:
-        read_configurations = progress.add_task(
-                "[cyan] Read run configurations from disk",
-                total=len(run_indices))
-        daq_progbar = progress.add_task(
-                "[turquoise]Acquiring Data from the Test System",
-                total=len(run_indices),
-                start=False
-                )
-        for rcfp, frcfp in zip(run_config_files, full_run_config_files):
-            if daq_system_initialized.is_set():
-                progress.start_task(daq_progbar)
-            with open(rcfp, 'r') as rcf:
-                run_configuration_queue.put(
-                        (yaml.safe_load(rcf.read()), frcfp)
-                )
-            progress.update(read_configurations, advance=1)
+    try:
+        with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(bar_width=None),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn()) as progress:
+            read_configurations = progress.add_task(
+                    "[cyan] Read run configurations from disk",
+                    total=len(run_indices))
+            daq_progbar = progress.add_task(
+                    "[turquoise]Acquiring Data from the Test System",
+                    total=len(run_indices),
+                    start=False
+                    )
+            config_iter = zip(run_config_files, full_run_config_files)
+            daq_active = False
+            while not daq_done.is_set():
+                # activate the progress bar when daq is initialized
+                if daq_system_initialized.is_set() and not daq_active:
+                    progress.start_task(daq_progbar)
+                    daq_active = True
+                try:
+                    rcfp, frcfp = next(config_iter)
+                    with open(rcfp, 'r') as rcf:
+                        run_configuration_queue.put(
+                                (yaml.safe_load(rcf.read()), frcfp)
+                        )
+                    progress.update(read_configurations, advance=1)
+                except StopIteration:
+                    all_run_configs_generated.set()
+                    pass
+                try:
+                    daq_tasks_completed = daq_progress_queue.get(block=False)
+                    progress.update(daq_progbar, advance=daq_tasks_completed)
+                except queue.Empty:
+                    pass
+                try:
+                    _ = acquired_data_queue.get(block=False)
+                except queue.Empty:
+                    pass
+    except KeyboardInterrupt:
         all_run_configs_generated.set()
-        if not daq_system_initialized.is_set():
-            daq_system_initialized.wait()
-            progress.start_task(daq_progbar)
-        while not daq_done.is_set():
-            try:
-                daq_tasks_completed = daq_progress_queue.get(block=False)
-                progress.update(daq_progbar, advance=daq_tasks_completed)
-            except queue.Empty:
-                pass
-            try:
-                _ = acquired_data_queue.get(block=False)
-            except queue.Empty:
-                pass
+        daq_thread.join()
