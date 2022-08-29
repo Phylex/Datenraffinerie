@@ -169,6 +169,8 @@ def pipelined_acquire_data(configurations: queue.Queue,
                 )
         )
         i += 1
+    if stop.is_set():
+        logger.info('Stop signal set, exiting')
     data_acquisition_done.set()
 
 
