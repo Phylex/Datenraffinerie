@@ -83,6 +83,20 @@
            ch:
              {{ value }}:
                HighRange: 1
+      default: |-
+       target:
+         roc_s0:
+           ch:
+             {{ value }}:
+               HighRange: 1
+         roc_s1:
+           ch:
+             {{ value }}:
+               HighRange: 1
+         roc_s2:
+           ch:
+             {{ value }}:
+               HighRange: 1
 
 
 - name: multidim_scan_test
@@ -155,21 +169,32 @@
            ch:
              {{ value }}:
                HighRange: 1
-               Channel_off: 0
          roc_s1:
            ch:
              {{ value }}:
                HighRange: 1
-               Channel_off: 0
          roc_s2:
            ch:
              {{ value }}:
                HighRange: 1
-               Channel_off: 0
       values:
         start: 0
         stop: 72
         step: 10
+      default: |-
+       target:
+         roc_s0:
+           ch:
+             {{ value }}:
+               HighRange: 0
+         roc_s1:
+           ch:
+             {{ value }}:
+               HighRange: 0
+         roc_s2:
+           ch:
+             {{ value }}:
+               HighRange: 0
     - key:
       - ['roc_s0', 'roc_s1', 'roc_s2']
       - ReferenceVoltage

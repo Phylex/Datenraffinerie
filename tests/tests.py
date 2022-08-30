@@ -462,8 +462,9 @@ def test_generate_configurations(procedure, patches):
      ])
     ])
 def test_get_procedure_configs(main_config_file, procedure_name, output):
-    system_default_config, systme_init_config, run_configs, run_count = \
-            get_procedure_configs(main_config_file, procedure_name, diff=True)
+    procedure, \
+        (system_default_config, systme_init_config, run_configs, run_count) = \
+        get_procedure_configs(main_config_file, procedure_name, diff=True)
     output = output[1:]
     output.insert(0, {})
     for run, diff in zip(run_configs, output):
@@ -501,5 +502,5 @@ def test_get_procedure_configs(main_config_file, procedure_name, output):
      )
     ])
 def test_clean_input(variant, unsanitized_input, cleaned_input):
-    daq_adapter = DAQAdapter(variant, 'hostname', 4444)
+    daq_adapter = DAQAdapter(variant, 'hostname', 4444, 8888)
     assert daq_adapter._clean_configuration(unsanitized_input) == cleaned_input
