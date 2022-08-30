@@ -146,7 +146,8 @@ def build_dimension_patches(scan_dimension):
             default_template = scan_dimension['default']
             template = jinja2.Template(template)
             default_template = jinja2.Template(default_template)
-            patch_set.append(yaml.safe_load(template.render(value=val)))
+            patch_set.append(
+                    yaml.safe_load(template.render(value=scan_values[0])))
             for prev_val, val in zip(scan_values[:-1], scan_values[1:]):
                 patch = yaml.safe_load(default_template.render(value=prev_val))
                 dtu.update_dict(patch,

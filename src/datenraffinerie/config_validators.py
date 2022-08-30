@@ -86,7 +86,8 @@ parameter = Schema(
            {'template': str,
             'values': parameter_range,
             'default': str},
-           error="A parameter must have a 'template' and 'values'"
+           error="A parameter must have a 'template', "
+                 "'values' and 'default' field "
                  " or 'key' and 'values' field")
          )
 
