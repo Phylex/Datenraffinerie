@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
 		try {
 			hid_t in_file = H5Fopen(input_file_paths[i].c_str(), H5P_DEFAULT, H5P_DEFAULT);
 			merge_tables(output_file, in_file, group_name, "measurements", block_size);
+			H5Fclose(in_file);
 		} catch (std::runtime_error e) {
 			std::cout << "Runtime error appending file: " << input_file_paths[i] << std::endl << e.what() << std::endl;
 			exit(EXIT_FAILURE);
