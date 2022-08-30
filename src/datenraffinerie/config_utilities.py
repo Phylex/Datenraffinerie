@@ -143,9 +143,16 @@ def build_dimension_patches(scan_dimension):
     except KeyError:
         try:
             template = scan_dimension['template']
+            default_template = scan_dimension['default']
             template = jinja2.Template(template)
-            for val in scan_values:
-                patch_set.append(yaml.safe_load(template.render(value=val)))
+            default_template = jinja2.Template(default_template)
+            patch_set.append(yaml.safe_load(template.render(value=val)))
+            for prev_val, val in zip(scan_values[:-1], scan_values[1:]):
+                patch = yaml.safe_load(default_template.render(value=prev_val))
+                dtu.update_dict(patch,
+                                yaml.safe_load(template.render(value=val)),
+                                in_place=True)
+                patch_set.append(patch)
             return patch_set
         except jinja2.TemplateSyntaxError as e:
             raise ConfigFormatError(

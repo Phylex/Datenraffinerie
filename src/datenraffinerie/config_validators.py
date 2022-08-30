@@ -84,7 +84,8 @@ parameter = Schema(
         Or({'key': [list, str, int],
             'values': parameter_range},
            {'template': str,
-            'values': parameter_range},
+            'values': parameter_range,
+            'default': str},
            error="A parameter must have a 'template' and 'values'"
                  " or 'key' and 'values' field")
          )
