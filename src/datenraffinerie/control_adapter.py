@@ -152,7 +152,7 @@ class DAQAdapter():
         self.logger.info("Configuration successful")
 
     def reset(self):
-        self.logger.debug("resetting roc by closing and reopening "
+        self.logger.debug("resetting daq-server by closing and reopening "
                           "the connection")
         self.socket.close()
         self.context.destroy()

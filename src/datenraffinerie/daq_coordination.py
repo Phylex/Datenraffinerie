@@ -464,7 +464,7 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.command()
 @click.argument('netcfg', type=click.File('r'),
                 metavar='[network configuration file]')
-@click.option('--log', type=str, default=None,
+@click.option('--log/--no-log', type=bool, default=False,
               help='Enable logging and append logs to the filename passed to '
                    'this option')
 @click.option('--loglevel', default='INFO',
@@ -478,11 +478,11 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 def main(netcfg, log, loglevel, client_output, capture_data):
     if client_output is not None:
         client_output = Path(client_output)
-    if log is not None:
-        logging.basicConfig(filename=log,
+    if log:
+        logging.basicConfig(filename='daq-coord.log',
                             filemode='a+',
                             level=_log_level_dict[loglevel],
-                            format='[%(asctime)s] %(levelname)s:'
+                            format='[%(asctime)s] %(levelname)-10s:'
                                    '%(name)-50s %(message)s')
     logging.info('Read in network config')
     try:

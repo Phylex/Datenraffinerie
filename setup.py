@@ -5,11 +5,11 @@ setup(
         'console_scripts': [
             'datenraffinerie = datenraffinerie.datenraffinerie:cli',
             'generate-configs = datenraffinerie.gen_configurations:generate_configuratons',
-            'acquire-data = datenraffinerie.acquire_data:acquire_data',
-            'acquire-data-pipelined = datenraffinerie.acquire_data:pipelined_main',
+            'acquire-data-single-threaded = datenraffinerie.acquire_data:acquire_data',
+            'acquire-data = datenraffinerie.acquire_data:pipelined_main',
             'coordinate-daq-access = datenraffinerie.daq_coordination:main',
-            'process-raw-data = datenraffinerie.frack_data:main',
-            'process-raw-data-parallel = datenraffinerie.postprocessing_queue:main',
+            'process-raw-data-single-threaded = datenraffinerie.frack_data:main',
+            'process-raw-data = datenraffinerie.postprocessing_queue:main',
         ]
     },
     install_requires=[
