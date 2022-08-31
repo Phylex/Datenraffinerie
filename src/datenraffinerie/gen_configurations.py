@@ -168,7 +168,7 @@ def generate_configuratons(config, netcfg, procedure,
                     dctu.update_dict(run_config,
                                      rcf_update, in_place=True)
                     new_state = dctu.update_dict(gstate, run_config)
-                    rcq.put((i, dctu.diff_dict(new_state, gstate)))
+                    rcq.put((i, new_state))
                     i += 1
                     generator_config_states[j] = new_state
             except StopIteration:
