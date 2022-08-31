@@ -109,6 +109,7 @@ def generate_configuratons(config, netcfg, procedure,
     config_queue_filled = mp.Event()
     run_config_gen_done = threading.Event()
     full_configs_generated = mp.Queue()
+    full_config_generation_progress = mp.Queue()
     stop = mp.Event()
     config_iter_lock = threading.Lock()
 
@@ -131,6 +132,7 @@ def generate_configuratons(config, netcfg, procedure,
                   full_config,
                   num_digits,
                   full_configs_generated,
+                  full_config_generation_progress,
                   fcgd,
                   stop
                   )
@@ -186,6 +188,11 @@ def generate_configuratons(config, netcfg, procedure,
             while True:
                 try:
                     _ = full_configs_generated.get(block=False)
+                except queue.Empty:
+                    break
+            while True:
+                try:
+                    _ = full_config_generation_progress.get(block=False)
                     progress.update(full_progress_bar, advance=1)
                 except queue.Empty:
                     break
@@ -204,6 +211,7 @@ def generate_full_configs(output_dir: Path,
                           full_init_config: dict,
                           num_digits: int,
                           generated_configs_full_queue: mp.Queue,
+                          full_config_generation_progress: mp.Queue,
                           config_generation_full_done: mp.Event,
                           stop: mp.Event):
     logger = logging.getLogger('run-config-generator')
@@ -217,6 +225,7 @@ def generate_full_configs(output_dir: Path,
         with open(output_dir / full_run_conf_file_name, 'w+') as frcf:
             frcf.write(yaml.safe_dump(full_config))
         generated_configs_full_queue.put(output_dir / full_run_conf_file_name)
+        full_config_generation_progress.put(1)
         logger.debug(f'{run_configs.empty()} = run_empty')
         logger.debug(
                 f'{run_queue_fill_done.is_set()} '
