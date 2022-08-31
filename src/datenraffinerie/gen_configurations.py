@@ -17,11 +17,11 @@ from rich.progress import TimeElapsedColumn, TimeRemainingColumn
 from . import config_utilities as cfu
 from . import dict_utils as dctu
 from itertools import tee
-from time import sleep
 import logging
 from typing import Union
 from operator import and_
 from functools import reduce
+from copy import deepcopy
 
 _log_level_dict = {'DEBUG': logging.DEBUG,
                    'INFO': logging.INFO,
@@ -164,8 +164,9 @@ def generate_configuratons(config, netcfg, procedure,
                 for j, (rcq, gstate) in enumerate(
                         zip(run_config_queues, generator_config_states)):
                     with config_iter_lock:
-                        dctu.update_dict(run_config,
-                                         next(run_configs_1), in_place=True)
+                        rcf_update = deepcopy(next(run_configs_1))
+                    dctu.update_dict(run_config,
+                                     rcf_update, in_place=True)
                     new_state = dctu.update_dict(gstate, run_config)
                     rcq.put((i, dctu.diff_dict(new_state, gstate)))
                     i += 1
@@ -220,6 +221,7 @@ def generate_full_configs(output_dir: Path,
         logger.debug(
                 f'{run_queue_fill_done.is_set()} '
                 '= config_generation_done')
+        run_configs.task_done()
     config_generation_full_done.set()
 
 
