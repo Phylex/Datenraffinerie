@@ -221,7 +221,6 @@ def generate_full_configs(output_dir: Path,
         logger.debug(
                 f'{run_queue_fill_done.is_set()} '
                 '= config_generation_done')
-        run_configs.task_done()
     config_generation_full_done.set()
 
 
