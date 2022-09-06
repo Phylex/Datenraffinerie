@@ -10,6 +10,7 @@ setup(
             'coordinate-daq-access = datenraffinerie.daq_coordination:main',
             'process-raw-data-single-threaded = datenraffinerie.frack_data:main',
             'process-raw-data = datenraffinerie.postprocessing_queue:main',
+            'yaml-utils = datenraffinerie.yaml_utils:cli',
         ]
     },
     install_requires=[
