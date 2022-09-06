@@ -175,20 +175,22 @@ def test_build_dimension_patches(config_file, procedure_name,
     test_procedure = list(filter(lambda x: x['name'] == procedure_name,
                           validated_configs))[0]
     scan_dimension = test_procedure['parameters'][0]
-    scan_parameters = build_dimension_patches(scan_dimension)
+    scan_parameters, scan_defaults = build_dimension_patches(scan_dimension)
     assert scan_parameters == parameter_patches
 
 
-@pytest.mark.parametrize("dimensional_patch_sets, outputs", [
-    ([[
+@pytest.mark.parametrize("dimensional_patch_sets, scan_dim_defaults, outputs", [
+    (
+      [
+       [
          {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}},
           'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}},
           'roc_s2': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}}}},
          {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}},
           'roc_s1': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}},
           'roc_s2': {'ReferenceVoltage': {0: {'Calib': 5}, 1: {'Calib': 5}}}},
-      ],
-      [
+       ],
+       [
          {'roc_s0': {'Top': {0: {'phase_strobe': 0}}},
           'roc_s1': {'Top': {0: {'phase_strobe': 0}}},
           'roc_s2': {'Top': {0: {'phase_strobe': 0}}}},
@@ -198,8 +200,20 @@ def test_build_dimension_patches(config_file, procedure_name,
          {'roc_s0': {'Top': {0: {'phase_strobe': 4}}},
           'roc_s1': {'Top': {0: {'phase_strobe': 4}}},
           'roc_s2': {'Top': {0: {'phase_strobe': 4}}}},
-       ]
-      ], [
+        ]
+      ],
+      [
+         [
+             {},
+             {},
+         ],
+         [
+             {},
+             {},
+             {},
+         ]
+      ],
+      [
          {'roc_s0': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
                      'Top': {0: {'phase_strobe': 0}}},
           'roc_s1': {'ReferenceVoltage': {0: {'Calib': 0}, 1: {'Calib': 0}},
@@ -245,8 +259,11 @@ def test_build_dimension_patches(config_file, procedure_name,
       ]
      ),
 ])
-def test_build_scan_patches(dimensional_patch_sets, outputs):
-    assert outputs == build_scan_patches(dimensional_patch_sets)
+def test_build_scan_patches(dimensional_patch_sets, scan_dim_defaults,
+                            outputs):
+    patches = build_scan_patches(dimensional_patch_sets,
+                                 scan_dim_defaults)
+    assert outputs == patches
 
 
 @pytest.fixture

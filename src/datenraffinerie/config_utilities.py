@@ -15,6 +15,7 @@ from .config_errors import ConfigFormatError
 from . import dict_utils as dtu
 from . import config_validators as cvd
 import logging
+from rich import print
 
 
 def get_procedure_configs(main_config_file: str, procedure_name: str,
@@ -134,12 +135,14 @@ def generate_patch_from_key(keys: Union[list, str], value):
 def build_dimension_patches(scan_dimension):
     scan_values = scan_dimension['values']
     patch_set = []
+    default_set = []
     try:
         scan_dim_key = scan_dimension['key']
         for val in scan_values:
             patch = generate_patch_from_key(scan_dim_key, val)
             patch_set.append(patch)
-        return patch_set
+            default_set.append({})
+        return patch_set, default_set
     except KeyError:
         try:
             template = scan_dimension['template']
@@ -148,13 +151,12 @@ def build_dimension_patches(scan_dimension):
             default_template = jinja2.Template(default_template)
             patch_set.append(
                     yaml.safe_load(template.render(value=scan_values[0])))
+            default_set.append({})
             for prev_val, val in zip(scan_values[:-1], scan_values[1:]):
-                patch = yaml.safe_load(default_template.render(value=prev_val))
-                dtu.update_dict(patch,
-                                yaml.safe_load(template.render(value=val)),
-                                in_place=True)
-                patch_set.append(patch)
-            return patch_set
+                default_set.append(
+                    yaml.safe_load(default_template.render(value=prev_val)))
+                patch_set.append(yaml.safe_load(template.render(value=val)))
+            return patch_set, default_set
         except jinja2.TemplateSyntaxError as e:
             raise ConfigFormatError(
                     f"The template is malformed: {e.message}")
@@ -164,23 +166,36 @@ def build_dimension_patches(scan_dimension):
                     " could not be found")
 
 
-def build_scan_patches(scan_dim_patch_list: list, current_patch={}):
+def build_scan_patches(scan_dim_patches: list, scan_dim_defaults: list,
+                       current_patch={}, current_default={}):
     patches = []
-    if len(scan_dim_patch_list) > 1:
-        for scan_dim_patch in scan_dim_patch_list[0]:
+    assert len(scan_dim_defaults) == len(scan_dim_patches)
+    if len(scan_dim_patches) > 1:
+        for scan_dim_patch, scan_dim_default in \
+                zip(scan_dim_patches[0], scan_dim_defaults[0]):
+            new_default = dtu.update_dict(current_default, scan_dim_default)
             new_cp = dtu.update_dict(current_patch, scan_dim_patch)
-            patches += build_scan_patches(scan_dim_patch_list[1:], new_cp)
+            patches += build_scan_patches(scan_dim_patches[1:],
+                                          scan_dim_defaults[1:],
+                                          new_cp, new_default)
     else:
-        for scan_dim_patch in scan_dim_patch_list[0]:
-            patches.append(dtu.update_dict(current_patch, scan_dim_patch))
+        for scan_dim_patch, scan_dim_default in \
+                zip(scan_dim_patches[0], scan_dim_defaults[0]):
+            patch = dtu.update_dict(current_default, scan_dim_default)
+            patch = dtu.update_dict(patch, current_patch)
+            patch = dtu.update_dict(patch, scan_dim_patch)
+            patches.append(patch)
     return patches
 
 
 def generate_patches(procedure_config):
     scan_dim_patches = []
+    scan_dim_defaults = []
     for dimension in procedure_config['parameters']:
-        scan_dim_patches.append(build_dimension_patches(dimension))
-    return build_scan_patches(scan_dim_patches)
+        dim_patches, dim_defaults = build_dimension_patches(dimension)
+        scan_dim_patches.append(dim_patches)
+        scan_dim_defaults.append(dim_defaults)
+    return build_scan_patches(scan_dim_patches, scan_dim_defaults)
 
 
 def generate_init_config(procedure_config: dict):
