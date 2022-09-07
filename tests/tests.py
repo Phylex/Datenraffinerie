@@ -262,7 +262,7 @@ def test_build_dimension_patches(config_file, procedure_name,
 def test_build_scan_patches(dimensional_patch_sets, scan_dim_defaults,
                             outputs):
     patches = build_scan_patches(dimensional_patch_sets,
-                                 scan_dim_defaults)
+                                 {})
     assert outputs == patches
 
 

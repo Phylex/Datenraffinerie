@@ -151,11 +151,12 @@ def build_dimension_patches(scan_dimension):
             default_template = jinja2.Template(default_template)
             patch_set.append(
                     yaml.safe_load(template.render(value=scan_values[0])))
-            default_set.append({})
             for prev_val, val in zip(scan_values[:-1], scan_values[1:]):
                 default_set.append(
                     yaml.safe_load(default_template.render(value=prev_val)))
                 patch_set.append(yaml.safe_load(template.render(value=val)))
+            default_set.append(
+                yaml.safe_load(default_template.render(value=scan_values[-1])))
             return patch_set, default_set
         except jinja2.TemplateSyntaxError as e:
             raise ConfigFormatError(
@@ -166,22 +167,19 @@ def build_dimension_patches(scan_dimension):
                     " could not be found")
 
 
-def build_scan_patches(scan_dim_patches: list, scan_dim_defaults: list,
-                       current_patch={}, current_default={}):
+def build_scan_patches(scan_dim_patches: list, default: dict,
+                       current_patch={}):
     patches = []
-    assert len(scan_dim_defaults) == len(scan_dim_patches)
     if len(scan_dim_patches) > 1:
-        for scan_dim_patch, scan_dim_default in \
-                zip(scan_dim_patches[0], scan_dim_defaults[0]):
-            new_default = dtu.update_dict(current_default, scan_dim_default)
+        for scan_dim_patch in scan_dim_patches[0]:
+            new_cp = default
             new_cp = dtu.update_dict(current_patch, scan_dim_patch)
             patches += build_scan_patches(scan_dim_patches[1:],
-                                          scan_dim_defaults[1:],
-                                          new_cp, new_default)
+                                          default,
+                                          new_cp)
     else:
-        for scan_dim_patch, scan_dim_default in \
-                zip(scan_dim_patches[0], scan_dim_defaults[0]):
-            patch = dtu.update_dict(current_default, scan_dim_default)
+        for scan_dim_patch in scan_dim_patches[0]:
+            patch = default
             patch = dtu.update_dict(patch, current_patch)
             patch = dtu.update_dict(patch, scan_dim_patch)
             patches.append(patch)
@@ -194,8 +192,11 @@ def generate_patches(procedure_config):
     for dimension in procedure_config['parameters']:
         dim_patches, dim_defaults = build_dimension_patches(dimension)
         scan_dim_patches.append(dim_patches)
-        scan_dim_defaults.append(dim_defaults)
-    return build_scan_patches(scan_dim_patches, scan_dim_defaults)
+        scan_dim_defaults += dim_defaults
+    complete_deflt = {}
+    for deflt in scan_dim_defaults:
+        complete_deflt = dtu.update_dict(complete_deflt, deflt)
+    return build_scan_patches(scan_dim_patches, default=complete_deflt)
 
 
 def generate_init_config(procedure_config: dict):
