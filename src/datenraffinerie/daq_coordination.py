@@ -352,7 +352,7 @@ class DAQCoordinator():
                                 f'{err.args[0]} from the sc-server')
                         error_msg = \
                             'During configuration of the ROCs an error ' + \
-                            f'ocurred an error ocurred: {err.args[0]}'
+                            f'ocurred: {err.args[0]}'
                         daq_response = DAQCoordResponse(
                                 type='error',
                                 content=error_msg
