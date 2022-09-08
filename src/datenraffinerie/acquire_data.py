@@ -150,7 +150,14 @@ def pipelined_acquire_data(configurations: queue.Queue,
             'run_{0:0>{width}}_data.h5'.format(i, width=num_digits)
         if not keep or (keep and not raw_file_path.exists()):
             logger.info(f'gathering Data for run {i}')
-            data = daq_system.measure(run_config)
+            try:
+                data = daq_system.measure(run_config)
+            except ValueError as err:
+                click.echo('An error ocurred during a measurement: '
+                           f'{err.args[0]}')
+                del daq_system
+                data_acquisition_done.set()
+                return
             with open(output_dir / raw_file_name, 'wb+') as rdf:
                 rdf.write(data)
         else:
@@ -300,4 +307,4 @@ def pipelined_main(output_directory, log, loglevel, keep):
                     pass
     except KeyboardInterrupt:
         stop.set()
-        daq_thread.join()
+    daq_thread.join()

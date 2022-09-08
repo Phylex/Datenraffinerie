@@ -134,7 +134,7 @@ def frack_data(frack_data_queue: queue.Queue,
                 logger.error(
                     'failed to created hdf file from '
                     f'{os.path.basename(unpack_path)}, '
-                    f'unpacker returned error code {returncode}')
+                    f'fracker returned error code {returncode}')
                 os.remove(raw_path)
             if returncode < 0:
                 logger.error('failed to created hdf file from '
