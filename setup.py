@@ -11,6 +11,7 @@ setup(
             'process-raw-data-single-threaded = datenraffinerie.frack_data:main',
             'process-raw-data = datenraffinerie.postprocessing_queue:main',
             'yaml-utils = datenraffinerie.yaml_utils:cli',
+            'show-hdf = datenraffinerie.print_h5:show_hdf',
         ]
     },
     install_requires=[
