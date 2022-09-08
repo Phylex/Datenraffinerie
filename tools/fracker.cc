@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
 			CacheKey key;
 			if (event_mode) {
 				key = CacheKey(*((int *)key_chip_source), *((int *)key_channel_source), *((int *)key_half_source));
-				key = transform_event_row_to_cache_key(key);
+				transform_event_row_to_cache_key(key);
 			} else {
 				key = CacheKey(*((int *)key_chip_source), *((short *)key_channel_source), *((short *)key_half_source));
 			}
@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
 				if (i < data_columns.size()) {
 					elem = (char *)data_member_pointers[i];
 				} else {
-					elem = (char *)&(cache[key].data()[i - data_columns.size()]);
+					elem = (char *)&(cache.find(key)->second.data()[i - data_columns.size()]);
 				}
 				for (int byteno = 0; byteno < member_sizes[i]; byteno++) {
 					// this is the actual copy step

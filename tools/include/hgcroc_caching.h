@@ -49,7 +49,7 @@ static std::map<unsigned int, std::string> chip_num_to_name = {
 using CacheKey = std::tuple<unsigned int, unsigned int, unsigned int>;
 
 std::vector<CacheKey> generate_cache_key(int roc, std::string block_name, int block_number);
-CacheKey transform_event_row_to_cache_key(CacheKey row_key);
+void transform_event_row_to_cache_key(CacheKey &row_key);
 bool validate_key(CacheKey key);
 
 
@@ -84,14 +84,14 @@ std::map<CacheKey, std::vector<T>> generate_hgcroc_config_cache(YAML::Node confi
 			for (int roc=0; roc<roc_count; roc++) {
 				std::vector<CacheKey> cache_keys = generate_cache_key(roc, std::get<0>(yaml_key), std::get<1>(yaml_key));
 				for (auto key: cache_keys) {
-					std::vector<T> entry;
-					if(cache.find(key) != cache.end()) {
-						entry = cache[key];
+					typename std::map<CacheKey, std::vector<T>>::iterator entry;
+				  entry = cache.find(key);
+					if(entry != cache.end()) {
+						entry->second.push_back(config[chip_num_to_name[std::get<0>(key)]][std::get<0>(yaml_key)][std::get<1>(yaml_key)][std::get<2>(yaml_key)].as<T>());
 					} else {
-						entry.clear();
+					std::vector<T> cache_val {config[chip_num_to_name[std::get<0>(key)]][std::get<0>(yaml_key)][std::get<1>(yaml_key)][std::get<2>(yaml_key)].as<T>()};
+						cache.emplace(key, cache_val);
 					}
-					entry.push_back(config[chip_num_to_name[std::get<0>(key)]][std::get<0>(yaml_key)][std::get<1>(yaml_key)][std::get<2>(yaml_key)].as<T>());
-					cache[key] = entry;
 				}
 			}
 		}

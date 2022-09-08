@@ -20,8 +20,8 @@ int main() {
 	// test the key generation functions
 	CacheKey test_t1(0, 40, 0);
 	CacheKey test_t2(0, 20, 1);
-	CacheKey ct1 = transform_event_row_to_cache_key(test_t2);
-	std::cout << "Calculated key from event data: " << std::get<0>(ct1) << " " << std::get<1>(ct1) << " " << std::get<2>(ct1) << std::endl;
+	transform_event_row_to_cache_key(test_t2);
+	std::cout << "Calculated key from event data: " << std::get<0>(test_t2) << " " << std::get<1>(test_t2) << " " << std::get<2>(test_t2) << std::endl;
 
 	// test the cache generation functions
 	std::vector<std::string> config_columns;

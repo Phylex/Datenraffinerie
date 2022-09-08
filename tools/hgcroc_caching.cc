@@ -8,7 +8,7 @@ bool validate_key(CacheKey key) {
 }
 
 
-CacheKey transform_event_row_to_cache_key(CacheKey row_key) {
+void transform_event_row_to_cache_key(CacheKey &row_key) {
 	unsigned int chip = std::get<0>(row_key);
 	unsigned int channel = std::get<1>(row_key);
 	unsigned int half = std::get<2>(row_key);
@@ -24,8 +24,8 @@ CacheKey transform_event_row_to_cache_key(CacheKey row_key) {
 		out_channel = channel - 37 + ( half * 2);
 		out_type = 100;
 	}
-	CacheKey out_key(chip, out_channel, out_type);
-	return out_key;
+	std::get<1>(row_key) = out_channel;
+	std::get<2>(row_key) = out_type;
 }
 
 std::vector<CacheKey> generate_cache_key(int roc, std::string block_name, int block_number) {
