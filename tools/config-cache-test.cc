@@ -9,12 +9,12 @@
 
 int main() {
 	YAML::Node config = YAML::LoadFile("../../tests/configuration/defaults/V3LDHexaboard-poweron-default.yaml");
-	if(config["target"])
-		config = config["target"];
 	YAML::Node overlay = YAML::LoadFile("../../tests/configuration/defaults/initLDV3.yaml");
 	YAML::Node channel_overlay = YAML::LoadFile("../../tests/configuration/defaults/channel_settings.yaml");
 	update<int>(config, overlay);
 	update<int>(config, channel_overlay);
+	if(config["target"])
+		config = config["target"];
 	std::vector<std::string> columns = {"S", "Delay9", "range_inv", "Toa_vref", "HighRange", "LowRange"};
 	
 	// test the key generation functions
@@ -35,6 +35,14 @@ int main() {
 		std::cout << col << std::endl;
 	}
 	std::cout << std::endl;
+
+	std::vector<CacheKey> keys = generate_cache_key(0, "HalfWise", 0);
+	std::vector<CacheKey> keys_h2 = generate_cache_key(0, "HalfWise", 1);
+	keys.insert(keys.end(), keys_h2.begin(), keys_h2.end());
+	std::cout << "Generating Keys for HalfWise:" << std::endl;
+	for (CacheKey key: keys) {
+		std::cout << "{chip = " << std::get<0>(key) << "; channel = " << std::get<1>(key) << "; channel-type = " << std::get<2>(key) << "}" << std::endl;
+	}
 
 	std::map<CacheKey, std::vector<long>> cache = generate_hgcroc_config_cache<long>(config, columns);
 	unsigned int channel_types[] = {0, 1, 100};

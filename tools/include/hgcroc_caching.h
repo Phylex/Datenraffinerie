@@ -21,8 +21,8 @@ static std::array<unsigned int, 3> channel_types = {
 
 static std::map<unsigned int, int> channel_count = {
 	{ROC_CHAN_TYPE, 72},
-	{ROC_CALIB_CHAN_TYPE, 4},
-	{ROC_CM_CHAN_TYPE, 2}
+	{ROC_CALIB_CHAN_TYPE, 2},
+	{ROC_CM_CHAN_TYPE, 4}
 };
 
 static std::map<unsigned int, std::string> channel_type_index_to_name = {
