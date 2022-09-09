@@ -192,7 +192,7 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.command
 @click.argument('output_dir', type=click.Path(dir_okay=True),
                 metavar='[Location containing the config and data]')
-@click.option('--log', type=str, default=None,
+@click.option('--log', type=str, default='post.log',
               help='Enable logging and append logs to the filename passed to '
                    'this option')
 @click.option('--loglevel', default='INFO',
