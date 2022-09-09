@@ -63,9 +63,12 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
                    ' 9 = best compression')
 @click.option('--keep/--no-keep', default=False,
               help='Keep the already aquired data, defaults to False')
+@click.option('--readback/--no-readback', default=False,
+              help='Tell the sc-server to read back the register value'
+                   'written to the roc')
 def main(config, netcfg, procedure, output_dir, log, loglevel,
          root, full_conf_generators, unpack_tasks, fracker_tasks,
-         compression, keep):
+         compression, keep, readback):
     config = click.format_filename(config)
     # generate the conifgurations
     if log:
@@ -226,6 +229,7 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
                   output_dir,
                   run_count,
                   keep,
+                  readback
                   )
             )
     synchronize_with_full_config_generation = threading.Thread(

@@ -28,13 +28,18 @@ class DAQCoordCommand():
         'locking_token': str,
         'config': None
         }, {
-        'command': Or('initialize', 'measure'),
+        'command': 'initialize',
         'locking_token': str,
         'config': str
+        }, {
+        'command': 'measure',
+        'locking_token': str,
+        'config': str,
+        'readback': bool
         }))
 
     def __init__(self, command: str, locking_token=None,
-                 config=None):
+                 config=None, readback: bool = False):
         self.command = command if command in self.valid_commands else None
         if command in self.valid_commands[1:] and locking_token is None:
             raise DAQError(f"For a message with the command: {command}, a "
@@ -43,15 +48,22 @@ class DAQCoordCommand():
         if command in self.valid_commands[2:] and config is None:
             raise DAQError("For a message of type 'load defaults'"
                            "or 'measure' a configuration dict is required")
+        if not isinstance(readback, bool):
+            raise DAQError('The measurement Command needs a readback '
+                           'argument that is a bool')
+        self.readback = readback
         self.config = config
 
     def serialize(self):
         config = None
         if self.config is not None:
             config = yaml.dump(self.config)
-        return bson.encode({'command': self.command,
-                            'locking_token': self.locking_token,
-                            'config': config})
+        msg_dict = {'command': self.command,
+                    'locking_token': self.locking_token,
+                    'config': config}
+        if self.command == self.valid_commands[-2]:
+            msg_dict['readback'] = self.readback
+        return bson.encode(msg_dict)
 
     @staticmethod
     def parse(message: bytes):
@@ -63,9 +75,14 @@ class DAQCoordCommand():
         parsed_config = None
         if message_dict['config'] is not None:
             parsed_config = yaml.safe_load(valid_message['config'])
+        try:
+            readback = valid_message['readback']
+        except KeyError:
+            readback = False
         return DAQCoordCommand(command=valid_message['command'],
                                locking_token=valid_message['locking_token'],
-                               config=parsed_config)
+                               config=parsed_config,
+                               readback=readback)
 
 
 class DAQCoordResponse():
@@ -175,7 +192,7 @@ class DAQCoordClient():
                     f'{response.content}')
         self.logger.info('initialized')
 
-    def measure(self, run_config: dict):
+    def measure(self, run_config: dict, readback=False):
         message = DAQCoordCommand(command='measure', locking_token=self.lock,
                                   config=run_config)
         raw_msg = message.serialize()
@@ -392,7 +409,8 @@ class DAQCoordinator():
                 if target_config != {}:
                     self.logger.info('Configuring target system')
                     try:
-                        self.target.set(target_config, readback=True)
+                        self.target.set(target_config,
+                                        readback=daq_command.readback)
                     except ValueError as err:
                         self.logger.warn(
                                 'target configuration failed. Got the error: '

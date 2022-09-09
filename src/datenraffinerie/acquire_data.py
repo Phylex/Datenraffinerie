@@ -128,7 +128,8 @@ def pipelined_acquire_data(configurations: queue.Queue,
                            initial_config: dict,
                            output_dir: Path,
                            run_count: int,
-                           keep: bool):
+                           keep: bool,
+                           readback: bool):
     # info needed for the generation of the filenames
     num_digits = math.ceil(math.log(run_count, 10))
     logger = logging.getLogger('data-acquisitor')
@@ -151,7 +152,7 @@ def pipelined_acquire_data(configurations: queue.Queue,
         if not keep or (keep and not raw_file_path.exists()):
             logger.info(f'gathering Data for run {i}')
             try:
-                data = daq_system.measure(run_config)
+                data = daq_system.measure(run_config, readback=readback)
             except ValueError as err:
                 click.echo('An error ocurred during a measurement: '
                            f'{err.args[0]}')
@@ -194,7 +195,10 @@ def pipelined_acquire_data(configurations: queue.Queue,
               help='specify the logging verbosity')
 @click.option('--keep/--no-keep', default=False,
               help='Keep the already aquired data, defaults to False')
-def pipelined_main(output_directory, log, loglevel, keep):
+@click.option('--readback/--no-readback', default=False,
+              help='Tell the sc-server to read back the register value'
+                   'written to the roc')
+def pipelined_main(output_directory, log, loglevel, keep, readback):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -260,6 +264,7 @@ def pipelined_main(output_directory, log, loglevel, keep):
                   output_directory,
                   len(run_indices),
                   keep,
+                  readback,
                   )
             )
     daq_thread.start()
