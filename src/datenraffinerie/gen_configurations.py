@@ -93,6 +93,11 @@ def generate_configuratons(config, netcfg, procedure,
         post_config['mode'] = procedure['mode']
         post_config['procedure'] = procedure['name']
         pcf.write(yaml.safe_dump(post_config))
+    with open(output_dir / 'daq_config.yaml', 'w+') as daqcf:
+        daq_config = {}
+        daq_config['run_start_tdc_procedure'] \
+            = procedure['run_start_tdc_procedure']
+        daqcf.write(yaml.safe_dump(daq_config))
 
     # generate the configurations for the runs
     num_digits = math.ceil(math.log(run_count, 10))
