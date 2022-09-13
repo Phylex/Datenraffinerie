@@ -10,6 +10,7 @@ from pathlib import Path
 from .control_adapter import DAQSystem
 from hgcroc_configuration_client.client import Client as SCClient
 from schema import Schema, Or
+from schema import SchemaError
 from .errors import DAQError
 import uuid
 from time import sleep
@@ -17,8 +18,8 @@ from time import ctime
 
 
 class DAQCoordCommand():
-    valid_commands = ['acquire lock', 'release lock',
-                      'initialize', 'measure', 'shutdown']
+    valid_commands = ['acquire lock', 'release lock', 'shutdown',
+                      'read_target', 'initialize', 'measure', 'configure']
     schema = Schema(Or({
         'command': Or('acquire lock', 'shutdown'),
         'locking_token': None,
@@ -32,10 +33,19 @@ class DAQCoordCommand():
         'locking_token': str,
         'config': str
         }, {
+        'command': 'read_target',
+        'locking_token': str,
+        'config': Or(str, None)
+        }, {
         'command': 'measure',
         'locking_token': str,
         'config': str,
         'readback': bool
+        }, {
+         'command': 'configure',
+         'locking_token': str,
+         'config': str,
+         'readback': bool
         }))
 
     def __init__(self, command: str, locking_token=None,
@@ -45,8 +55,8 @@ class DAQCoordCommand():
             raise DAQError(f"For a message with the command: {command}, a "
                            "locking token is required")
         self.locking_token = locking_token
-        if command in self.valid_commands[2:] and config is None:
-            raise DAQError("For a message of type 'load defaults'"
+        if command in self.valid_commands[4:] and config is None:
+            raise DAQError("For a message of type 'initialize', 'configure"
                            "or 'measure' a configuration dict is required")
         if not isinstance(readback, bool):
             raise DAQError('The measurement Command needs a readback '
@@ -61,7 +71,7 @@ class DAQCoordCommand():
         msg_dict = {'command': self.command,
                     'locking_token': self.locking_token,
                     'config': config}
-        if self.command == self.valid_commands[-2]:
+        if self.command in self.valid_commands[5:]:
             msg_dict['readback'] = self.readback
         return bson.encode(msg_dict)
 
@@ -71,7 +81,12 @@ class DAQCoordCommand():
             message_dict = bson.decode(message)
         except:
             raise DAQError('Unable to decode bson message')
-        valid_message = DAQCoordCommand.schema.validate(message_dict)
+        try:
+            valid_message = DAQCoordCommand.schema.validate(message_dict)
+        except SchemaError as err:
+            raise ValueError(
+                    'Message validation failed for message: '
+                    f'{message_dict}\n Got Error: {err}')
         parsed_config = None
         if message_dict['config'] is not None:
             parsed_config = yaml.safe_load(valid_message['config'])
@@ -86,7 +101,8 @@ class DAQCoordCommand():
 
 
 class DAQCoordResponse():
-    valid_responses = ['error', 'data', 'lock', 'ack', 'access denied']
+    valid_responses = ['error', 'data', 'lock', 'ack', 'access denied',
+                       'target_config']
     schema = Schema(Or({
             'type': 'error',
             'content': str
@@ -99,6 +115,9 @@ class DAQCoordResponse():
         }, {
             'type': Or('ack', 'access denied'),
             'content': None
+        }, {
+            'type': 'target_config',
+            'content': str
         })
     )
 
@@ -106,6 +125,8 @@ class DAQCoordResponse():
         if type not in self.valid_responses:
             raise DAQError('daq response not valid')
         self.type = type
+        if type == 'target_config' and not isinstance(content, dict):
+            raise DAQError('The target config needs to be a dict')
         self.content = content
         if type == 'data' and not isinstance(content, bytes):
             raise DAQError('The data needs to be of type bytes')
@@ -131,6 +152,9 @@ class DAQCoordResponse():
                     {'type': 'lock', 'content': str(self.content)})
         if self.type == 'ack':
             return bson.encode({'type': 'ack', 'content': None})
+        if self.type == 'target_config':
+            return bson.encode({'type': 'target_config',
+                                'content': yaml.safe_dump(self.content)})
 
     @staticmethod
     def parse(message: bytes, logger):
@@ -138,6 +162,8 @@ class DAQCoordResponse():
         if rsp_dict['type'] == 'data':
             logger.debug(f'Received {len(rsp_dict["content"])} bytes of data')
         valid_message = DAQCoordResponse.schema.validate(rsp_dict)
+        if valid_message['type'] == 'target_config':
+            valid_message['content'] = yaml.safe_load(valid_message['content'])
         return DAQCoordResponse(type=valid_message['type'],
                                 content=valid_message['content'])
 
@@ -172,7 +198,7 @@ class DAQCoordClient():
         self.logger.info('Acquired lock')
         self.lock = response.content
 
-    def initialize(self, config: dict):
+    def initialize(self, config: dict, start_tdcs: bool = False):
         message = DAQCoordCommand(command='initialize',
                                   locking_token=self.lock,
                                   config=config)
@@ -191,10 +217,34 @@ class DAQCoordClient():
                     'Server responded with an error state: '
                     f'{response.content}')
         self.logger.info('initialized')
+        if start_tdcs:
+            rocs = list(filter(
+                lambda x: 'roc_s' in x, config['target'].keys()))
+            self._start_tdcs(rocs)
 
     def measure(self, run_config: dict, readback=False):
         message = DAQCoordCommand(command='measure', locking_token=self.lock,
                                   config=run_config)
+        raw_msg = message.serialize()
+        self.socket.send(raw_msg)
+        self.zmq_transaction_running = True
+        self.raw_response = self.socket.recv()
+        self.zmq_transaction_running = False
+        response = DAQCoordResponse.parse(self.raw_response, self.logger)
+        if response.type == 'error':
+            self.logger.error(
+                    f"Received error from coordinator: {response.content}")
+            raise ValueError(
+                    'Server responded with an error state: '
+                    f'{response.content}')
+        return response.content
+
+    def read_target(self, config: dict = None):
+        message = DAQCoordCommand(
+                command='read_target',
+                locking_token=self.lock,
+                config=config
+                )
         raw_msg = message.serialize()
         self.socket.send(raw_msg)
         self.zmq_transaction_running = True
@@ -233,6 +283,68 @@ class DAQCoordClient():
                         f'{response.content}')
         self.socket.close()
         self.io_context.destroy()
+
+    def _start_tdcs(self, rocs: list, readback=False):
+        self.logger.info('Starting up Master TDCs')
+        config = {'target': {}}
+        for roc in rocs:
+            config['target'][roc] = \
+                {'MasterTdc':
+                    {0: {'EN_MASTER_CTDC_VOUT_INIT': 1,
+                         'VD_CTDC_P_DAC_EN': 1,
+                         'VD_CTDC_P_D': 16,
+                         'EN_MASTER_FTDC_VOUT_INIT': 1,
+                         'VD_FTDC_P_DAC_EN': 1,
+                         'VD_FTDC_P_D': 16},
+                     1: {'EN_MASTER_CTDC_VOUT_INIT': 1,
+                         'VD_CTDC_P_DAC_EN': 1,
+                         'VD_CTDC_P_D': 16,
+                         'EN_MASTER_FTDC_VOUT_INIT': 1,
+                         'VD_FTDC_P_DAC_EN': 1,
+                         'VD_FTDC_P_D': 16}
+                     }
+                 }
+        message = DAQCoordCommand(command='configure',
+                                  config=config,
+                                  locking_token=self.lock,
+                                  readback=readback)
+        self.logger.info('Sending configure command with config: ')
+        self.logger.debug(f'\n{config}')
+        self.socket.send(message.serialize())
+        self.zmq_transaction_running = True
+        self.raw_response = self.socket.recv()
+        self.zmq_transaction_running = False
+        response = DAQCoordResponse.parse(self.raw_response, self.logger)
+        if response.type == 'error':
+            self.logger.error(
+                    f"Received error from coordinator: {response.content}")
+            raise ValueError(
+                    'Server responded with an error state: '
+                    f'{response.content}')
+
+        config = {'target': {}}
+        for roc in rocs:
+            config['target'][roc] = \
+                {'MasterTdc':
+                    {0: {'EN_MASTER_CTDC_VOUT_INIT': 0,
+                         'EN_MASTER_FTDC_VOUT_INIT': 0
+                         },
+                     1: {'EN_MASTER_CTDC_VOUT_INIT': 0,
+                         'EN_MASTER_FTDC_VOUT_INIT': 0
+                         }
+                     }
+                 }
+        message = DAQCoordCommand(command='configure',
+                                  config=config,
+                                  locking_token=self.lock,
+                                  readback=readback)
+        self.logger.info('Sending configure command with config: ')
+        self.logger.debug(f'\n{config}')
+        self.socket.send(message.serialize())
+        self.zmq_transaction_running = True
+        self.raw_response = self.socket.recv()
+        self.zmq_transaction_running = False
+        self.logger.info('Master TDCs set up')
 
 
 class DAQCoordinator():
@@ -353,16 +465,17 @@ class DAQCoordinator():
                             daq_response.serialize(self.logger))
                     continue
                 try:
-                    initial_target_config = config['target']
+                    target_config = config['target']
                 except KeyError:
-                    initial_target_config = {}
-                if initial_target_config != {}:
+                    target_config = {}
+                if target_config != {}:
                     self.logger.debug('Initializing target system')
                     try:
                         self.logger.debug(
                             'Initializing Rocs\n'
-                            f'{yaml.dump(initial_target_config)}')
-                        self.target.set(initial_target_config, readback=True)
+                            f'{yaml.dump(target_config)}')
+                        self.target.set(target_config,
+                                        readback=daq_command.readback)
                     except ValueError as err:
                         self.logger.warn(
                                 'target configuration failed. Got the error: '
@@ -383,6 +496,61 @@ class DAQCoordinator():
                 self.logger.info('DAQ-System and target initialized')
                 response = DAQCoordResponse(type='ack')
                 self.initialized = True
+                self.command_socket.send(response.serialize(self.logger))
+                continue
+
+            if command == 'configure':
+                self.logger.info('Configuring DAQ-System')
+                config = daq_command.config
+                self.logger.debug(
+                        'Received system config:\n' +
+                        yaml.dump(config))
+                try:
+                    self.daq_system.configure(config)
+                except ValueError as err:
+                    self.logger.warn(
+                            'initialization of the daq system failed, received'
+                            f'error: {err.args[0]}')
+                    error_msg = 'During initialization of the daq system ' + \
+                                f'an error ocurred: {err.args[0]}'
+                    daq_response = DAQCoordResponse(
+                            type='error',
+                            content=error_msg
+                            )
+                    self.command_socket.send(
+                            daq_response.serialize(self.logger))
+                    continue
+                try:
+                    target_config = config['target']
+                except KeyError:
+                    target_config = {}
+                if target_config != {}:
+                    self.logger.debug('Configuring target system')
+                    try:
+                        self.logger.debug(
+                            'Configuring Rocs\n'
+                            f'{yaml.dump(target_config)}')
+                        self.target.set(target_config,
+                                        readback=daq_command.readback)
+                    except ValueError as err:
+                        self.logger.warn(
+                                'target configuration failed. Got the error: '
+                                f'{err.args[0]} from the sc-server')
+                        error_msg = \
+                            'During configuration of the ROCs an error ' + \
+                            f'ocurred: {err.args[0]}'
+                        daq_response = DAQCoordResponse(
+                                type='error',
+                                content=error_msg
+                                )
+                        self.command_socket.send(
+                                daq_response.serialize(self.logger))
+                        continue
+                else:
+                    self.logger.debug('No target config found, '
+                                      'target initialization skipped')
+                self.logger.info('DAQ-System and target configured')
+                response = DAQCoordResponse(type='ack')
                 self.command_socket.send(response.serialize(self.logger))
                 continue
 
@@ -435,7 +603,7 @@ class DAQCoordinator():
                     self.daq_system.take_data(self.measurement_data_path)
                 except ValueError as err:
                     self.logger.warn(
-                            'Data takingfailed. Got the error: '
+                            'Data taking failed. Got the error: '
                             f'{err.args[0]} from the DAQ-system')
                     error_msg = \
                         'During the Data taking the DAQ system encountered' \
@@ -447,6 +615,19 @@ class DAQCoordinator():
                     self.command_socket.send(
                             daq_response.serialize(self.logger))
                     continue
+                except RuntimeWarning as warn:
+                    self.logger.warn(
+                            'Data taking failed. Got the warning: '
+                            f'{warn.args[0]} from the DAQ-system')
+                    error_msg = \
+                        'The DAQ system encountered' \
+                        f' an error: {warn.args[0]}'
+                    daq_response = DAQCoordResponse(
+                            type='error',
+                            content=error_msg
+                            )
+                    self.command_socket.send(
+                            daq_response.serialize(self.logger))
                 with open(self.measurement_data_path, 'rb') as data_file:
                     self.logger.info('Sending Acquired data to clinet')
                     daq_response = DAQCoordResponse(
@@ -461,6 +642,27 @@ class DAQCoordinator():
                     self.command_socket.send(
                             daq_response.serialize(self.logger))
 
+                continue
+
+            if command == 'read_target':
+                read_config = daq_command.config
+                self.logger.info('Received request to read out the target')
+                try:
+                    config = self.target.get_from_hardware(read_config)
+                    self.logger.debug(
+                            f'Read Config from the hardware:\n{config}')
+                    daq_response = DAQCoordResponse(
+                            type='target_config',
+                            content={'target': config}
+                            )
+                except ValueError as err:
+                    self.logger.error(
+                            f'Received error from the Target: {err.args[0]}')
+                    daq_response = DAQCoordResponse(
+                            type='error',
+                            content=f'{err.args[0]}'
+                            )
+                self.command_socket.send(daq_response.serialize(self.logger))
                 continue
 
             if command == 'shutdown':
@@ -482,7 +684,7 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.command()
 @click.argument('netcfg', type=click.File('r'),
                 metavar='[network configuration file]')
-@click.option('--log/--no-log', type=bool, default=False,
+@click.option('--log/--no-log', type=bool, default=True,
               help='Enable logging and append logs to the filename passed to '
                    'this option')
 @click.option('--loglevel', default='INFO',

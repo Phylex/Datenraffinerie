@@ -102,7 +102,8 @@ class DAQAdapter():
         self.logger.debug("initializing")
         self.configuration = self._clean_configuration(initial_config)
         # include the data port in the configuration
-        self.configuration['zmqPushPull_port'] = self.data_port
+        self.configuration[self.variant_key_map[self.variant]]['zmqPushPull_port'] \
+            = self.data_port
         self.socket.send_string("initialize", zmq.SNDMORE)
         config_string = yaml.dump(self.configuration)
         self.logger.debug("sending config:\n" + config_string)
@@ -120,21 +121,57 @@ class DAQAdapter():
     def configure(self, config: dict = {}, cache=False):
         self.logger.info('Configuring')
         config = self._clean_configuration(config)
-        if cache:
-            current_config = self.configuration
-            self.logger.debug(f'Updating config with:\n{config}')
-            config = update_dict(self.configuration, config)
-            write_config = diff_dict(current_config, config)
-            self.configuration = config
-        else:
-            update_dict(self.configuration, config, in_place=True)
+        self.logger.debug(f'Updating config with:\n{config}')
+        if self.variant == 'client':
             write_config = config
+        else:
+            # constrain the configuration that should be updated
+            # to the configuration in the active menu
+            try:
+                active_menu = config['daq']['active_menu']
+            except KeyError:
+                try:
+                    active_menu = self.configuration['daq']['active_menu']
+                except KeyError:
+                    raise ValueError('No Active menu found')
+            try:
+                current_config = {
+                    'daq':
+                    {'active_menu': active_menu,
+                     'menus': {
+                        active_menu:
+                        self.configuration['daq']['menus'][active_menu]}
+                     }
+                    }
+            except KeyError:
+                current_config = \
+                    {'daq':
+                     {'active_menu': active_menu,
+                      'menus': {active_menu: {}}
+                      }
+                     }
+            config = update_dict(current_config, config)
+            # check that we are only configuring the stuff in the active_menu
+            if any(map(lambda x: active_menu != x,
+                       config['daq']['menus'].keys())):
+                raise RuntimeWarning(
+                    'Configuring menus that are not the'
+                    'active menu, these parameters are going to be'
+                    'ignored.')
+            self.configuration = update_dict(self.configuration, config)
+            if cache:
+                write_config = config \
+                    if diff_dict(current_config, config) is not None else \
+                    {self.variant_key_map[self.variant]: {}}
+            else:
+                write_config = config
 
         # if the config is empty we don't have to write anything
-        if write_config == {} or write_config is None:
+        if write_config[self.variant_key_map[self.variant]] == {}:
             self.logger.debug("Configuration did not change, "
                               "skipping configuration of the backend")
             return
+        self.logger.debug(f'Writing config:\n{config}')
         config_string = yaml.dump(write_config)
         self.logger.debug(f"Sending config:\n{config_string}")
         self.socket.send_string('configure', zmq.SNDMORE)
@@ -150,6 +187,7 @@ class DAQAdapter():
                     f" written to {self.hostname}. The daq component"
                     f"responded with {reply}")
         self.logger.info("Configuration successful")
+        self.configuration = update_dict(self.configuration, write_config)
 
     def reset(self):
         self.logger.debug("resetting daq-server by closing and reopening "
