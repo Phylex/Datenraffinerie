@@ -14,7 +14,9 @@ def cli(ctx):
 @cli.command()
 @click.argument('original', type=click.File('r'))
 @click.argument('patch', type=click.File('r'))
-@click.argument('output', type=click.File('w+'))
+@click.option('--output', '-o', type=click.Path(), default=None,
+              help='File that the updated dict is written to. '
+                   'If no file is given the output is printed on stdout')
 def update(original, patch, output):
     try:
         orig_dict = yaml.safe_load(original.read())
@@ -29,14 +31,20 @@ def update(original, patch, output):
     output_dict = dctu.update_dict(orig_dict, update)
     if output_dict is None:
         output_dict = {}
-    output.write(yaml.safe_dump(output_dict))
+    if output is not None:
+        with open(output, 'w+') as opf:
+            opf.write(yaml.safe_dump(output_dict))
+    else:
+        print(yaml.safe_dump(output_dict))
 
 
 @cli.command()
 @click.argument('original', type=click.File('r'))
 @click.argument('changed', type=click.File('r'))
-@click.argument('difference', type=click.File('w+'))
-def diff(original, changed, difference):
+@click.option('--output', '-o', type=click.Path(), default=None,
+              help='File that the diff is written to. '
+                   'If no file is given the output is printed on stdout')
+def diff(original, changed, output):
     try:
         orig_dict = yaml.safe_load(original.read())
     except yaml.ScannerError:
@@ -50,7 +58,11 @@ def diff(original, changed, difference):
     diff_dict = dctu.diff_dict(orig_dict, changed_dict)
     if diff_dict is None:
         diff_dict = {}
-    difference.write(yaml.safe_dump(diff_dict))
+    if output is not None:
+        with open(output, 'w+') as opf:
+            opf.write(yaml.safe_dump(diff_dict))
+    else:
+        print(yaml.safe_dump(diff_dict))
 
 
 if __name__ == '__main__':
