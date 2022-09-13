@@ -32,11 +32,11 @@ def get_procedure_configs(main_config_file: str, procedure_name: str,
     except IndexError:
         all_procedure_names = list(map(lambda x: x['name'],
                                    available_procedures))
-        logging.critical(f"The procedure with name: {procedure} could not be "
-                         "found, Available procedures are: "
+        logging.critical(f"The procedure with name: {procedure_name} "
+                         "could not be found, Available procedures are: "
                          f"{all_procedure_names}")
         raise ValueError("Procedure could not be found",
-                         procedure, available_procedures)
+                         procedure_name, all_procedure_names)
     return procedure, generate_configurations(procedure, calibration, diff)
 
 
