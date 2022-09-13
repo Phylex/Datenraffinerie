@@ -97,6 +97,7 @@ daq_config = Schema(
          'system_settings': systems_settings,
          Optional('calibration', default=None): str,
          Optional('merge', default=True): bool,
+         Optional('run_start_tdc_procedure', default=False): bool,
          Optional('mode', default='summary'): Or('summary', 'full'),
          Optional('parameters', default=[]): [parameter],
          Optional('data_columns', default=[]): [str]
