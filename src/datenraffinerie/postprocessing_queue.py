@@ -202,14 +202,14 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.option('--root/--no-root', default=False,
               help='keep the rootfile generated as intermediary')
 @click.option('--unpack_tasks', default=1, type=int,
-              help='number of unpackers/frackers to run in parallel')
-@click.option('--fracker_tasks', default=3, type=int,
-              help='number of unpackers/frackers to run in parallel')
+              help='number of unpacking tastks to run in parallel')
+@click.option('--frack_tasks', default=3, type=int,
+              help='number of frackers to run in parallel')
 @click.option('--compression', '-c', default=3, type=int,
               help='Set the compression for the hdf file, 0 = no compression'
                    ' 9 = best compression')
 def main(output_dir, log, loglevel, root, unpack_tasks,
-         fracker_tasks, compression):
+         frack_tasks, compression):
     if log is not None:
         logging.basicConfig(filename=log, level=_log_level_dict[loglevel],
                             format='[%(asctime)s] %(levelname)s:'
@@ -256,7 +256,7 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
                   fracker_reporting_queue,
                   unpack_done,
                   fracking_done,
-                  max(1, fracker_tasks),
+                  max(1, frack_tasks),
                   raw_data,
                   root,
                   compression,
