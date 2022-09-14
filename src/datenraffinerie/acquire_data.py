@@ -70,16 +70,18 @@ def pipelined_acquire_data(configurations: queue.Queue,
                 return
             with open(output_dir / raw_file_name, 'wb+') as rdf:
                 rdf.write(data)
-            try:
-                config = daq_system.read_target(config=None)
-            except ValueError as err:
-                click.echo('An error occured during readout of the target:'
-                           f' {err.args[0]}')
-                del daq_system
-                data_acquisition_done.set()
-                return
-            with open(output_dir / full_roc_readback_file_name, 'w+') as frcf:
-                frcf.write(yaml.safe_dump(config))
+            if full_readback:
+                try:
+                    config = daq_system.read_target(config=None)
+                except ValueError as err:
+                    click.echo('An error occured during readout of the target:'
+                               f' {err.args[0]}')
+                    del daq_system
+                    data_acquisition_done.set()
+                    return
+                with open(output_dir / full_roc_readback_file_name, 'w+') \
+                        as frcf:
+                    frcf.write(yaml.safe_dump(config))
         else:
             logger.info(f'found existing data for run {i}, '
                         'skipping acquisition')
