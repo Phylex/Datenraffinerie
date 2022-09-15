@@ -178,7 +178,10 @@ def start_compiled_fracker(rootfile: Path,
     fracker_command_tokens += [str(col) for col in columns]
     fracker_command_tokens.append('-p')
     fracker_command_tokens.append(str(compression))
-    logger.info('Ran fracker with command: ' + ' '.join(fracker_command_tokens))
+    fracker_command_tokens.append('-f')
+    fracker_command_tokens.append('full' if raw_data else 'summary')
+    logger.info(
+        'Ran fracker with command: ' + ' '.join(fracker_command_tokens))
     return sp.Popen(fracker_command_tokens, stdout=sp.PIPE)
 
 
@@ -224,6 +227,7 @@ def start_unpack(raw_path,
     meta_yaml['metaData'] = {}
     meta_yaml['metaData']['characMode'] = 1 if characMode else 0
     meta_yaml['metaData']['keepRawData'] = 1 if raw_data else 0
+    meta_yaml['metaData']['keepSummary'] = 0 if raw_data else 1
     meta_yaml['metaData']['chips_params'] = {}
     with open(meta_yaml_path, 'w+') as mcf:
         mcf.write(yaml.safe_dump(meta_yaml))

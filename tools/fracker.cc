@@ -17,8 +17,8 @@ int main(int argc, char **argv) {
 	std::string config_file_path;
 	std::string data_file_path;
 	std::string output_path;
+	std::string data_format;
 	std::vector<std::string> columns;
-	bool iterable;
 	unsigned int block_size;
 	unsigned int compression;
 
@@ -33,11 +33,13 @@ int main(int argc, char **argv) {
 		->check(CLI::ExistingFile);
 	app.add_option("-b", block_size, "The size of a block to copy data from the root to the hdf file")
 		->default_val(1000000);
-	app.add_option("-s", columns, "The selection of columns that should appear in the output data");
+	app.add_option("-s", columns, "The selection of columns that should appear in the output data")
+		->required();
 	app.add_option("-o", output_path, "path to the output containing the data and config specified");
-	app.add_option("-t", iterable, "specify if the output file should be iterable");
 	app.add_option("-p", compression, "specify how tightly to pack (compress) the data. 0 = no compression 9 = max compression")
 		->default_val(0);
+	app.add_option("-f", data_format, "The data format to expect in the root file specified with the '-i' option, either 'full' or 'summary'")
+		->default_str("summary");
 
 	/* parse the options */
 	try {
@@ -75,8 +77,21 @@ int main(int argc, char **argv) {
 
 	/* get the tree from the root file containing the data */
 	bool event_mode;
+	if (data_format == "summary") {
+		event_mode = true;
+	} else if (data_format == "full") {
+	  event_mode = false;
+	} else {
+		std::cout << "Data format neither 'full' nor 'summary'. Exiting .." << std::endl;
+		exit(EXIT_FAILURE);
+	}
 	TFile *Measurement;
-	TTree *measurement_tree = openRootTree(Measurement, data_file_path, &event_mode);
+	TTree *measurement_tree;
+	try {
+	  measurement_tree = openRootTree(Measurement, data_file_path, event_mode);
+	} catch (std::runtime_error& err) {
+			std::cout << "An error was encountered while opening the Root file: " << err.what() << std::endl;
+	}
 	std::vector<std::string> data_columns = filter_measurement_columns(event_mode, columns);
 	std::vector<std::string> config_columns;
 	/* filter out the columns needed for the configuration */

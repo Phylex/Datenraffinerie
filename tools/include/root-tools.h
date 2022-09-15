@@ -7,6 +7,7 @@
 #include <string>
 #include <string.h>
 #include <hdf5.h>
+#include <exception>
 struct hgcroc_data {
 	int event;
 	int chip;
@@ -211,5 +212,5 @@ struct hgcroc_summary_data {
 	};
 };
 std::vector<std::string> filter_measurement_columns(bool event_mode, std::vector<std::string> columns);
-TTree *openRootTree(TFile *Measurements, std::string root_file_path, bool* event_mode);
+TTree *openRootTree(TFile *Measurements, std::string root_file_path, bool event_mode);
 #endif
