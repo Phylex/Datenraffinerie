@@ -215,7 +215,18 @@ def unpack_raw_data_into_root(in_file_path, out_file_path, raw_data: bool=False)
 def start_unpack(raw_path,
                  unpacked_path,
                  logger: logging.Logger,
-                 raw_data: bool = False):
+                 raw_data: bool = False,
+                 characMode: bool = False):
+    # we need to create a meta-yaml file for the unpacker
+    meta_yaml_path = os.path.splitext(
+            os.path.abspath(unpacked_path))[0] + '_unpack_meta.yaml'
+    meta_yaml = {}
+    meta_yaml['metaData'] = {}
+    meta_yaml['metaData']['characMode'] = 1 if characMode else 0
+    meta_yaml['keepRawData'] = 1 if raw_data else 0
+    with open(meta_yaml_path, 'w+') as mcf:
+        mcf.write(yaml.safe_dump(meta_yaml))
+
     unpack_command_path = shutil.which('unpack')
     if unpack_command_path is None:
         raise FileNotFoundError('Unable to find the unpack command')
@@ -226,9 +237,8 @@ def start_unpack(raw_path,
     # add the output file to the token list
     unpack_command_tokens.append('-o')
     unpack_command_tokens.append(str(unpacked_path))
-    if not raw_data:
-        unpack_command_tokens.append('-t')
-        unpack_command_tokens.append('unpacked')
+    unpack_command_tokens.append('-M')
+    unpack_command_tokens.append(str(meta_yaml_path))
     logger.info('starting unpack command: ' + ' '.join(unpack_command_tokens))
     return sp.Popen(unpack_command_tokens, stdout=sp.PIPE)
 

@@ -23,7 +23,8 @@ def unpack_data(raw_data_queue: queue.Queue,
                 data_taking_done: threading.Event,
                 unpacking_done: threading.Event,
                 max_parallel_unpackers: int,
-                raw_data: bool):
+                raw_data: bool,
+                characterisation_mode: bool):
     logger = logging.getLogger('unpack-data-thread')
     running_tasks = []
     while not data_taking_done.is_set() or not raw_data_queue.empty() \
@@ -40,7 +41,8 @@ def unpack_data(raw_data_queue: queue.Queue,
                             unpack_path,
                             logging.getLogger(
                                 f'unpack-{os.path.basename(raw_path)}'),
-                            raw_data=raw_data
+                            raw_data=raw_data,
+                            characMode=characterisation_mode
                             ),
                         raw_path,
                         unpack_path,
@@ -228,6 +230,12 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
         except KeyError:
             mode = 'summary'
         raw_data = True if mode == 'full' else False
+        try:
+            data_format = procedure['data_format']
+        except KeyError:
+            data_format = 'raw'
+        characterisation_mode = True \
+            if data_format == 'characterisation' else False
 
     # prepare the threading environment
     raw_data_queue = queue.Queue()
@@ -247,7 +255,8 @@ def main(output_dir, log, loglevel, root, unpack_tasks,
                   data_taking_done,
                   unpack_done,
                   max(1, unpack_tasks),
-                  raw_data
+                  raw_data,
+                  characterisation_mode
                   )
             )
     frack_thread = threading.Thread(

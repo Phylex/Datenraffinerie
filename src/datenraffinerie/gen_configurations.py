@@ -92,6 +92,7 @@ def generate_configuratons(config, netcfg, procedure,
         post_config['data_columns'] = procedure['data_columns']
         post_config['mode'] = procedure['mode']
         post_config['procedure'] = procedure['name']
+        post_config['data_format'] = procedure['data_format']
         pcf.write(yaml.safe_dump(post_config))
     with open(output_dir / 'daq_config.yaml', 'w+') as daqcf:
         daq_config = {}
