@@ -224,6 +224,7 @@ def start_unpack(raw_path,
     meta_yaml['metaData'] = {}
     meta_yaml['metaData']['characMode'] = 1 if characMode else 0
     meta_yaml['metaData']['keepRawData'] = 1 if raw_data else 0
+    meta_yaml['metaData']['chips_params'] = {}
     with open(meta_yaml_path, 'w+') as mcf:
         mcf.write(yaml.safe_dump(meta_yaml))
 
