@@ -15,6 +15,7 @@ from .errors import DAQError
 import uuid
 from time import sleep
 from time import ctime
+import os
 
 
 class DAQCoordCommand():
@@ -634,14 +635,17 @@ class DAQCoordinator():
                         type='data',
                         content=data_file.read()
                     )
-                    if self.capture_data:
-                        with open(f'run_{self.run_counter}_data.raw', 'wb+') \
-                                as lrf:
-                            lrf.write(daq_response.content)
-                    self.run_counter += 1
-                    self.command_socket.send(
-                            daq_response.serialize(self.logger))
-
+                if self.capture_data:
+                    storage_file_name = \
+                        Path(self.lock + f'_run_{self.run_counter}_data.raw')
+                    self.logger.info(
+                        'Storing Data locally in file: '
+                        f'{storage_file_name}')
+                    os.rename(self.measurement_data_path,
+                              storage_file_name.absolute())
+                self.run_counter += 1
+                self.command_socket.send(daq_response.serialize(self.logger))
+                self.logger.info('Data sent')
                 continue
 
             if command == 'read_target':
@@ -649,8 +653,9 @@ class DAQCoordinator():
                 self.logger.info('Received request to read out the target')
                 try:
                     config = self.target.get_from_hardware(read_config)
-                    self.logger.debug(
-                            f'Read Config from the hardware:\n{config}')
+                    self.info.debug(
+                        'Read Config from the hardware, sending it to '
+                        'the client')
                     daq_response = DAQCoordResponse(
                             type='target_config',
                             content={'target': config}
@@ -663,6 +668,7 @@ class DAQCoordinator():
                             content=f'{err.args[0]}'
                             )
                 self.command_socket.send(daq_response.serialize(self.logger))
+                self.logger.info('target config sent to client')
                 continue
 
             if command == 'shutdown':
