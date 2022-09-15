@@ -78,9 +78,9 @@ int main(int argc, char **argv) {
 	/* get the tree from the root file containing the data */
 	bool event_mode;
 	if (data_format == "summary") {
-		event_mode = true;
+		event_mode = false;
 	} else if (data_format == "full") {
-	  event_mode = false;
+	  event_mode = true;
 	} else {
 		std::cout << "Data format neither 'full' nor 'summary'. Exiting .." << std::endl;
 		exit(EXIT_FAILURE);
