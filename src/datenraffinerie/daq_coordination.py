@@ -653,7 +653,7 @@ class DAQCoordinator():
                 self.logger.info('Received request to read out the target')
                 try:
                     config = self.target.get_from_hardware(read_config)
-                    self.info.debug(
+                    self.logger.info.debug(
                         'Read Config from the hardware, sending it to '
                         'the client')
                     daq_response = DAQCoordResponse(
