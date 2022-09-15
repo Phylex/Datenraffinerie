@@ -15,7 +15,6 @@ from .config_errors import ConfigFormatError
 from . import dict_utils as dtu
 from . import config_validators as cvd
 import logging
-from rich import print
 
 
 def get_procedure_configs(main_config_file: str, procedure_name: str,
