@@ -15,6 +15,7 @@ from .config_errors import ConfigFormatError
 from . import dict_utils as dtu
 from . import config_validators as cvd
 import logging
+from itertools import chain
 
 
 def get_procedure_configs(main_config_file: str, procedure_name: str,
@@ -23,8 +24,7 @@ def get_procedure_configs(main_config_file: str, procedure_name: str,
     with open(main_config_file, 'r') as cfp:
         config = yaml.safe_load(cfp.read())
     config = cvd.main_config.validate(config)
-    available_procedures = config['procedures'] + config['libraries']
-    available_procedures = available_procedures[0]
+    available_procedures = config['procedures'] + list(chain(*config['libraries']))
     try:
         procedure = list(filter(lambda x: x['name'] == procedure_name,
                                 available_procedures))[0]
