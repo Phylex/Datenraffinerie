@@ -212,7 +212,7 @@ def pipelined_main(output_directory, log, loglevel, keep, readback,
                     "[cyan] Read run configurations from disk",
                     total=len(run_indices))
             daq_progbar = progress.add_task(
-                    "[turquoise]Acquiring Data from the Test System",
+                    "[turquoise] Acquiring Data from the Test System",
                     total=len(run_indices),
                     start=False
                     )
