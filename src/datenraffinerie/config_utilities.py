@@ -58,26 +58,28 @@ def generate_configurations(procedure: dict, calibration: dict = None,
         current_state = full_system_init_config.copy()
 
         def run_config_generator():
-            for patch in scan_patches:
-                run_config = dtu.update_dict(full_system_init_config, patch)
-                run_config_diff = dtu.diff_dict(current_state, run_config)
-                if run_config_diff is not None:
-                    dtu.update_dict(current_state,
-                                    run_config_diff,
-                                    in_place=True)
-                    yield run_config_diff
-                else:
-                    yield {}
-
+            for _ in range(procedure['repeat']):
+                for patch in scan_patches:
+                    run_config = dtu.update_dict(full_system_init_config,
+                                                 patch)
+                    run_config_diff = dtu.diff_dict(current_state, run_config)
+                    if run_config_diff is not None:
+                        dtu.update_dict(current_state,
+                                        run_config_diff,
+                                        in_place=True)
+                        yield run_config_diff
+                    else:
+                        yield {}
     else:
         system_init_config = dtu.update_dict(system_default_config,
                                              system_init_config)
 
         def run_config_generator():
-            for patch in scan_patches:
-                yield dtu.update_dict(system_init_config, patch)
+            for _ in range(procedure['repeat']):
+                for patch in scan_patches:
+                    yield dtu.update_dict(system_init_config, patch)
     return system_default_config, system_init_config, run_config_generator(), \
-        len(scan_patches)
+        len(scan_patches) * procedure['repeat']
 
 
 def load_configuration(config_path):
@@ -188,6 +190,8 @@ def build_scan_patches(scan_dim_patches: list, default: dict,
 def generate_patches(procedure_config):
     scan_dim_patches = []
     scan_dim_defaults = []
+    if procedure_config['parameters'] is None:
+        return {}
     for dimension in procedure_config['parameters']:
         dim_patches, dim_defaults = build_dimension_patches(dimension)
         scan_dim_patches.append(dim_patches)

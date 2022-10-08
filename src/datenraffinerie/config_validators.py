@@ -98,9 +98,10 @@ daq_config = Schema(
          Optional('calibration', default=None): str,
          Optional('merge', default=True): bool,
          Optional('run_start_tdc_procedure', default=False): bool,
+         Optional('repeat', default=1): int,
          Optional('mode', default='summary'): Or('summary', 'full'),
          Optional('data_format', default='raw'): Or('raw', 'characterisation'),
-         'parameters': [parameter],
+         Optional('parameters', default=None): [parameter],
          Optional('data_columns', default=[]): [str]
          }
 )
