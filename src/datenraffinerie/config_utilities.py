@@ -24,7 +24,8 @@ def get_procedure_configs(main_config_file: str, procedure_name: str,
     with open(main_config_file, 'r') as cfp:
         config = yaml.safe_load(cfp.read())
     config = cvd.main_config.validate(config)
-    available_procedures = config['procedures'] + list(chain(*config['libraries']))
+    available_procedures = config['procedures'] + \
+        list(chain(*config['libraries']))
     try:
         procedure = list(filter(lambda x: x['name'] == procedure_name,
                                 available_procedures))[0]
@@ -151,7 +152,7 @@ def build_dimension_patches(scan_dimension):
             template = jinja2.Template(template)
             default_template = jinja2.Template(default_template)
             patch_set.append(
-                    yaml.safe_load(template.render(value=scan_values[0])))
+                yaml.safe_load(template.render(value=scan_values[0])))
             for prev_val, val in zip(scan_values[:-1], scan_values[1:]):
                 default_set.append(
                     yaml.safe_load(default_template.render(value=prev_val)))
@@ -161,11 +162,11 @@ def build_dimension_patches(scan_dimension):
             return patch_set, default_set
         except jinja2.TemplateSyntaxError as e:
             raise ConfigFormatError(
-                    f"The template is malformed: {e.message}")
+                f"The template is malformed: {e.message}")
         except KeyError:
             raise ConfigFormatError(
-                    "Neither the template keyword nor the 'key' keyword"
-                    " could not be found")
+                "Neither the template keyword nor the 'key' keyword"
+                " could not be found")
 
 
 def build_scan_patches(scan_dim_patches: list, default: dict,
@@ -191,7 +192,7 @@ def generate_patches(procedure_config):
     scan_dim_patches = []
     scan_dim_defaults = []
     if procedure_config['parameters'] is None:
-        return {}
+        return [{}]
     for dimension in procedure_config['parameters']:
         dim_patches, dim_defaults = build_dimension_patches(dimension)
         scan_dim_patches.append(dim_patches)
@@ -216,8 +217,8 @@ def generate_init_config(procedure_config: dict):
 def generate_system_default_config(procedure_config: dict):
     config = {}
     default_config_fragments = [
-            load_configuration(dcp)
-            for dcp in procedure_config['system_settings']['default']]
+        load_configuration(dcp)
+        for dcp in procedure_config['system_settings']['default']]
     for frag in default_config_fragments:
         dtu.update_dict(config, frag, in_place=True)
     return config
