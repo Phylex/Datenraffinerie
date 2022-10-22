@@ -66,9 +66,11 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
 @click.option('--readback/--no-readback', default=False,
               help='Tell the sc-server to read back the register value'
                    'written to the roc')
+@click.option('--full-readback/-no-full-readback', default=False,
+              help='Enable a Full read of the ROC parameters after every run')
 def main(config, netcfg, procedure, output_dir, log, loglevel,
          root, full_conf_generators, unpack_tasks, fracker_tasks,
-         compression, keep, readback):
+         compression, keep, readback, full_readback):
     config = click.format_filename(config)
     # generate the conifgurations
     if log:
@@ -113,6 +115,11 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
         post_config['mode'] = procedure['mode']
         post_config['procedure'] = procedure['name']
         pcf.write(yaml.safe_dump(post_config))
+    with open(output_dir / 'daq_config.yaml', 'w+') as daqcf:
+        daq_config = {}
+        daq_config['run_start_tdc_procedure'] \
+            = procedure['run_start_tdc_procedure']
+        daqcf.write(yaml.safe_dump(daq_config))
 
     # get the data needed for the postprocessing
     raw_data = True if procedure['mode'] == 'full' else False
@@ -191,9 +198,9 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
 
     config_gen_thread = threading.Thread(
             target=pipelined_generate_run_params,
-            args=(output_dir,
-                  run_configs_2,
-                  config_iter_lock,
+            args=(output_dir,                       # directory to place the results in
+                  run_configs_2,                    # the following two items are used by the 
+                  config_iter_lock,                 # config generator to build the differential run config
                   run_config_queue,
                   run_config_gen_progress_queue,
                   run_config_gen_done,
@@ -202,7 +209,7 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
             )
     full_config_gen_procs = [mp.Process(
             target=generate_full_configs,
-            args=(output_dir,
+            args=(output_dir,                       # directory to place the results in
                   rcq,
                   config_queue_fill_done,
                   full_config,
@@ -229,20 +236,13 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
                   output_dir,
                   run_count,
                   keep,
-                  readback
-                  )
-            )
-    synchronize_with_full_config_generation = threading.Thread(
-            target=synchronize_with_config_generation,
-            args=(root_data_queue,
-                  syncronized_root_data_queue,
-                  full_configs_queue,
-                  unpack_done,
-                  sync_done
+                  readback,
+                  procedure['run_start_tdc_procedure'],
+                  full_readback,
                   )
             )
 
-    # initilize the threads
+    # start the unpack_tasks that turn the raw data into the root file
     unpack_thread = threading.Thread(
             target=unpack_data,
             args=(raw_data_queue,
@@ -254,6 +254,19 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
                   raw_data
                   )
             )
+
+    # synchronize the fracking with the full config generation
+    synchronize_with_full_config_generation = threading.Thread(
+            target=synchronize_with_config_generation,
+            args=(root_data_queue,
+                  syncronized_root_data_queue,
+                  full_configs_queue,
+                  unpack_done,
+                  sync_done
+                  )
+            )
+
+    # frack the data (last step)
     frack_thread = threading.Thread(
             target=frack_data,
             args=(syncronized_root_data_queue,
@@ -287,6 +300,11 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
         full_progress_bar = progress.add_task(
                 'Generating full config for fracker',
                 total=run_count)
+        daq_progbar = progress.add_task(
+                "[turquoise] Acquiring Data from the Test System",
+                total=run_count,
+                start=False
+                )
         i = 0
         run_config = {}
         # current configuration state of the config generator
@@ -299,7 +317,8 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
                                         full_config_generators_done)):
             try:
                 for j, (rcq, gstate) in enumerate(
-                        zip(full_config_generator_input_queues, generator_config_states)):
+                        zip(full_config_generator_input_queues,
+                            generator_config_states)):
                     with config_iter_lock:
                         rcf_update = deepcopy(next(run_configs_1))
                     dctu.update_dict(run_config,
@@ -327,8 +346,9 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
                 except queue.Empty:
                     break
             logging.debug(
-                    f'{reduce(and_, map(lambda x: x.is_set(), full_config_generators_done))}'
-                    ' = state of full config generators')
+                f'{reduce(and_, map(lambda x: x.is_set(), full_config_generators_done))}'
+                ' = state of full config generators')
+
         progress.refresh()
     config_gen_thread.join()
     for fgp in full_config_gen_procs:
