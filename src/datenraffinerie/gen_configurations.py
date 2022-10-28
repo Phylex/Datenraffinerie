@@ -3,7 +3,6 @@ import yaml
 import os
 import math
 import shutil
-import glob
 from pathlib import Path
 import threading
 import multiprocessing as mp
@@ -28,6 +27,45 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
                    'WARNING': logging.WARNING,
                    'ERROR': logging.ERROR,
                    'CRITICAL': logging.CRITICAL}
+
+
+def generate_tool_configurations(output_dir: Path, network_config: Path,
+                                 procedure: dict, system_default_config: dict,
+                                 system_init_config: dict) -> None:
+    """
+    Create the configurations that govern the behaviour of the tools along with
+    the initial state configurations of the system
+    """
+    init_config_path = output_dir / 'initial_state_config.yaml'
+    default_config_path = output_dir / 'default_config.yaml'
+    post_config_path = output_dir / 'postprocessing_config.yaml'
+    daq_config_path = output_dir / 'daq_config.yaml'
+    proc_network_config = output_dir / 'network_config.yaml'
+    procedure_config_files = [init_config_path, default_config_path,
+                              post_config_path, daq_config_path]
+    # clean the output directory of any previous configuration files
+    for file in procedure_config_files:
+        if file.exists():
+            os.remove(file)
+    # generate the initial, default and network configuration
+    shutil.copyfile(network_config, proc_network_config)
+    with open(default_config_path, 'w+') as dcf:
+        dcf.write(yaml.safe_dump(system_default_config))
+    with open(init_config_path, 'w+') as icf:
+        icf.write(yaml.safe_dump(system_init_config))
+    with open(post_config_path, 'w+') as pcf:
+        post_config = {}
+        post_config['data_columns'] = procedure['data_columns']
+        post_config['mode'] = procedure['mode']
+        post_config['procedure'] = procedure['name']
+        post_config['data_format'] = procedure['data_format']
+        pcf.write(yaml.safe_dump(post_config))
+    with open(daq_config_path, 'w+') as daqcf:
+        daq_config = {}
+        daq_config['run_start_tdc_procedure'] \
+            = procedure['run_start_tdc_procedure']
+        daqcf.write(yaml.safe_dump(daq_config))
+    return
 
 
 @click.command()
@@ -59,10 +97,10 @@ def generate_configuratons(config, netcfg, procedure,
     try:
         procedure, (system_default_config, system_init_config, run_configs,
                     run_count) = cfu.get_procedure_configs(
-                            main_config_file=config,
-                            procedure_name=procedure,
-                            calibration=None,
-                            diff=True)
+            main_config_file=config,
+            procedure_name=procedure,
+            calibration=None,
+            diff=True)
         run_configs_1, run_configs_2 = tee(run_configs)
     except ValueError as err:
         print(f"The procedure with name: {err.args[1]} could not be found,")
@@ -76,29 +114,8 @@ def generate_configuratons(config, netcfg, procedure,
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
 
-    # clean the output directory of any previous config files
-    for file in glob.glob(str(output_dir.absolute() / '*.yaml')):
-        os.remove(file)
-
-    # generate the initial, default and network config
-    netcfg = Path(netcfg)
-    shutil.copyfile(netcfg, output_dir / 'network_config.yaml')
-    with open(output_dir / 'default_config.yaml', 'w+') as dcf:
-        dcf.write(yaml.safe_dump(system_default_config))
-    with open(output_dir / 'initial_state_config.yaml', 'w+') as icf:
-        icf.write(yaml.safe_dump(system_init_config))
-    with open(output_dir / 'postprocessing_config.yaml', 'w+') as pcf:
-        post_config = {}
-        post_config['data_columns'] = procedure['data_columns']
-        post_config['mode'] = procedure['mode']
-        post_config['procedure'] = procedure['name']
-        post_config['data_format'] = procedure['data_format']
-        pcf.write(yaml.safe_dump(post_config))
-    with open(output_dir / 'daq_config.yaml', 'w+') as daqcf:
-        daq_config = {}
-        daq_config['run_start_tdc_procedure'] \
-            = procedure['run_start_tdc_procedure']
-        daqcf.write(yaml.safe_dump(daq_config))
+    generate_tool_configurations(output_dir, netcfg, procedure,
+                                 system_default_config, system_init_config)
 
     # generate the configurations for the runs
     num_digits = math.ceil(math.log(run_count, 10))
@@ -108,7 +125,7 @@ def generate_configuratons(config, netcfg, procedure,
     run_config_queues = [mp.Queue() for _ in range(full_conf_generators)]
     generator_config_states = [{} for _ in range(full_conf_generators)]
     full_config_generators_done = [
-            mp.Event() for _ in range(full_conf_generators)]
+        mp.Event() for _ in range(full_conf_generators)]
 
     run_param_queue = queue.Queue()
     param_gen_progress_queue = queue.Queue()
@@ -120,30 +137,30 @@ def generate_configuratons(config, netcfg, procedure,
     config_iter_lock = threading.Lock()
 
     config_gen_thread = threading.Thread(
-            target=pipelined_generate_run_params,
-            args=(output_dir,
-                  run_configs_2,
-                  config_iter_lock,
-                  run_param_queue,
-                  param_gen_progress_queue,
-                  run_config_gen_done,
-                  num_digits
-                  )
-            )
+        target=pipelined_generate_run_params,
+        args=(output_dir,
+              run_configs_2,
+              config_iter_lock,
+              run_param_queue,
+              param_gen_progress_queue,
+              run_config_gen_done,
+              num_digits
+              )
+    )
     full_config_gen_procs = [mp.Process(
-            target=generate_full_configs,
-            args=(output_dir,
-                  rcq,
-                  config_queue_filled,
-                  full_config,
-                  num_digits,
-                  full_configs_generated,
-                  full_config_generation_progress,
-                  fcgd,
-                  stop
-                  )
-            ) for rcq, fcgd in zip(run_config_queues,
-                                   full_config_generators_done)]
+        target=generate_full_configs,
+        args=(output_dir,
+              rcq,
+              config_queue_filled,
+              full_config,
+              num_digits,
+              full_configs_generated,
+              full_config_generation_progress,
+              fcgd,
+              stop
+              )
+    ) for rcq, fcgd in zip(run_config_queues,
+                           full_config_generators_done)]
     config_gen_thread.start()
     for fcgp in full_config_gen_procs:
         fcgp.start()
@@ -155,11 +172,11 @@ def generate_configuratons(config, netcfg, procedure,
             TimeElapsedColumn(),
             TimeRemainingColumn()) as progress:
         run_progress_bar = progress.add_task(
-                'Generating run configurations',
-                total=run_count)
+            'Generating run configurations',
+            total=run_count)
         full_progress_bar = progress.add_task(
-                'Generating full config for fracker',
-                total=run_count)
+            'Generating full config for fracker',
+            total=run_count)
         i = 0
         run_config = {}
         while not config_queue_filled.is_set() \
@@ -203,8 +220,8 @@ def generate_configuratons(config, netcfg, procedure,
                 except queue.Empty:
                     break
             logging.debug(
-                    f'{reduce(and_, map(lambda x: x.is_set(), full_config_generators_done))}'
-                    ' = state of full config generators')
+                f'{reduce(and_, map(lambda x: x.is_set(), full_config_generators_done))}'
+                ' = state of full config generators')
         progress.refresh()
     config_gen_thread.join()
     for fgp in full_config_gen_procs:
@@ -227,21 +244,21 @@ def generate_full_configs(output_dir: Path,
         i, config = run_configs.get()
         dctu.update_dict(full_config, config, in_place=True)
         full_run_conf_file_name = 'run_{0:0>{width}}_config_full.yaml'.format(
-                i, width=num_digits)
+            i, width=num_digits)
         with open(output_dir / full_run_conf_file_name, 'w+') as frcf:
             frcf.write(yaml.safe_dump(full_config))
         generated_configs_full_queue.put(output_dir / full_run_conf_file_name)
         full_config_generation_progress.put(1)
         logger.debug(f'{run_configs.empty()} = run_empty')
         logger.debug(
-                f'{run_queue_fill_done.is_set()} '
-                '= config_generation_done')
+            f'{run_queue_fill_done.is_set()} '
+            '= config_generation_done')
     config_generation_full_done.set()
 
 
 def pipelined_generate_run_params(
         output_dir: Path,
-        run_configs: iter,
+        run_configs: Iterator,
         run_conf_lock: threading.Lock,
         config_queue: queue.Queue,
         config_gen_progress_queue: queue.Queue,
@@ -257,7 +274,7 @@ def pipelined_generate_run_params(
         run_conf_file_name = \
             'run_{0:0>{width}}_config.yaml'.format(i, width=num_digits)
         full_run_conf_file_name = 'run_{0:0>{width}}_config_full.yaml'.format(
-                i, width=num_digits)
+            i, width=num_digits)
         raw_file_name = \
             'run_{0:0>{width}}_data.raw'.format(i, width=num_digits)
         root_file_name = \
@@ -272,11 +289,11 @@ def pipelined_generate_run_params(
         with open(run_conf_path, 'w+') as rcf:
             rcf.write(yaml.safe_dump(run_config))
         config_queue.put(
-                (run_config,
-                 raw_file_path,
-                 root_file_path,
-                 hdf_file_path,
-                 full_run_conf_path)
+            (run_config,
+             raw_file_path,
+             root_file_path,
+             hdf_file_path,
+             full_run_conf_path)
         )
         config_gen_progress_queue.put(i)
         i += 1
