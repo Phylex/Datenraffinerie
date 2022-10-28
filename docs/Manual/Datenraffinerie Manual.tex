@@ -59,6 +59,8 @@ The Datenraffinerie is the Attempt to create a coherent and user friendly way to
 \section{Overview}
 The Datenraffinerie consists of two groups of programs. There are the Services that need to be run on the Hexacontroller and another computer called the \emph{Coordinator}. The second group of programs are the command line tools that the user primarily interacts with, that are run on the \emph{Client} which is also where the raw data is delivered too.
 
+The core of the Datenraffinerie are procedures. Procedures are segmented into runs. For every run the ROCs and the daq-system are first configured and then a set of measurements are taken. For every configuration a run is created. 
+
 \subsection{Services}
 \begin{figure}
 	\includegraphics[width=\textwidth]{datenraffinerie-daq-setup}
@@ -310,7 +312,7 @@ As can be seen a single procedure can have many different settings which will be
 The Following is a list of the different procedure configuration parameters together with a short summary of the effect of the different settings.
 
 \begin{center}
-\begin{tabular}{| m{4cm} | m{8.5cm} |}
+\begin{tabular}{| m{3cm} | m{10cm} |}
 Name & Description \\
 \hline	\hline
 \verb|name| & The name of the descriptions. It needs to be unique for all procedures loaded into the Datenraffinerie \\ \hline
@@ -337,6 +339,6 @@ The sequence of the files in the \texttt{defaults} and \texttt{init} listings ma
 \subsubsection{The \texttt{run\_start\_tdc\_procedure}}\label{sec:start_tdc_proc}
 To work around a bug in the TDCs (ToA and ToT) of the ROC the 
 \subsection{Run configuration generation}\label{sec:run_config}
-Bla
+A central part of the Datenraffinerie is the generation of configurations from a compact notation. This makes it easy to modify and create large scans of the configuration phase space.
 
 \end{document}

@@ -8,3 +8,12 @@ src/*.egg-info/
 build/
 docs/build/
 tools/.cache/
+# latex ignores
+*.aux
+*.dvi
+*.fdb_latexmk
+*.fls
+*.out
+*.pdf
+*.toc
+
