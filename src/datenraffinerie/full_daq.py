@@ -1,8 +1,5 @@
 import click
 import os
-import glob
-import shutil
-import yaml
 import math
 import logging
 import queue
@@ -19,6 +16,7 @@ from . import config_utilities as cfu
 from . import dict_utils as dctu
 from .gen_configurations import pipelined_generate_run_params
 from .gen_configurations import generate_full_configs
+from .gen_configurations import generate_tool_configurations
 from .acquire_data import pipelined_acquire_data
 from .postprocessing_queue import unpack_data, frack_data
 from .postprocessing_queue import synchronize_with_config_generation
@@ -74,8 +72,8 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
     config = click.format_filename(config)
     # generate the conifgurations
     if log:
-        logging.basicConfig(filename='gen_config.log', level=loglevel,
-                            format='[%(asctime)s] %(levelname)s:'
+        logging.basicConfig(filename='full-daq.log', level=loglevel,
+                            format='[%(asctime)s] %(levelname)-10s:'
                                    '%(name)-50s %(message)s')
     config = click.format_filename(config)
     try:
@@ -98,32 +96,18 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
 
-    # clean the output directory of any previous config files
-    for file in glob.glob(str(output_dir.absolute() / '*.yaml')):
-        os.remove(file)
-
-    # generate the initial, default and network config
-    netcfg = Path(netcfg)
-    shutil.copyfile(netcfg, output_dir / 'network_config.yaml')
-    with open(output_dir / 'default_config.yaml', 'w+') as dcf:
-        dcf.write(yaml.safe_dump(system_default_config))
-    with open(output_dir / 'initial_state_config.yaml', 'w+') as icf:
-        icf.write(yaml.safe_dump(system_init_config))
-    with open(output_dir / 'postprocessing_config.yaml', 'w+') as pcf:
-        post_config = {}
-        post_config['data_columns'] = procedure['data_columns']
-        post_config['mode'] = procedure['mode']
-        post_config['procedure'] = procedure['name']
-        pcf.write(yaml.safe_dump(post_config))
-    with open(output_dir / 'daq_config.yaml', 'w+') as daqcf:
-        daq_config = {}
-        daq_config['run_start_tdc_procedure'] \
-            = procedure['run_start_tdc_procedure']
-        daqcf.write(yaml.safe_dump(daq_config))
+    generate_tool_configurations(output_dir, netcfg, procedure,
+                                 system_default_config, system_init_config)
 
     # get the data needed for the postprocessing
     raw_data = True if procedure['mode'] == 'full' else False
     data_columns = procedure['data_columns']
+    try:
+        data_format = procedure['data_format']
+    except KeyError:
+        data_format = 'raw'
+    characterisation_mode = True \
+        if data_format == 'characterisation' else False
 
     # generate the configurations for the runs
     num_digits = math.ceil(math.log(run_count, 10))
@@ -198,9 +182,13 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
 
     config_gen_thread = threading.Thread(
             target=pipelined_generate_run_params,
-            args=(output_dir,                       # directory to place the results in
-                  run_configs_2,                    # the following two items are used by the 
-                  config_iter_lock,                 # config generator to build the differential run config
+            args=(output_dir,                       # directory to place the
+                                                    # results into
+                  run_configs_2,                    # the following two items
+                                                    # are used by the
+                  config_iter_lock,                 # config generator to build
+                                                    # the differential run
+                                                    # configurations
                   run_config_queue,
                   run_config_gen_progress_queue,
                   run_config_gen_done,
@@ -209,7 +197,7 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
             )
     full_config_gen_procs = [mp.Process(
             target=generate_full_configs,
-            args=(output_dir,                       # directory to place the results in
+            args=(output_dir,
                   rcq,
                   config_queue_fill_done,
                   full_config,
@@ -251,7 +239,8 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
                   data_acquisition_done,
                   unpack_done,
                   max(1, unpack_tasks),
-                  raw_data
+                  raw_data,
+                  characterisation_mode
                   )
             )
 
@@ -294,17 +283,23 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
             MofNCompleteColumn(),
             TimeElapsedColumn(),
             TimeRemainingColumn()) as progress:
-        run_progress_bar = progress.add_task(
+        run_config_progress_bar = progress.add_task(
                 'Generating run configurations',
                 total=run_count)
-        full_progress_bar = progress.add_task(
+        full_config_progress_bar = progress.add_task(
                 'Generating full config for fracker',
                 total=run_count)
         daq_progbar = progress.add_task(
-                "[turquoise] Acquiring Data from the Test System",
+                "Acquiring Data from the Test System",
                 total=run_count,
                 start=False
                 )
+        unpack_progress_bar = progress.add_task(
+            'Unpacking data',
+            total=run_count)
+        frack_progress_bar = progress.add_task(
+            'fracking data',
+            total=run_count)
         i = 0
         run_config = {}
         # current configuration state of the config generator
@@ -336,13 +331,13 @@ def main(config, netcfg, procedure, output_dir, log, loglevel,
             while True:
                 try:
                     _ = run_config_gen_progress_queue.get(block=False)
-                    progress.update(run_progress_bar, advance=1)
+                    progress.update(run_config_progress_bar, advance=1)
                 except queue.Empty:
                     break
             while True:
                 try:
                     _ = full_configs_queue.get(block=False)
-                    progress.update(full_progress_bar, advance=1)
+                    progress.update(full_config_progress_bar, advance=1)
                 except queue.Empty:
                     break
             logging.debug(
