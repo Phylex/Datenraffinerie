@@ -191,9 +191,9 @@ def pipelined_generate_full_run_config(
     full_config: dict,
     full_conf_gen_out_daq_in_queue: mp.Queue,
     config_gen_progress_queue: mp.Queue,
-    full_conf_gen_done: threading.Event,
+    full_conf_gen_done: mp.Event,
     num_generators: int,
-    stop: threading.Event,
+    stop: mp.Event,
 ):
     """
     Produce the full config and write it onto disk in parallel to
@@ -292,8 +292,9 @@ def generate_configuratons(
     patch_gen_done = threading.Event()
 
     # generate the starting config for multiple full_conf generators
-    full_configs_generated = mp.Queue()
-    full_config_generation_progress = mp.Queue()
+    fcm = mp.Manager()
+    full_configs_generated = fcm.Queue()
+    full_config_generation_progress = fcm.Queue()
     full_config_generation_done = threading.Event()
 
     # global signals
