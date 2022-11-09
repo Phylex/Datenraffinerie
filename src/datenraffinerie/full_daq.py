@@ -14,15 +14,13 @@ from rich.progress import TimeElapsedColumn, TimeRemainingColumn
 import multiprocessing as mp
 from . import config_utilities as cfu
 from . import dict_utils as dctu
-from .gen_configurations import pipelined_generate_run_params
-from .gen_configurations import generate_full_configs
+from .gen_configurations import pipelined_generate_patches
+from .gen_configurations import pipelined_generate_full_run_config
 from .gen_configurations import generate_tool_configurations
 from .acquire_data import pipelined_acquire_data
 from .postprocessing_queue import unpack_data, frack_data
 from .postprocessing_queue import synchronize_with_config_generation
-from itertools import tee, reduce
 from copy import deepcopy
-from operator import and_
 
 
 _log_level_dict = {
@@ -144,7 +142,6 @@ def main(
             calibration=None,
             diff=True,
         )
-        run_configs_1, run_configs_2 = tee(run_configs)
     except ValueError as err:
         print(f"The procedure with name: {err.args[1]} could not be found,")
         print("Available procedures are:")
@@ -176,116 +173,71 @@ def main(
 
     # event telling all the subprocesses to stop
     stop = mp.Event()
-    # lock to make the tee iterator thread safe
-    config_iter_lock = threading.Lock()
 
-    # ##################### DATA QUEUES #########################
     # queue that holds the filenames for a run indicating the
     # run config has been generated
-    run_config_queue = queue.Queue()
-    # queues containing the run configs for the different full config
-    # generators
-    full_config_generator_input_queues = [
-        mp.Queue() for _ in range(full_conf_generators)
-    ]
-    # queue holding the tasks representing the task after
-    # data taking
-    raw_data_queue = queue.Queue()
-    # queue holding the data structure representing tasks
-    # after the unpacking
-    root_data_queue = queue.Queue()
-    # queue holding the tasks representing tasks that
-    # have both a full run config on disk and unpacked
-    # data. This synchronizes both tasks with each other
-    syncronized_root_data_queue = queue.Queue()
-    # queue holding the names of the full configurations
-    # that have been generated
-    full_configs_queue = mp.Queue()
-    # list that the queue will be emptied into
-    full_configs_queue = []
+    patch_gen_out_full_gen_in = queue.Queue()
+    patch_gen_progress_queue = queue.Queue()
+    patch_gen_done = threading.Event()
 
-    # ###################### PROGRESS QUEUES ###################
-    # queue for sending infos to the progress bar
-    # about the state of run config generation
-    run_config_gen_progress_queue = queue.Queue()
-    # queue showing the progress of the full run configuration
-    full_config_generation_progress = mp.Queue()
-    # queue holding tokens symbolizing progress
-    # of the daq procedure
+    # queues and signals relating to the full config generation
+    fcm = mp.Manager()
+    full_gen_out_daq_in = fcm.Queue()
+    full_config_gen_progress = fcm.Queue()
+    full_config_gen_done = threading.Event()
+
+    # daq
+    daq_out_unpack_in = queue.Queue()
     daq_progress = queue.Queue()
-    # queue holding tokens symbolizing progress
-    # of the unpacking step
+    daq_done = threading.Event()
+    daq_system_initialized = threading.Event()
+    
+    # unpacking
+    unpack_out_frack_in = queue.Queue()
     unpack_progress = queue.Queue()
+    unpack_done = threading.Event()
+
     # queue holding tokens symbolizing progress
     # of the fracking step
+    frack_out = queue.Queue()
     frack_progress = queue.Queue()
-
-    # ################## Completion Events ####################
-    # evet signalling that the run configurations
-    # have been written to disk
-    run_config_gen_done = threading.Event()
-
-    # event signalling that all runs have been placed
-    # in the queue for full config generation
-    config_queue_fill_done = mp.Event()
-    # event used to activate the daq progress bar
-    daq_system_initialized = threading.Event()
-    # events indicating the completion of a given stage for
-    # every run of the procedure
-    data_acquisition_done = threading.Event()
-    unpack_done = threading.Event()
-    sync_done = threading.Event()
     fracking_done = threading.Event()
 
-    # events signalling that the different config generators have finished
-    # generating configurations
-    full_config_generators_done = [mp.Event() for _ in range(full_conf_generators)]
 
     config_gen_thread = threading.Thread(
-        target=pipelined_generate_run_params,
+        target=pipelined_generate_patches,
         args=(
             output_dir,  # directory to place the
-            # results into
-            run_configs_2,  # the following two items
-            # are used by the
-            config_iter_lock,  # config generator to build
-            # the differential run
-            # configurations
-            run_config_queue,
-            run_config_gen_progress_queue,
-            run_config_gen_done,
+            run_configs,
+            patch_gen_out_full_gen_in,
+            patch_gen_progress_queue,
+            patch_gen_done,
             num_digits,
+            stop,
         ),
     )
-    full_config_gen_procs = [
-        mp.Process(
-            target=generate_full_configs,
-            args=(
-                output_dir,
-                rcq,
-                config_queue_fill_done,
-                full_config,
-                num_digits,
-                full_configs_queue,
-                full_config_generation_progress,
-                fcgd,
-                stop,
-            ),
+    full_config_gen_thread = threading.Thread(
+        target=pipelined_generate_full_run_config,
+        args=(
+            patch_gen_done,
+            patch_gen_out_full_gen_in,
+            full_config,
+            full_gen_out_daq_in,
+            full_config_gen_progress,
+            full_config_gen_done,
+            stop,
         )
-        for rcq, fcgd in zip(
-            full_config_generator_input_queues, full_config_generators_done
-        )
-    ]
+    )
     # acquire the data in a separate thread
     daq_thread = threading.Thread(
         target=pipelined_acquire_data,
         args=(
-            run_config_queue,
+            patch_gen_out_full_gen_in,
             daq_progress,
-            raw_data_queue,
-            run_config_gen_done,
+            daq_out_unpack_in,
+            full_config_gen_done,
             daq_system_initialized,
-            data_acquisition_done,
+            daq_done,
             stop,
             netcfg,
             system_init_config,
@@ -302,10 +254,10 @@ def main(
     unpack_thread = threading.Thread(
         target=unpack_data,
         args=(
-            raw_data_queue,
+            daq_out_unpack_in,
             unpack_progress,
-            root_data_queue,
-            data_acquisition_done,
+            unpack_out_frack_in,
+            daq_done,
             unpack_done,
             max(1, unpack_tasks),
             raw_data,
@@ -313,23 +265,11 @@ def main(
         ),
     )
 
-    # synchronize the fracking with the full config generation
-    synchronize_with_full_config_generation = threading.Thread(
-        target=synchronize_with_config_generation,
-        args=(
-            root_data_queue,
-            syncronized_root_data_queue,
-            full_configs_queue,
-            unpack_done,
-            sync_done,
-        ),
-    )
-
     # frack the data (last step)
     frack_thread = threading.Thread(
         target=frack_data,
         args=(
-            syncronized_root_data_queue,
+            unpack_out_frack_in,
             frack_progress,
             unpack_done,
             fracking_done,
@@ -341,11 +281,9 @@ def main(
         ),
     )
     config_gen_thread.start()
-    for fcgp in full_config_gen_procs:
-        fcgp.start()
+    full_config_gen_thread.start()
     daq_thread.start()
     unpack_thread.start()
-    synchronize_with_full_config_generation.start()
     frack_thread.start()
     with Progress(
         SpinnerColumn(),
@@ -366,52 +304,43 @@ def main(
         )
         unpack_progress_bar = progress.add_task("Unpacking data", total=run_count)
         frack_progress_bar = progress.add_task("fracking data", total=run_count)
-        i = 0
-        run_config = {}
-        # current configuration state of the config generator
-        generator_config_states = [{} for _ in range(full_conf_generators)]
-        while (
-            not config_queue_fill_done.is_set()
-            or not run_config_gen_progress_queue.empty()
-            or not run_config_queue.empty()
-            or not run_config_gen_done.is_set()
-            or not reduce(and_, map(lambda x: x.is_set(), full_config_generators_done))
-        ):
+        while not fracking_done.is_set():
             try:
-                for j, (rcq, gstate) in enumerate(
-                    zip(full_config_generator_input_queues, generator_config_states)
-                ):
-                    with config_iter_lock:
-                        rcf_update = deepcopy(next(run_configs_1))
-                    dctu.update_dict(run_config, rcf_update, in_place=True)
-                    new_state = dctu.update_dict(gstate, run_config)
-                    rcq.put((i, new_state))
-                    i += 1
-                    generator_config_states[j] = new_state
-            except StopIteration:
-                config_queue_fill_done.set()
-            try:
-                _ = run_config_queue.get(block=False)
+                _ = patch_gen_progress_queue.get(block=False)
+                progress.update(run_config_progress_bar, advance=1)
             except queue.Empty:
                 pass
-            while True:
-                try:
-                    _ = run_config_gen_progress_queue.get(block=False)
-                    progress.update(run_config_progress_bar, advance=1)
-                except queue.Empty:
-                    break
-            while True:
-                try:
-                    _ = full_configs_queue.get(block=False)
-                    progress.update(full_config_progress_bar, advance=1)
-                except queue.Empty:
-                    break
+            try:
+                _ = full_config_gen_progress.get(block=False)
+                progress.update(full_config_progress_bar, advance=1)
+            except queue.Empty:
+                pass
+            if daq_system_initialized.is_set() and not daq_active:
+                progress.start_task(daq_progbar)
+                daq_active = True
+            try:
+                if daq_active:
+                    _ = daq_progress.get(block=False)
+                    progress.update(daq_progbar, advance=1)
+            except queue.Empty:
+                pass
+            try:
+                _ = unpack_progress.get(block=False)
+                progress.update(unpack_progress_bar, advance=1)
+            except queue.Empty:
+                pass
+            try:
+                _ = frack_progress.get(block=False)
+                progress.update(frack_progress_bar, advance=1)
+            except queue.Empty:
+                pass
             logging.debug(
-                f"{reduce(and_, map(lambda x: x.is_set(), full_config_generators_done))}"
-                " = state of full config generators"
+                f"{full_config_gen_done.is_set()}"
+                " = state of full config generator"
             )
-
         progress.refresh()
     config_gen_thread.join()
-    for fgp in full_config_gen_procs:
-        fgp.join()
+    full_config_gen_thread.join()
+    daq_thread.join()
+    unpack_thread.join()
+    frack_thread.join()
