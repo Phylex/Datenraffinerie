@@ -13,6 +13,7 @@ setup(
             'yaml-utils = datenraffinerie.yaml_utils:cli',
             'show-hdf = datenraffinerie.print_h5:show_hdf',
             'read-rocs = datenraffinerie.read_rocs:cli',
+            'full-daq = datenraffinerie.full_daq:main',
         ]
     },
     install_requires=[
