@@ -20,7 +20,7 @@ from .gen_configurations import generate_tool_configurations
 from .acquire_data import pipelined_acquire_data
 from .postprocessing_queue import unpack_data, frack_data
 from .postprocessing_queue import synchronize_with_config_generation
-from copy import deepcopy
+import yaml
 
 
 _log_level_dict = {
@@ -115,7 +115,7 @@ def main(
     root,
     full_conf_generators,
     unpack_tasks,
-    fracker_tasks,
+    frack_tasks,
     compression,
     keep,
     readback,
@@ -157,6 +157,8 @@ def main(
     generate_tool_configurations(
         output_dir, netcfg, procedure, system_default_config, system_init_config
     )
+    with open(netcfg, 'r') as nw_file:
+        network_config = yaml.safe_load(nw_file.read())
 
     # get the data needed for the postprocessing
     raw_data = True if procedure["mode"] == "full" else False
@@ -190,6 +192,7 @@ def main(
     daq_out_unpack_in = queue.Queue()
     daq_progress = queue.Queue()
     daq_done = threading.Event()
+    daq_active = False
     daq_system_initialized = threading.Event()
     
     # unpacking
@@ -225,6 +228,7 @@ def main(
             full_gen_out_daq_in,
             full_config_gen_progress,
             full_config_gen_done,
+            full_conf_generators,
             stop,
         )
     )
@@ -273,7 +277,7 @@ def main(
             frack_progress,
             unpack_done,
             fracking_done,
-            max(1, fracker_tasks),
+            max(1, frack_tasks),
             raw_data,
             root,
             compression,
