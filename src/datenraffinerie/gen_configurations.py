@@ -345,7 +345,6 @@ def generate_configuratons(
             not full_config_generation_done.is_set()
             or not full_config_generation_progress.empty()
         ):
-
             while True:
                 try:
                     _ = patch_gen_progress_queue.get(block=False)

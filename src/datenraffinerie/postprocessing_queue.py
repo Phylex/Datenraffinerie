@@ -152,38 +152,6 @@ def frack_data(frack_data_queue: queue.Queue,
     fracking_done.set()
 
 
-def synchronize_with_config_generation(
-        unpack_out_queue: queue.Queue,
-        synced_with_config_generation: queue.Queue,
-        generated_full_configurations: list,
-        previous_task_complete: threading.Event,
-        current_task_complete: threading.Event):
-    tasks_waiting_for_config = []
-    while not previous_task_complete.is_set() \
-            and not unpack_out_queue.empty() \
-            and not len(tasks_waiting_for_config) == 0:
-        try:
-            task = unpack_out_queue.get(block=False)
-            raw_path, unpack_path, fracked_path, full_config_path = task
-            if full_config_path in generated_full_configurations:
-                synced_with_config_generation.put(task)
-            else:
-                tasks_waiting_for_config.append(task)
-        except queue.Empty:
-            pass
-        del_indices = []
-        for i, task in enumerate(tasks_waiting_for_config):
-            raw_path, unpack_path, fracked_path, full_config_path = task
-            if full_config_path in generated_full_configurations:
-                synced_with_config_generation.put(task)
-                del_indices.append(i)
-            else:
-                tasks_waiting_for_config.append(task)
-        tasks_waiting_for_config = list(
-                filter(lambda x: tasks_waiting_for_config.index(x)
-                       not in del_indices, tasks_waiting_for_config))
-
-
 _log_level_dict = {'DEBUG': logging.DEBUG,
                    'INFO': logging.INFO,
                    'WARNING': logging.WARNING,
