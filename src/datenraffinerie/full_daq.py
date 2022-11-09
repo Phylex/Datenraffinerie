@@ -1,17 +1,18 @@
-import click
 import os
+import multiprocessing as mp
 import math
 import logging
 import queue
 import threading
 from pathlib import Path
+import click
 from rich.progress import Progress
 from rich.progress import SpinnerColumn
 from rich.progress import MofNCompleteColumn
 from rich.progress import TextColumn
 from rich.progress import BarColumn
 from rich.progress import TimeElapsedColumn, TimeRemainingColumn
-import multiprocessing as mp
+import yaml
 from . import config_utilities as cfu
 from . import dict_utils as dctu
 from .gen_configurations import pipelined_generate_patches
@@ -19,8 +20,6 @@ from .gen_configurations import pipelined_generate_full_run_config
 from .gen_configurations import generate_tool_configurations
 from .acquire_data import pipelined_acquire_data
 from .postprocessing_queue import unpack_data, frack_data
-from .postprocessing_queue import synchronize_with_config_generation
-import yaml
 
 
 _log_level_dict = {
@@ -157,17 +156,17 @@ def main(
     generate_tool_configurations(
         output_dir, netcfg, procedure, system_default_config, system_init_config
     )
-    with open(netcfg, 'r') as nw_file:
+    with open(netcfg, "r", encoding="utf-8") as nw_file:
         network_config = yaml.safe_load(nw_file.read())
 
     # get the data needed for the postprocessing
-    raw_data = True if procedure["mode"] == "full" else False
+    raw_data = procedure["mode"] == "full"
     data_columns = procedure["data_columns"]
     try:
         data_format = procedure["data_format"]
     except KeyError:
         data_format = "raw"
-    characterisation_mode = True if data_format == "characterisation" else False
+    characterisation_mode = data_format == "characterisation"
 
     # generate the configurations for the runs
     num_digits = math.ceil(math.log(run_count, 10))
@@ -194,7 +193,7 @@ def main(
     daq_done = threading.Event()
     daq_active = False
     daq_system_initialized = threading.Event()
-    
+
     # unpacking
     unpack_out_frack_in = queue.Queue()
     unpack_progress = queue.Queue()
@@ -205,7 +204,6 @@ def main(
     frack_out = queue.Queue()
     frack_progress = queue.Queue()
     fracking_done = threading.Event()
-
 
     config_gen_thread = threading.Thread(
         target=pipelined_generate_patches,
@@ -230,7 +228,7 @@ def main(
             full_config_gen_done,
             full_conf_generators,
             stop,
-        )
+        ),
     )
     # acquire the data in a separate thread
     daq_thread = threading.Thread(
@@ -243,7 +241,7 @@ def main(
             daq_system_initialized,
             daq_done,
             stop,
-            netcfg,
+            network_config,
             system_init_config,
             output_dir,
             run_count,
@@ -338,10 +336,6 @@ def main(
                 progress.update(frack_progress_bar, advance=1)
             except queue.Empty:
                 pass
-            logging.debug(
-                f"{full_config_gen_done.is_set()}"
-                " = state of full config generator"
-            )
         progress.refresh()
     config_gen_thread.join()
     full_config_gen_thread.join()
