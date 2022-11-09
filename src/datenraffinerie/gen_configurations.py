@@ -320,6 +320,7 @@ def generate_configuratons(
             full_configs_generated,
             full_config_generation_progress,
             full_config_generation_done,
+            full_conf_generators,
             stop,
         ),
     )
