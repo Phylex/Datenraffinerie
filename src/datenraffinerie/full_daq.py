@@ -244,7 +244,6 @@ def main(
             network_config,
             system_init_config,
             output_dir,
-            run_count,
             keep,
             readback,
             procedure["run_start_tdc_procedure"],
