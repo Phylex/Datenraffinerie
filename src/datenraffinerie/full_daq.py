@@ -201,7 +201,6 @@ def main(
 
     # queue holding tokens symbolizing progress
     # of the fracking step
-    frack_out = queue.Queue()
     frack_progress = queue.Queue()
     fracking_done = threading.Event()
 
@@ -234,7 +233,7 @@ def main(
     daq_thread = threading.Thread(
         target=pipelined_acquire_data,
         args=(
-            patch_gen_out_full_gen_in,
+            full_gen_out_daq_in,
             daq_progress,
             daq_out_unpack_in,
             full_config_gen_done,

@@ -137,25 +137,25 @@ def pipelined_main(output_directory, log, loglevel, keep, readback, full_readbac
     if not daq_config.exists():
         print(f"No daq_config.yaml found in {output_directory}" "exiting ...")
         sys.exit(1)
-    with open(daq_config, "r") as daqcf:
+    with open(daq_config, "r", encoding='utf-8') as daqcf:
         daq_config = yaml.safe_load(daqcf.read())
     network_config = output_directory / "network_config.yaml"
     if not network_config.exists():
         print(f"No network_config.yaml found in {output_directory}" "exiting ...")
         sys.exit(1)
-    with open(network_config, "r") as nwcf:
+    with open(network_config, "r", encoding='utf-8') as nwcf:
         network_config = yaml.safe_load(nwcf.read())
     default_config = output_directory / "default_config.yaml"
     if not default_config.exists():
         print(f"No default_config.yaml found in {output_directory}" "exiting ...")
         sys.exit(1)
-    with open(default_config, "r") as dcf:
+    with open(default_config, "r", encoding='utf-8') as dcf:
         default_config = yaml.safe_load(dcf.read())
     init_config = output_directory / "initial_state_config.yaml"
     if not init_config.exists():
         print(f"No initial_state_config.yaml found in {output_directory}" "exiting ...")
         sys.exit(1)
-    with open(init_config, "r") as icf:
+    with open(init_config, "r", encoding='utf-8') as icf:
         init_config = yaml.safe_load(icf.read())
 
     run_config_files = sorted(list(output_directory.glob("run_*_config.yaml")))
