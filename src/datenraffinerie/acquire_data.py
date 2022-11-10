@@ -1,13 +1,15 @@
-from .daq_coordination import DAQCoordClient
-import yaml
 import glob
 import click
 from pathlib import Path
 import logging
 import os
+import sys
 import queue
 import threading
 import math
+import yaml
+from .daq_coordination import DAQCoordClient
+from .gen_configurations import generate_run_file_names
 from rich.progress import Progress
 from rich.progress import MofNCompleteColumn, SpinnerColumn
 from rich.progress import TextColumn, BarColumn
@@ -21,43 +23,34 @@ _log_level_dict = {'DEBUG': logging.DEBUG,
                    'CRITICAL': logging.CRITICAL}
 
 
-def pipelined_acquire_data(configurations: queue.Queue,
+def pipelined_acquire_data(full_config_out: queue.Queue,
                            data_acquisition_progress: queue.Queue,
                            acquired_data: queue.Queue,
-                           config_generation_done: threading.Event,
+                           full_conf_gen_done: threading.Event,
                            daq_initialized: threading.Event,
-                           data_acquisition_done: threading.Event,
+                           daq_done: threading.Event,
                            stop: threading.Event,
                            network_configuration: dict,
                            initial_config: dict,
                            output_dir: Path,
-                           run_count: int,
                            keep: bool,
                            readback: bool,
                            start_tdcs: bool,
                            full_readback: bool):
     # info needed for the generation of the filenames
-    num_digits = math.ceil(math.log(run_count, 10))
     logger = logging.getLogger('data-acquisitor')
-    logger.info('Initializing DAQ system')
+    logger.info('Connecting to DAQ-server')
     daq_system = DAQCoordClient(network_configuration)
+    logger.info('Initializing DAQ-server')
     daq_system.initialize(initial_config, start_tdcs=start_tdcs)
     daq_initialized.set()
     logger.info('DAQ-System initialized')
     i = 0
-    while (not config_generation_done.is_set() or not configurations.empty()) \
+    while (not full_conf_gen_done.is_set() or not full_config_out.empty()) \
             and not stop.is_set():
-        run_config, full_run_config_path = configurations.get()
-        raw_file_name = \
-            'run_{0:0>{width}}_data.raw'.format(i, width=num_digits)
-        raw_file_path = output_dir / raw_file_name
-        root_file_name = \
-            'run_{0:0>{width}}_data.root'.format(i, width=num_digits)
-        hdf_file_name = \
-            'run_{0:0>{width}}_data.h5'.format(i, width=num_digits)
-        full_roc_readback_file_name = \
-            'run_{0:0>{width}}_config_readback.yaml'.format(i,
-                                                            width=num_digits)
+        run_config, file_names = full_config_out.get()
+        raw_file_path = file_names[2]
+        full_roc_readback_file_path = file_names[-1]
         if not keep or (keep and not raw_file_path.exists()):
             logger.info(f'gathering Data for run {i}')
             try:
@@ -66,9 +59,9 @@ def pipelined_acquire_data(configurations: queue.Queue,
                 click.echo('An error ocurred during a measurement: '
                            f'{err.args[0]}')
                 del daq_system
-                data_acquisition_done.set()
+                daq_done.set()
                 return
-            with open(output_dir / raw_file_name, 'wb+') as rdf:
+            with open(raw_file_path, 'wb+') as rdf:
                 rdf.write(data)
             if full_readback:
                 try:
@@ -77,31 +70,24 @@ def pipelined_acquire_data(configurations: queue.Queue,
                     click.echo('An error occured during readout of the target:'
                                f' {err.args[0]}')
                     del daq_system
-                    data_acquisition_done.set()
+                    daq_done.set()
                     return
-                with open(output_dir / full_roc_readback_file_name, 'w+') \
+                with open(full_roc_readback_file_path, 'w+') \
                         as frcf:
                     frcf.write(yaml.safe_dump(config))
         else:
             logger.info(f'found existing data for run {i}, '
                         'skipping acquisition')
         logger.info(f'data acquisition for run {i} done')
-        logger.info(f'There are still {configurations.qsize()} '
+        logger.info(f'There are still {full_config_out.qsize()} '
                     'items in the Queue')
         data_acquisition_progress.put(i)
-        acquired_data.put(
-            (
-                raw_file_path,
-                output_dir / root_file_name,
-                output_dir / hdf_file_name,
-                full_run_config_path,
-                )
-        )
+        acquired_data.put(file_names)
         i += 1
     if stop.is_set():
         logger.info('Stop signal set, exiting')
     del daq_system
-    data_acquisition_done.set()
+    daq_done.set()
 
 
 @click.command()
@@ -127,72 +113,65 @@ def pipelined_main(output_directory, log, loglevel, keep, readback,
                         format='[%(asctime)s] %(levelname)s:'
                                '%(name)-50s %(message)s')
     logger = logging.getLogger('main')
+    logger.info('Reading in configurations')
     # get the expected files from the directory
     output_directory = Path(output_directory)
     daq_config = output_directory / 'daq_config.yaml'
     if not daq_config.exists():
         print(f"No daq_config.yaml found in {output_directory}"
               "exiting ...")
-        exit(1)
+        sys.exit(1)
+    with open(daq_config, 'r') as daqcf:
+        daq_config = yaml.safe_load(daqcf.read())
     network_config = output_directory / 'network_config.yaml'
     if not network_config.exists():
         print(f"No network_config.yaml found in {output_directory}"
               "exiting ...")
-        exit(1)
+        sys.exit(1)
+    with open(network_config, 'r') as nwcf:
+        network_config = yaml.safe_load(nwcf.read())
     default_config = output_directory / 'default_config.yaml'
     if not default_config.exists():
         print(f"No default_config.yaml found in {output_directory}"
               "exiting ...")
-        exit(1)
+        sys.exit(1)
+    with open(default_config, 'r') as dcf:
+        default_config = yaml.safe_load(dcf.read())
     init_config = output_directory / 'initial_state_config.yaml'
     if not init_config.exists():
         print(f"No initial_state_config.yaml found in {output_directory}"
               "exiting ...")
-        exit(1)
-    run_config_files = list(glob.glob(
-        str(output_directory.absolute()) + '/' + 'run_*_config.yaml'))
-    sorted(run_config_files,
-           key=lambda x: int(os.path.basename(x).split('_')[1]))
-    run_config_files = [output_directory / Path(rcf)
-                        for rcf in run_config_files]
-    run_indices = list(map(lambda x: os.path.basename(x).split('_')[1],
-                           run_config_files))
-    full_run_config_files = [rcf.parent / (rcf.stem + '_full.yaml')
-                             for rcf in run_config_files]
-
-    # read in the configurations
-    logger.info('Reading in configurations')
-    with open(network_config, 'r') as nwcf:
-        network_config = yaml.safe_load(nwcf.read())
-    with open(default_config, 'r') as dcf:
-        default_config = yaml.safe_load(dcf.read())
+        sys.exit(1)
     with open(init_config, 'r') as icf:
         init_config = yaml.safe_load(icf.read())
-    with open(daq_config, 'r') as daqcf:
-        daq_config = yaml.safe_load(daqcf.read())
+
+    run_config_files = sorted(list(output_directory.glob('run_*_config.yaml')))
+    num_digits = len(run_config_files[0].name.split('_')[1])
+    run_ids = range(len(run_config_files))
+
+    # read in the configurations
     # set up the different events that we are looking for
-    all_run_configs_generated = threading.Event()
+    full_gen_done = threading.Event()
     daq_system_initialized = threading.Event()
     daq_done = threading.Event()
     stop = threading.Event()
 
     # set up the queues to pass the data around
-    run_configuration_queue = queue.Queue()
+    full_gen_out_daq_in = queue.Queue()
     daq_progress_queue = queue.Queue()
-    acquired_data_queue = queue.Queue()
+    daq_out_unpack_in = queue.Queue()
     daq_thread = threading.Thread(
             target=pipelined_acquire_data,
-            args=(run_configuration_queue,
+            args=(full_gen_out_daq_in,
                   daq_progress_queue,
-                  acquired_data_queue,
-                  all_run_configs_generated,
+                  daq_out_unpack_in,
+                  full_gen_done,
                   daq_system_initialized,
                   daq_done,
                   stop,
                   network_config,
                   init_config,
                   output_directory,
-                  len(run_indices),
                   keep,
                   readback,
                   daq_config['run_start_tdc_procedure'],
@@ -224,14 +203,14 @@ def pipelined_main(output_directory, log, loglevel, keep, readback,
                     progress.start_task(daq_progbar)
                     daq_active = True
                 try:
-                    rcfp, frcfp = next(config_iter)
-                    with open(rcfp, 'r') as rcf:
-                        run_configuration_queue.put(
-                                (yaml.safe_load(rcf.read()), frcfp)
-                        )
+                    run_id = next(run_ids)
+                    run_files = generate_run_file_names(run_id, num_digits, output_directory)
+                    with open(run_files[0], 'r', encoding='utf-8') as patchfile:
+                        patch = yaml.safe_load(patchfile.read())
+                    full_gen_out_daq_in.put((patch, run_files))
                     progress.update(read_configurations, advance=1)
                 except StopIteration:
-                    all_run_configs_generated.set()
+                    full_gen_done.set()
                     pass
                 try:
                     _ = daq_progress_queue.get(block=False)
@@ -239,7 +218,7 @@ def pipelined_main(output_directory, log, loglevel, keep, readback,
                 except queue.Empty:
                     pass
                 try:
-                    _ = acquired_data_queue.get(block=False)
+                    _ = daq_out_unpack_in.get(block=False)
                 except queue.Empty:
                     pass
     except KeyboardInterrupt:

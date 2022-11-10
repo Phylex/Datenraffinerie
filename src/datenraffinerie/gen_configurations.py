@@ -7,10 +7,8 @@ import threading
 import multiprocessing as mp
 import queue
 import logging
-from operator import and_
-from functools import reduce
 from copy import deepcopy
-from typing import Iterator, Tuple
+from typing import Iterator, Tuple, Generator
 import click
 import yaml
 from rich.progress import Progress
@@ -79,12 +77,13 @@ def generate_tool_configurations(
 
 def generate_run_file_names(
     run_id: int, width: int, output_dir: Path
-) -> Tuple[Path, Path, Path, Path, Path]:
+) -> Tuple[Path, Path, Path, Path, Path, Path]:
     """
     Generate the file names for all the files of the run
     """
     run_conf_file_name = f"run_{run_id:0>{width}}_config.yaml"
     full_run_conf_file_name = f"run_{run_id:0>{width}}_config_full.yaml"
+    readback_run_conf_file_name = f"run_{run_id:0>{width}}_config_readback.yaml"
     raw_file_name = f"run_{run_id:0>{width}}_data.raw"
     root_file_name = f"run_{run_id:0>{width}}_data.root"
     hdf_file_name = f"run_{run_id:0>{width}}_data.h5"
@@ -93,18 +92,20 @@ def generate_run_file_names(
     root_file_path = output_dir / root_file_name
     hdf_file_path = output_dir / hdf_file_name
     full_run_conf_path = output_dir / full_run_conf_file_name
+    readback_config_path = output_dir / readback_run_conf_file_name
     return (
         run_conf_path,
         full_run_conf_path,
         raw_file_path,
         root_file_path,
         hdf_file_path,
+        readback_config_path,
     )
 
 
 def write_patch_to_file(
-    config: dict, filenames: Tuple[Path, Path, Path, Path, Path]
-) -> Tuple[dict, Tuple[Path, Path, Path, Path, Path]]:
+    config: dict, filenames: Tuple[Path, Path, Path, Path, Path, Path]
+) -> Tuple[dict, Tuple[Path, Path, Path, Path, Path, Path]]:
     """
     Write the patch to a file and return what was
     passed in to act as a map function with side effects
@@ -144,8 +145,9 @@ def pipelined_generate_patches(
 
 
 def write_out_full_config(
+    patch: dict,
     full_config: dict,
-    run_file_paths: Tuple[Path, Path, Path, Path, Path],
+    run_file_paths: Tuple[Path, Path, Path, Path, Path, Path],
     config_out_queue: mp.Queue,
     config_progress_queue: mp.Queue,
 ) -> None:
@@ -155,27 +157,28 @@ def write_out_full_config(
     """
     with open(run_file_paths[1], "w+", encoding="utf-8") as out_file:
         out_file.write(yaml.safe_dump(full_config))
-    config_out_queue.put(run_file_paths)
+    config_out_queue.put((patch, run_file_paths))
     config_progress_queue.put(1)
 
 
 def full_config_param_generator(
     patch_gen_done: threading.Event,
     full_config: dict,
-    run_config_and_files: queue.Queue,
+    patch_gen_output: queue.Queue,
     counfig_out_queue: mp.Queue,
     config_gen_progress_queue: mp.Queue,
     stop: threading.Event,
-):
+) -> Generator:
     """
     transform the queue of the patch write thread into a generator and
     keep track of the state of the config that is to be written out
     """
     current_config = deepcopy(full_config)
-    while not patch_gen_done.is_set() or not run_config_and_files.empty():
-        config, run_files = run_config_and_files.get()
+    while not patch_gen_done.is_set() or not patch_gen_output.empty():
+        config, run_files = patch_gen_output.get()
         current_config = dctu.update_dict(current_config, config, in_place=True)
         yield (
+            config,
             current_config,
             run_files,
             counfig_out_queue,
@@ -191,9 +194,9 @@ def pipelined_generate_full_run_config(
     full_config: dict,
     full_conf_gen_out_daq_in_queue: mp.Queue,
     config_gen_progress_queue: mp.Queue,
-    full_conf_gen_done: mp.Event,
+    full_conf_gen_done: threading.Event,
     num_generators: int,
-    stop: mp.Event,
+    stop: threading.Event,
 ):
     """
     Produce the full config and write it onto disk in parallel to
