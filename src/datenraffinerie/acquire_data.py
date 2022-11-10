@@ -1,19 +1,16 @@
-import glob
-import click
 from pathlib import Path
 import logging
-import os
 import sys
 import queue
 import threading
-import math
+import click
 import yaml
-from .daq_coordination import DAQCoordClient
-from .gen_configurations import generate_run_file_names
 from rich.progress import Progress
 from rich.progress import MofNCompleteColumn, SpinnerColumn
 from rich.progress import TextColumn, BarColumn
 from rich.progress import TimeRemainingColumn, TimeElapsedColumn
+from .daq_coordination import DAQCoordClient
+from .gen_configurations import generate_run_file_names
 
 
 _log_level_dict = {
@@ -164,7 +161,7 @@ def pipelined_main(output_directory, log, loglevel, keep, readback, full_readbac
     run_config_files = sorted(list(output_directory.glob("run_*_config.yaml")))
     num_digits = len(run_config_files[0].name.split("_")[1])
     run_count = len(run_config_files)
-    run_ids = range(len(run_config_files))
+    run_ids = iter(range(len(run_config_files)))
 
     # read in the configurations
     # set up the different events that we are looking for
