@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from time import sleep
 import glob
+from typing import List
 import yaml
 from rich.progress import Progress
 from rich.progress import SpinnerColumn
@@ -28,20 +29,20 @@ def unpack_data(
     characterisation_mode: bool,
 ):
     logger = logging.getLogger("unpack-data-thread")
-    running_tasks = []
+    running_tasks: List = []
     while (
         not data_taking_done.is_set()
         or not raw_data_queue.empty()
-        or not len(running_tasks) == 0
+        or len(running_tasks) != 0
     ):
         if len(running_tasks) < max_parallel_unpackers:
             try:
                 (
+                    patch_path,
+                    full_config_path,
                     raw_path,
-                    full_path,
                     unpack_path,
                     fracked_path,
-                    full_config_path,
                     readback_config_path,
                 ) = raw_data_queue.get(block=False)
                 logger.info("Received data to unpack," f"{os.path.basename(raw_path)}")

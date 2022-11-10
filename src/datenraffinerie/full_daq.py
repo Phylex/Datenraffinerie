@@ -199,8 +199,7 @@ def main(
     unpack_progress = queue.Queue()
     unpack_done = threading.Event()
 
-    # queue holding tokens symbolizing progress
-    # of the fracking step
+    # fracking
     frack_progress = queue.Queue()
     fracking_done = threading.Event()
 
