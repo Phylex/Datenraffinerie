@@ -1,6 +1,18 @@
 [project]
 name = "datenraffinerie"
-version = 1.0.0
+version = 1.0.1
+requires-python = ">=3.9"
+author = "Alexander Becker"
+author_email = "a.becker@cern.ch"
+description = "Toolset to acqire and process Data from test systems of the HGCAL detector"
+readme = "README.md"
+keywords = [""]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+    "Environment :: Console",
+]
 dependencies = [
 	"Click",
 	"pandas",
@@ -14,12 +26,27 @@ dependencies = [
 	"rich",
 	"pymongo",
 	"hgcroc-configuration-client",
-	'python_version<="3.9"',
 ]
+
+[project.scripts]
+datenraffinerie = "datenraffinerie.full_daq:main"
+generate-configs = "datenraffinerie.gen_configurations:generate_configurations"
+acquire-data = "datenraffinerie.acquire_data:pipelined_main"
+coordinate-daq = "datenraffinerie.daq_coordination:main"
+process-raw-data = "datenraffinerie.postprocessing_queue:main"
+yaml-utils = "datenraffinerie.yaml_utils:cli"
+read-rocs = "datenraffinerie.read_rocs:cli"
+show-hdf = "datenraffinerie.print_h5:show_hdf"
+
+[tool.setuptools.package-dir]
+datenraffinerie = "datenraffinerie"
 
 [build-system]
 requires = [
-	"setuptools>=42",
+	"setuptools",
 	"wheel"
 ]
 build-backend = "setuptools.build_meta"
+
+[bumpversion]
+
