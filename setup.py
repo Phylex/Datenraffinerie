@@ -17,7 +17,6 @@ setup(
         ]
     },
     install_requires=[
-        'Click',
         'luigi',
         'pandas',
         'matplotlib',
