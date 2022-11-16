@@ -1,11 +1,8 @@
 [project]
 name = "datenraffinerie"
-version = 1.0.1
+dynamic = ['version', 'readme']
 requires-python = ">=3.9"
-author = "Alexander Becker"
-author_email = "a.becker@cern.ch"
 description = "Toolset to acqire and process Data from test systems of the HGCAL detector"
-readme = "README.md"
 keywords = [""]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -28,6 +25,14 @@ dependencies = [
 	"hgcroc-configuration-client",
 ]
 
+[tool.setuptools.dynamic]
+version = {attr = "datenraffinerie.__version__"}
+readme = {file = "README.md"}
+
+[metadata]
+author = "Alexander Becker"
+author_email = "a.becker@cern.ch"
+
 [project.scripts]
 datenraffinerie = "datenraffinerie.full_daq:main"
 generate-configs = "datenraffinerie.gen_configurations:generate_configurations"
@@ -47,6 +52,3 @@ requires = [
 	"wheel"
 ]
 build-backend = "setuptools.build_meta"
-
-[bumpversion]
-
