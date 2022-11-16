@@ -8,6 +8,8 @@ src/*.egg-info/
 build/
 docs/build/
 tools/.cache/
+build/
+*.egg-info
 # latex ignores
 *.aux
 *.dvi
